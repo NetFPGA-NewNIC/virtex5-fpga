@@ -1,0 +1,10 @@
+#cores
+/coregen/
+#no cores xco
+!*.xco
+!*.xaw
+#
+/ise/
+#dont
+!*.bit
+!*.xise
