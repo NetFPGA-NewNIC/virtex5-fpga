@@ -171,7 +171,7 @@ module mdio_host_interface (
                     host_wr_data[26] <= 1'b1;               // Receiver Preserve Preamble Enable
                     host_wr_data[27] <= 1'b1;               // VLAN Enable
                     host_wr_data[28] <= 1'b1;               // Receiver Enable
-                    host_wr_data[29] <= 1'b1;               // In-band FCS Enable
+                    host_wr_data[29] <= 1'b0;               // In-band FCS Enable
                     host_wr_data[30] <= 1'b0;               // Jumbo Frame Enable
                     host_wr_data[31] <= 1'b0;               // Receiver reset
                     host_int_fsm <= s2;
