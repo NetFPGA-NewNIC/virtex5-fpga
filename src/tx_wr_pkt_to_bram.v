@@ -747,21 +747,31 @@ module tx_wr_pkt_to_bram (
             case (notification_mixer_fsm)
 
                 s0 : begin
+                    notification_message <= address_to_notify_huge_page_1;
                     if (send_notification_huge_page_1) begin
-                        notification_message <= address_to_notify_huge_page_1;
                         send_notification_huge_page_1_ack <= 1'b1;
-                        notify <= 1'b1;
-                        notification_mixer_fsm <= s1;
-                    end
-                    else if (send_notification_huge_page_2) begin
-                        notification_message <= address_to_notify_huge_page_2;
-                        send_notification_huge_page_2_ack <= 1'b1;
                         notify <= 1'b1;
                         notification_mixer_fsm <= s1;
                     end
                 end
 
                 s1 : begin
+                    if (notify_ack) begin
+                        notify <= 1'b0;
+                        notification_mixer_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    notification_message <= address_to_notify_huge_page_2;
+                    if (send_notification_huge_page_2) begin
+                        send_notification_huge_page_2_ack <= 1'b1;
+                        notify <= 1'b1;
+                        notification_mixer_fsm <= s3;
+                    end
+                end
+
+                s3 : begin
                     if (notify_ack) begin
                         notify <= 1'b0;
                         notification_mixer_fsm <= s0;
