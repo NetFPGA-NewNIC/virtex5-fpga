@@ -154,6 +154,10 @@ module rx_wr_pkt_to_hugepages (
 
         else begin  // not reset
 
+            // this state machine listens to return_huge_page_to_host from the
+            // core state machine that communicates with host via PCIe and 
+            // based on this signal change huge_page_free_*, which interact with 
+            // rx_huge_pages_addr module.
             case (free_huge_page_fsm)
                 s0 : begin
                     if (return_huge_page_to_host) begin
@@ -177,6 +181,9 @@ module rx_wr_pkt_to_hugepages (
                 end
             endcase
 
+            // this state machine sets huge_page_available and
+            // current_huge_page_addr appropriately, which are used by the
+            // core state machine.
             case (give_huge_page_fsm)
                 s0 : begin
                     if (huge_page_status_1) begin
@@ -250,10 +257,34 @@ module rx_wr_pkt_to_hugepages (
             case (send_fsm)
 
                 s0 : begin
+                    // [Initialization] s0 -> s1 if huge_page_available
                     driving_interface <= 1'b0;
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
 
+                    // Huge page layout:
+                    // One important thing is each packet should be stored
+                    // with 128B alignment, which ensures no TLP crosses 4KB boundary.
+                    //
+                    //      DWORDS
+                    // +---------------+ <-- 0
+                    // |   nr_qwords   |
+                    // |---------------|
+                    // |               | 
+                    // |    reserved   | 
+                    // |               | 
+                    // |---------------| <-- 32DW (128B) <- host_mem_addr
+                    // |   packet len  | 
+                    // |---------------|
+                    // |               | 
+                    // |  packet data  | 
+                    // |               | 
+                    // |---------------|
+                    // |   packet len  | 
+                    // |---------------|
+                    // |      ...      | 
+                    //
+                    // +'h80 means skipping 128B reserved area 
                     host_mem_addr <= current_huge_page_addr + 'h80;
                     huge_page_qword_counter <= 'b0;
                     if (huge_page_available) begin
@@ -262,6 +293,10 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s1 : begin
+                    // [Huge page available]
+                    // qwords_to_send is set by rx_tlp_trigger whenever a TLP is
+                    // ready to send. qwords_to_send is 4bit, with which 8B x 16 = 128B
+                    // the size of maximum TLP for RX.
                     qwords_in_tlp <= {4'b0, qwords_to_send};
                     endpoint_not_ready <= 1'b0;
 
@@ -269,6 +304,10 @@ module rx_wr_pkt_to_hugepages (
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
+                        // change_huge_page is a signal set by rx_tlp_trigger
+                        // and remember_to_change_huge_page is set when
+                        // send_last_tlp is set. Either of those two signal
+                        // lets the status go to s8 to end and switch huge page.
                         if (change_huge_page || remember_to_change_huge_page) begin
                             remember_to_change_huge_page <= 1'b0;
                             change_huge_page_ack <= 1'b1;
@@ -289,6 +328,8 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s2 : begin
+                    // [Start of frame]
+                    // # of dwords is the key metadata in the header
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
@@ -313,6 +354,9 @@ module rx_wr_pkt_to_hugepages (
                     rd_addr <= rd_addr +1;
                     trigger_tlp_ack <= 1'b0;
 
+                    // look_ahead_* keep the next metadata including address
+                    // and counter. this bookeeping is for s5 when TLP is
+                    // entirely sent.
                     look_ahead_host_mem_addr <= host_mem_addr + {qwords_in_tlp, 3'b0};
                     look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
@@ -321,6 +365,9 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s3 : begin
+                    // [Host address xmit]
+                    // if the endpoint is ready, the next part is
+                    // host_mem_addr, which is host-side destination address.
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
@@ -342,6 +389,10 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s4 : begin
+                    // [Packet fill]
+                    // if the endpoint is ready, start sending data (rd_data)
+                    // by incrementing rd_addr until the entire TLP is sent.
+                    // Once the sentire TLP is sent, goto s5.
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         trn_td <= {rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24], rd_data[39:32], rd_data[47:40], rd_data[55:48] ,rd_data[63:56]};
@@ -361,6 +412,10 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s5 : begin
+                    // [Commit read address]
+                    // Once a TLP is entirely drained from internal buffer, it
+                    // updates commited_rd_address, which let the MAC-side
+                    // producer know here is more available space in the buffer.
                     commited_rd_address <= rd_addr_prev2;
                     rd_addr <= rd_addr_prev2;
                     host_mem_addr <= look_ahead_host_mem_addr;
@@ -374,6 +429,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s6 : begin
+                    // [Endpoint not ready]
                     if (!trn_tdst_rdy_n) begin
                         rd_addr <= rd_addr +1;
                         trn_tsrc_rdy_n <= 1'b1;
@@ -382,12 +438,19 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s7 : begin
+                    // [Endpoint ready and resume packet fill]
                     trn_tsrc_rdy_n <= 1'b1;
                     rd_addr <= rd_addr +1;
                     send_fsm <= s4;
                 end
                 
                 s8 : begin
+                    // [Preparation for huge page switch]
+                    // Once all TLPs are sent for a huge page and finalize it,
+                    // it sends the last TLP to update "nr_qwords" at the
+                    // header space of the huge page, by which driver knows
+                    // how many qwords are valid in the huge page. The driver
+                    // uses LBUF_NR_DWORDS macro to extract this information.
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
@@ -414,6 +477,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s9 : begin
+                    // [Host address xmit for nr_qwords location]
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         return_huge_page_to_host <= 1'b1;
@@ -423,6 +487,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s10 : begin
+                    // [nr_qwords xmit]
                     return_huge_page_to_host <= 1'b0;
                     if (!trn_tdst_rdy_n) begin
                         trn_td <= {huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24], 32'b0};
@@ -432,6 +497,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s11 : begin
+                    // [Interrupt generation]
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
@@ -446,6 +512,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s12 : begin
+                    // [Clear interrupt back to beginning]
                     if (!cfg_interrupt_rdy_n) begin
                         cfg_interrupt_n <= 1'b1;
                         send_fsm <= s0;
