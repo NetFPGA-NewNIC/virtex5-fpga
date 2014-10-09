@@ -112,6 +112,8 @@ module rx_tlp_trigger (
         else begin  // not reset
 
             if (trigger_fsm == s0) begin
+                // if no more packet arrives until free_running hits
+                // a threshold, timeout is set.
                 free_running <= free_running +1;
                 timeout <= 1'b0;
                 if (free_running == 'hA000) begin
@@ -141,6 +143,8 @@ module rx_tlp_trigger (
             change_huge_page <= 1'b0;
             send_last_tlp <= 1'b0;
 
+            // a huge page contains header that includes nr_qwords
+            // and reserved space at the first 128B (=32DW and =16QW('h10))
             diff <= 'b0;
             commited_rd_address <= 'b0;
             huge_buffer_qword_counter <= 'h10;
@@ -152,30 +156,40 @@ module rx_tlp_trigger (
 
         else begin  // not reset
 
+            // commited_wr_address is the producer pointer from MAC while
+            // commited_rd_address is the consumer pointer from PCIe, so
+            // diff means the amount PCIe-side can consume.
             diff <= commited_wr_address + (~commited_rd_address) +1;
             
             case (trigger_fsm)
 
                 s0 : begin
+                    // [Intialization]
                     look_ahead_huge_buffer_qword_counter <= huge_buffer_qword_counter + diff;
                     diff_reg <= diff;
                     number_of_tlp_to_send <= diff[`BF:4];
 
                     if (diff >= 'h10) begin
+                        // buffer to be consumed >= 128B
                         trigger_fsm <= s1;
                     end
                     else if ( (huge_page_dirty) && (timeout) ) begin
+                        // diff < 128B and huge_page_dirty and timeout
                         trigger_fsm <= s9;
                     end
                     else if ( (diff) && (timeout) ) begin
+                        // 0 < diff < 128B and timeout, but huge_page not set
                         trigger_fsm <= s10;
                     end
                 end
 
                 s1 : begin
+                    // [TLP to be consumed]
                     huge_page_dirty <= 1'b1;
                     number_of_tlp_sent <= 'b0;
                     if (look_ahead_huge_buffer_qword_counter[18]) begin       // 2MB
+                        // if the current TLP crosses the huge page, switch to
+                        // another huge page
                         if (!qwords_remaining) begin
                             change_huge_page <= 1'b1;
                             trigger_fsm <= s5;
@@ -187,6 +201,9 @@ module rx_tlp_trigger (
                         end
                     end
                     else begin
+                        // if the current TLP can fit in the huge page,
+                        // send 128B('h10) TLP by setting trigger_tlp
+                        // qwords_remaining = diff - 128B
                         qwords_to_send <= 'h10;
                         trigger_tlp <= 1'b1;
                         qwords_remaining <= diff_reg[3:0];
@@ -195,9 +212,11 @@ module rx_tlp_trigger (
                 end
 
                 s2 : begin
+                    // [After TLP xmit]
                     look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
                     look_ahead_number_of_tlp_sent <= number_of_tlp_sent +1;
                     aux_huge_buffer_qword_counter <= huge_buffer_qword_counter + qwords_to_send;
+                    // waiting for TLP trigger to be acked
                     if (trigger_tlp_ack) begin
                         trigger_tlp <= 1'b0;
                         trigger_fsm <= s3;
@@ -205,6 +224,8 @@ module rx_tlp_trigger (
                 end
 
                 s3 : begin
+                    // [After TLP xmit acked]
+                    // commit rd_addr on internal buffer
                     commited_rd_address <= look_ahead_commited_rd_address;
                     number_of_tlp_sent <= look_ahead_number_of_tlp_sent;
                     huge_buffer_qword_counter <= aux_huge_buffer_qword_counter;
@@ -212,16 +233,20 @@ module rx_tlp_trigger (
                 end
 
                 s4 : begin
+                    // [Check TLPs to be sent]
                     if (number_of_tlp_sent < number_of_tlp_to_send) begin
+                        // if TLPs to be sent are remaining
                         trigger_tlp <= 1'b1;
                         trigger_fsm <= s2;
                     end
                     else begin
+                        // if no more TLP to be sent, goto initial state
                         trigger_fsm <= s0;
                     end
                 end
 
                 s5 : begin
+                    // [Change huge page]
                     huge_page_dirty <= 1'b0;
                     huge_buffer_qword_counter <= 'h10;
                     if (change_huge_page_ack) begin
@@ -231,6 +256,7 @@ module rx_tlp_trigger (
                 end
 
                 s6 : begin
+                    // [Last TLP xmit]
                     look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
                     if (change_huge_page_ack) begin
                         send_last_tlp <= 1'b0;
@@ -239,6 +265,8 @@ module rx_tlp_trigger (
                 end
 
                 s7 : begin
+                    // [After last TLP xmit]
+                    // commit rd_addr on internal buffer
                     commited_rd_address <= look_ahead_commited_rd_address;
                     huge_buffer_qword_counter <= 'h10;
                     qwords_remaining <= 'b0;
@@ -251,6 +279,7 @@ module rx_tlp_trigger (
                 end
 
                 s9 : begin
+                    // [Timeout with dirty huge page]
                     if (!qwords_remaining) begin
                         change_huge_page <= 1'b1;
                         trigger_fsm <= s5;
@@ -263,6 +292,7 @@ module rx_tlp_trigger (
                 end
 
                 s10 : begin
+                    // [Timeout with TLP < 128B]
                     qwords_to_send <= diff_reg;
                     send_last_tlp <= 1'b1;
                     trigger_fsm <= s6;
