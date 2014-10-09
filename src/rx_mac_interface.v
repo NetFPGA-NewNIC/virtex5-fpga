@@ -137,20 +137,39 @@ module rx_mac_interface (
         
         else begin  // not reset
             
+            // commited_rd_address is the pointer at which PCIe endpoint has
+            // consumed, so aux_wr_addr - commited_rd_address is the size of
+            // buffer filled. All pointers are in QWORD.
             diff <= aux_wr_addr + (~commited_rd_address) +1;
             wr_en <= 1'b1;
             
             case (rx_fsm)
-
+                // RX internal buffer structure:
+                //             QWORDS
+                //        +-------------+
+                //        | prev packet |
+                //        |-------------|<-- commited_wr_address
+                //        | len  |      | == 8B metadata region
+                //        |-------------|
+                //        |   rx_data   |<-- aux_wr_addr (current uncommited write pointer)
+                //        |             |
                 s0 : begin                                  // configure mac core to present preamble and save the packet timestamp while its reception
+					// [initialization]
                     byte_counter <= 'b0;
-                    aux_wr_addr <= commited_wr_address +1;
+
+					// awx_wr_addr initialization works also as pointer rollback
+					// if the packet is a bad frame (i.e., s1->s0).
+					// + 1 means 8B reserved region for packet length
+                    aux_wr_addr <= commited_wr_address +1;	
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s1;
                     end
                 end
 
                 s1 : begin
+                    // [rx data fill] s0 or s2 -> s1 if rx_data_valid
+                    // write rx_data from MAC by 8B at aux_wr_addr until good or
+                    // bad or full.
                     wr_data <= rx_data;
                     wr_addr <= aux_wr_addr;
                     aux_wr_addr <= aux_wr_addr +1;
@@ -202,10 +221,15 @@ module rx_mac_interface (
                 end
 
                 s2 : begin
+                    // [rx packet commit] s1 -> s2 if a good packet is received
+                    // before updating commited_wr_address, which is currently
+                    // at the beginning of the current packet, packet length
+                    // is written at the metadata region
                     wr_data <= {byte_counter, 32'b0};
                     wr_addr <= commited_wr_address;
 
                     commited_wr_address <= aux_wr_addr;                      // commit the packet
+                    // reserve 8B metadata region and initialize byte_counter
                     aux_wr_addr <= aux_wr_addr +1;
                     byte_counter <= 32'b0;
 
@@ -218,6 +242,7 @@ module rx_mac_interface (
                 end
                 
                 s3 : begin                                  // drop current frame
+                    // [rx buffer full]
                     if (rx_good_frame || rx_good_frame_reg || rx_bad_frame  || rx_bad_frame_reg) begin
                         dropped_frames_counter <= dropped_frames_counter +1; 
                         rx_fsm <= s0;
