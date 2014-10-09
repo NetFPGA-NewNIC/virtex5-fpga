@@ -74,7 +74,6 @@ module tx_huge_pages_addr (
     output reg              huge_page_status_2,
     input                   huge_page_free_1,
     input                   huge_page_free_2,
-    //output reg              interrupts_enabled,
     output reg  [63:0]      completed_buffer_address
     );
 
@@ -108,11 +107,27 @@ module tx_huge_pages_addr (
         end
         
         else begin  // not reset
-            if (huge_page_unlock_1) huge_page_status_1 <= 1'b1;
-            else if (huge_page_free_1) huge_page_status_1 <= 1'b0;
+            if (huge_page_unlock_1) begin
+                huge_page_status_1 <= 1'b1;
+                huge_page_qwords_1[7:0] <= aux_dw[31:24];
+                huge_page_qwords_1[15:8] <= aux_dw[23:16];
+                huge_page_qwords_1[23:16] <= aux_dw[15:8];
+                huge_page_qwords_1[31:24] <= aux_dw[7:0];
+            end
+            else if (huge_page_free_1) begin
+                huge_page_status_1 <= 1'b0;
+            end
 
-            if (huge_page_unlock_2) huge_page_status_2 <= 1'b1;
-            else if (huge_page_free_2) huge_page_status_2 <= 1'b0;
+            if (huge_page_unlock_2) begin
+                huge_page_status_2 <= 1'b1;
+                huge_page_qwords_2[7:0] <= aux_dw[31:24];
+                huge_page_qwords_2[15:8] <= aux_dw[23:16];
+                huge_page_qwords_2[23:16] <= aux_dw[15:8];
+                huge_page_qwords_2[31:24] <= aux_dw[7:0];
+            end
+            else if (huge_page_free_2) begin
+                huge_page_status_2 <= 1'b0;
+            end
 
         end     // not reset
     end  //always
@@ -125,12 +140,6 @@ module tx_huge_pages_addr (
         if (!reset_n ) begin  // reset
             huge_page_unlock_1 <= 1'b0;
             huge_page_unlock_2 <= 1'b0;
-            //interrupts_enabled <= 1'b0;
-            //huge_page_addr_1 <= 64'b0;
-            //huge_page_addr_2 <= 64'b0;
-            //huge_page_qwords_1 <= 32'b0;
-            //huge_page_qwords_2 <= 32'b0;
-            //completed_buffer_address <= 64'b0;
             state <= s0;
         end
         
@@ -161,21 +170,18 @@ module tx_huge_pages_addr (
                             end
 
                             6'b101000 : begin     // huge page un-lock
-                                state <= s5;
+                                huge_page_unlock_1 <= 1'b1;
+                                state <= s0;
                             end
 
                             6'b101001 : begin     // huge page un-lock
-                                state <= s6;
+                                huge_page_unlock_2 <= 1'b1;
+                                state <= s0;
                             end
 
                             6'b101100 : begin     // completion buffer address
                                 state <= s4;
                             end
-
-                            /*6'b101110 : begin     // interrupts eneable and disable
-                                interrupts_enabled <= ~interrupts_enabled;
-                                state <= s0;
-                            end*/
 
                             default : begin //other addresses
                                 state <= s0;
@@ -228,24 +234,6 @@ module tx_huge_pages_addr (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         state <= s0;
                     end
-                end
-
-                s5 : begin
-                    huge_page_unlock_1 <= 1'b1;
-                    huge_page_qwords_1[7:0] <= aux_dw[31:24];
-                    huge_page_qwords_1[15:8] <= aux_dw[23:16];
-                    huge_page_qwords_1[23:16] <= aux_dw[15:8];
-                    huge_page_qwords_1[31:24] <= aux_dw[7:0];
-                    state <= s0;
-                end
-
-                s6 : begin
-                    huge_page_unlock_2 <= 1'b1;
-                    huge_page_qwords_2[7:0] <= aux_dw[31:24];
-                    huge_page_qwords_2[15:8] <= aux_dw[23:16];
-                    huge_page_qwords_2[23:16] <= aux_dw[15:8];
-                    huge_page_qwords_2[31:24] <= aux_dw[7:0];
-                    state <= s0;
                 end
 
                 default : begin //other TLPs

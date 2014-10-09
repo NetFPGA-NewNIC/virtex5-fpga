@@ -230,6 +230,54 @@ module tx_wr_pkt_to_bram (
     reg     [9:0]   look_ahead_wr_addr_p1;
     reg     [3:0]   data_ready;
 
+    //-------------------------------------------------------
+    // Local health_mon
+    //-------------------------------------------------------
+    reg     [14:0]  health_mon_fsm;
+    reg     [9:0]   diff_mon_reg;
+    (* KEEP = "TRUE" *)reg     [31:0]   counter_mon;
+
+    ////////////////////////////////////////////////
+    // health_mon
+    ////////////////////////////////////////////////
+    always @( posedge trn_clk or negedge reset_n ) begin
+
+        if (!reset_n ) begin  // reset
+            counter_mon <= 'b0;
+            health_mon_fsm <= s0;
+        end
+        
+        else begin  // not reset
+
+            case (health_mon_fsm)
+
+                s0 : begin
+                    diff_mon_reg <= diff;
+                    counter_mon <= 'b0;
+                    if (diff) begin
+                        health_mon_fsm <= s1;
+                    end
+                end
+
+                s1 : begin
+                    counter_mon <= counter_mon + 1;
+                    if (diff != diff_mon_reg) begin
+                        diff_mon_reg <= diff;
+                        counter_mon <= 'b0;
+                    end
+                    if (!diff) begin
+                        health_mon_fsm <= s0;
+                    end
+                end
+
+                default : begin
+                    health_mon_fsm <= s0;
+                end
+
+            endcase
+        end     // not reset
+    end  //always
+
     assign reset_n = ~trn_lnk_up_n;
 
     ////////////////////////////////////////////////
@@ -275,7 +323,7 @@ module tx_wr_pkt_to_bram (
 
             case (give_huge_page_fsm)
                 s0 : begin
-                    if (huge_page_status_1) begin
+                    if (huge_page_status_1 && !waiting_data_huge_page_1) begin
                         huge_page_available <= 1'b1;
                         reading_huge_page_1 <= 1'b1;
                         current_huge_page_addr <= huge_page_addr_1;
@@ -293,7 +341,7 @@ module tx_wr_pkt_to_bram (
                 end
 
                 s2 : begin
-                    if (huge_page_status_2) begin
+                    if (huge_page_status_2 && !waiting_data_huge_page_2) begin
                         huge_page_available <= 1'b1;
                         reading_huge_page_2 <= 1'b1;
                         current_huge_page_addr <= huge_page_addr_2;
