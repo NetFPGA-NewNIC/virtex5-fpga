@@ -123,6 +123,9 @@ module rx_huge_pages_addr (
             case (state)
 
                 s0 : begin
+                    // unlock means that host unlock its host memory buffer
+                    // for each descriptor. initially all are cleared, which
+                    // means the host locks the rx buffers.
                     huge_page_unlock_1 <= 1'b0;
                     huge_page_unlock_2 <= 1'b0;
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[2])) begin
@@ -137,6 +140,10 @@ module rx_huge_pages_addr (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[39:34])
 
+                            // [driver interaction]
+                            // when device driver writes rx host buffer address in a descriptor like
+                            // nf10_writeq(adapter, rx_addr_off(idx), dma_addr),
+                            // jump to s2 or s3 depending on a descriptor ID.
                             6'b010000 : begin     // huge page address
                                 state <= s2;
                             end
@@ -145,6 +152,13 @@ module rx_huge_pages_addr (
                                 state <= s3;
                             end
 
+                            // [driver interaction]
+                            // when device driver writes rx status in a descriptor like
+                            // nf10_writel(adapter, rx_stat_off(idx), RX_READY),
+                            // huge_page_unlock_[desc_idx] is set. if so, huge_page_status_1 is
+                            // set accordingly to interact with rx_wr_pkt_to_hugepages module.
+                            // huge_page_free_* is set when its huge page is ready to return to
+                            // host.
                             6'b011000 : begin     // huge page un-lock
                                 huge_page_unlock_1 <= 1'b1;
                                 state <= s0;
