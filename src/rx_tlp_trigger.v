@@ -50,7 +50,7 @@
 module rx_tlp_trigger (
 
     input    clk,
-    input    reset_n,
+    input    reset,
 
     // Internal logic
     input      [`BF:0]      commited_wr_address,
@@ -59,9 +59,7 @@ module rx_tlp_trigger (
     output reg              change_huge_page,
     input                   change_huge_page_ack,
     output reg              send_last_tlp,
-    output reg [4:0]        qwords_to_send,
-    input                   huge_page_status_1,
-    input                   huge_page_status_2
+    output reg [4:0]        qwords_to_send
     );
 
     // localparam
@@ -103,8 +101,8 @@ module rx_tlp_trigger (
     ////////////////////////////////////////////////
     // timeout logic
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
-        if (!reset_n ) begin  // reset
+    always @(posedge clk) begin
+        if (reset) begin  // reset
             timeout <= 1'b0;
             free_running <= 'b0;
         end
@@ -117,11 +115,6 @@ module rx_tlp_trigger (
                 if (free_running == 'hA000) begin
                     timeout <= 1'b1;
                 end
-                //else if (huge_page_status_1 && huge_page_status_2) begin
-                //    if (free_running == 'h10) begin
-                //        timeout <= 1'b1;
-                //    end
-                //end
             end
             else begin
                 timeout <= 1'b0;
@@ -134,9 +127,9 @@ module rx_tlp_trigger (
     ////////////////////////////////////////////////
     // trigger-logic
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
+    always @(posedge clk) begin
         
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             trigger_tlp <= 1'b0;
             change_huge_page <= 1'b0;
             send_last_tlp <= 1'b0;

@@ -48,8 +48,7 @@ module  pci_exp_64b_app (
 
     // Transaction ( TRN ) Interface  //
     input                                         trn_clk,
-    input                                         trn_reset_n,
-    input                                         trn_lnk_up_n,
+    input                                         reset250,
 
     // Tx Local-Link  //
     output     [63:0]                             trn_td,
@@ -70,15 +69,14 @@ module  pci_exp_64b_app (
     output                                        rx_change_huge_page_ack,
     input                                         rx_send_last_tlp,
     input      [4:0]                              rx_qwords_to_send,
-    output                                        rx_huge_page_status_1,
-    output                                        rx_huge_page_status_2,
 
     // To rx_mac_interface //
     output     [`BF:0]                            rx_commited_rd_address,
 
     // To mac_host_configuration_interface  //
     input                                         host_clk,
-    input                                         host_reset_n,
+    input                                         host_reset,
+    input                                         reset156_25,
     output     [1:0]                              host_opcode,
     output     [9:0]                              host_addr,
     output     [31:0]                             host_wr_data,
@@ -179,8 +177,8 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     wire   [63:0]     rx_huge_page_addr_1;
     wire   [63:0]     rx_huge_page_addr_2;
-    //wire              rx_huge_page_status_1;
-    //wire              rx_huge_page_status_2;
+    wire              rx_huge_page_status_1;
+    wire              rx_huge_page_status_2;
     wire              rx_huge_page_free_1;
     wire              rx_huge_page_free_2;
 
@@ -301,7 +299,7 @@ module  pci_exp_64b_app (
     //////////////////////////////////////////////////////////////////////////////////////////
     mdio_host_interface mdio_host_interface_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
@@ -314,7 +312,8 @@ module  pci_exp_64b_app (
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         //50MHz domain
         .host_clk(host_clk),                                   // I
-        .host_reset_n(host_reset_n),                           // I
+        .host_reset(host_reset),                               // I
+        .reset156_25(reset156_25),                             // I
         .host_opcode(host_opcode),                             // O [1:0]
         .host_addr(host_addr),                                 // O [9:0]
         .host_wr_data(host_wr_data),                           // O [31:0]
@@ -332,7 +331,7 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     rx_huge_pages_addr rx_huge_pages_addr_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
@@ -354,7 +353,7 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     rx_wr_pkt_to_hugepages rx_wr_pkt_to_hugepages_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_td(rx_trn_td),                                    // O [63:0]
         .trn_trem_n(rx_trn_trem_n),                            // O [7:0]
         .trn_tsof_n(rx_trn_tsof_n),                            // O
@@ -397,7 +396,7 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     tx_huge_pages_addr tx_huge_pages_addr_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
@@ -422,7 +421,7 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     tx_rd_host_mem tx_rd_host_mem_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_td(tx_trn_td),                                    // O [63:0]
         .trn_trem_n(tx_trn_trem_n),                            // O [7:0]
         .trn_tsof_n(tx_trn_tsof_n),                            // O
@@ -455,7 +454,7 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     tx_wr_pkt_to_bram tx_wr_pkt_to_bram_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
@@ -500,7 +499,7 @@ module  pci_exp_64b_app (
     //////////////////////////////////////////////////////////////////////////////////////////
     enpoint_arbitration enpoint_arbitration_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .rx_turn(rx_turn),                                     // O
         .rx_driven(rx_driven),                                 // I
         .tx_turn(tx_turn),                                     // O
@@ -522,7 +521,7 @@ module  pci_exp_64b_app (
     //////////////////////////////////////////////////////////////////////////////////////////
     interrupt_en interrupt_en_mod (
         .trn_clk(trn_clk),                                     // I
-        .trn_lnk_up_n(trn_lnk_up_n),                           // I
+        .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I

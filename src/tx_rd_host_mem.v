@@ -51,8 +51,8 @@
 
 module tx_rd_host_mem (
 
-    input    trn_clk,
-    input    trn_lnk_up_n,
+    input                  trn_clk,
+    input                  reset,
 
     //Rx
     output reg  [63:0]     trn_td,
@@ -92,7 +92,6 @@ module tx_rd_host_mem (
 
     );
     parameter NUMB_HP = 2;      // = 2^something
-    wire            reset_n;
     
     // localparam
     localparam s0  = 15'b000000000000000;
@@ -124,15 +123,12 @@ module tx_rd_host_mem (
     reg     [63:0]  notification_message_reg;
     reg     [3:0]   next_tlp_tag;
 
-    assign reset_n = ~trn_lnk_up_n;
-    
-
     ////////////////////////////////////////////////
     // read request TLP generation to huge_page
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             trn_td <= 64'b0;
             trn_trem_n <= 8'hFF;
             trn_tsof_n <= 1'b1;
@@ -222,7 +218,6 @@ module tx_rd_host_mem (
                 end
 
                 s2 : begin
-                    
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_teof_n <= 1'b0;

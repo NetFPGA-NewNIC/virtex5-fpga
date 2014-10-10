@@ -179,12 +179,12 @@ module my_top (
     //-------------------------------------------------------
     // Local Wires 
     //-------------------------------------------------------
-    wire                                              reset_n_pcie_domain;
+    wire                                              reset250;
+    wire                                              reset156_25;
     
     //-------------------------------------------------------
     // Local Wires  DCM for XAUI
     //-------------------------------------------------------
-    wire                                              rest_dcm_in;
     wire                                              clk50;
     wire                                              dcm_for_xaui_locked;
 
@@ -203,7 +203,6 @@ module my_top (
     wire                                              xaui_mgt_tx_ready;
     wire   [6:0]                                      xaui_configuration_vector;
     wire   [7:0]                                      xaui_status_vector;
-    wire                                              reset_n;
     
     //-------------------------------------------------------
     // Local Wires  MAC
@@ -264,8 +263,6 @@ module my_top (
     wire                                              rx_change_huge_page;
     wire                                              rx_send_last_tlp;
     wire   [4:0]                                      rx_qwords_to_send;
-    wire                                              rx_huge_page_status_1;
-    wire                                              rx_huge_page_status_2;
 
     //-------------------------------------------------------
     // Local Wires rx_rd_addr_synch
@@ -284,8 +281,6 @@ module my_top (
     wire   [4:0]                                      rx_qwords_to_send_synch;
     wire                                              rx_trigger_tlp_ack;
     wire                                              rx_change_huge_page_ack;
-    wire                                              rx_huge_page_status_1_synch;
-    wire                                              rx_huge_page_status_2_synch;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC signal declaration
@@ -318,53 +313,17 @@ module my_top (
     wire   [9:0]                                      tx_commited_wr_addr;
     wire   [9:0]                                      tx_commited_wr_addr_synch;
 
-    ////////////////////////////////////////////////
-    // INSTRUMENTATION
-    ////////////////////////////////////////////////
-    `ifdef INSTRUMENTATION
-    (* KEEP = "TRUE" *)reg    [31:0]                  good_pkts_recv_on_mac_counter;
-    (* KEEP = "TRUE" *)reg    [31:0]                  bad_pkts_recv_on_mac_counter;
-
-    always @( posedge clk156_25 or negedge reset_n ) begin
-
-        if (!reset_n ) begin  // reset
-            good_pkts_recv_on_mac_counter <= 32'b0;
-            bad_pkts_recv_on_mac_counter <= 32'b0;
-        end
-        
-        else begin  // not reset
-
-            if (mac_rx_good_frame) begin
-                good_pkts_recv_on_mac_counter <= good_pkts_recv_on_mac_counter +1;
-            end
-
-            if (mac_rx_bad_frame) begin
-                bad_pkts_recv_on_mac_counter <= bad_pkts_recv_on_mac_counter +1;
-            end
-
-        end     // not reset
-    end  //always
-    `endif
-    ////////////////////////////////////////////////
-    // INSTRUMENTATION
-    ////////////////////////////////////////////////
-
     //-------------------------------------------------------
     // Virtex5-FX Global Clock Buffer
     //-------------------------------------------------------
     IBUFDS refclk_ibuf (.O(sys_clk_c), .I(sys_clk_p), .IB(sys_clk_n));  // 100 MHz
 
-    assign reset_n_pcie_domain = ~trn_lnk_up_n_c;
-
     //-------------------------------------------------------
     // Virtex5-FX DCM for XAUI
     //-------------------------------------------------------
-
-    assign rest_dcm_in = trn_lnk_up_n_c;
-
     xaui_dcm dcm_for_xaui (
         .CLKIN_IN(usr_100MHz),                                 // I
-        .RST_IN(rest_dcm_in),                                  // I
+        .RST_IN(reset250),                                     // I
         .CLKIN_IBUFG_OUT(),                                    // O (it's also possible to use 1 source clk for the all design)
         .CLK0_OUT(clk50),                                      // O
         .LOCKED_OUT(dcm_for_xaui_locked)                       // O
@@ -375,7 +334,6 @@ module my_top (
     //-------------------------------------------------------
 
     assign xaui_reset = ~dcm_for_xaui_locked;
-    assign reset_n = ~xaui_reset;
 
     xaui_v10_4_example_design xaui_d (
         .dclk(clk50),                                          // I
@@ -425,7 +383,7 @@ module my_top (
     // MAC
     //-------------------------------------------------------
     ten_gig_eth_mac_v10_3 mac_d (
-        .reset(xaui_reset),                                    // I
+        .reset(reset156_25),                                   // I
         
         .tx_underrun(mac_tx_underrun),                         // I 
         .tx_data(mac_tx_data),                                 // I [63:0] 
@@ -532,7 +490,7 @@ module my_top (
     //-------------------------------------------------------
     rx_mac_interface rx_mac_interface_mod (
         .clk(clk156_25),                                       // I
-        .reset_n(reset_n),                                     // I
+        .reset(reset156_25),                                   // I
         .rx_data(mac_rx_data),                                 // I [63:0]
         .rx_data_valid(mac_rx_data_valid),                     // I [7:0]
         .rx_good_frame(mac_rx_good_frame),                     // I
@@ -549,16 +507,14 @@ module my_top (
     //-------------------------------------------------------
     rx_tlp_trigger rx_tlp_trigger_mod (
         .clk(clk156_25),                                       // I
-        .reset_n(reset_n),                                     // I
+        .reset(reset156_25),                                   // I
         .commited_wr_address(rx_commited_wr_address),          // I [`BF:0]
         .trigger_tlp(rx_trigger_tlp),                          // O
         .trigger_tlp_ack(rx_trigger_tlp_ack_synch),            // I
         .change_huge_page(rx_change_huge_page),                // O
         .change_huge_page_ack(rx_change_huge_page_ack_synch),  // I
         .send_last_tlp(rx_send_last_tlp),                      // O
-        .qwords_to_send(rx_qwords_to_send),                    // O [4:0]
-        .huge_page_status_1(rx_huge_page_status_1_synch),      // I 
-        .huge_page_status_2(rx_huge_page_status_2_synch)       // I 
+        .qwords_to_send(rx_qwords_to_send)                     // O [4:0]
         );
     
     //-------------------------------------------------------
@@ -566,9 +522,9 @@ module my_top (
     //-------------------------------------------------------
     rx_rd_addr_synch rx_rd_addr_synch_mod (
         .clk_out(clk156_25),                                    // I
-        .reset_n_clk_out(reset_n),                              // I
+        .reset_clk_out(reset156_25),                            // I
         .clk_in(trn_clk_c),                                     // I
-        .reset_n_clk_in(reset_n_pcie_domain),                   // I
+        .reset_clk_in(reset250),                                // I
         .commited_rd_address_in(rx_commited_rd_address),        // I [`BF:0]
         .commited_rd_address_out(rx_commited_rd_address_synch)  // O [`BF:0]
         );
@@ -578,9 +534,9 @@ module my_top (
     //-------------------------------------------------------
     rx_trigger_synch rx_trigger_synch_mod (
         .clk_out(trn_clk_c),                                      // I
-        .reset_n_clk_out(reset_n_pcie_domain),                    // I
+        .reset_clk_out(reset250),                                 // I
         .clk_in(clk156_25),                                       // I
-        .reset_n_clk_in(reset_n),                                 // I
+        .reset_clk_in(reset156_25),                               // I
         .trigger_tlp_in(rx_trigger_tlp),                          // I 
         .trigger_tlp_out(rx_trigger_tlp_synch),                   // O 
         .trigger_tlp_ack_in(rx_trigger_tlp_ack),                  // I 
@@ -592,11 +548,7 @@ module my_top (
         .send_last_tlp_in(rx_send_last_tlp),                      // I 
         .send_last_tlp_out(rx_send_last_tlp_synch),               // O 
         .qwords_to_send_in(rx_qwords_to_send),                    // I [4:0]
-        .qwords_to_send_out(rx_qwords_to_send_synch),             // O [4:0]
-        .huge_page_status_1_in(rx_huge_page_status_1),            // I 
-        .huge_page_status_1_out(rx_huge_page_status_1_synch),     // O 
-        .huge_page_status_2_in(rx_huge_page_status_2),            // I 
-        .huge_page_status_2_out(rx_huge_page_status_2_synch)      // O 
+        .qwords_to_send_out(rx_qwords_to_send_synch)              // O [4:0]
         );
     //////////////////////////////////////////////////////////////////////////////////////////
     // Reception side of the NIC (END)
@@ -627,7 +579,7 @@ module my_top (
     //-------------------------------------------------------
     tx_mac_interface tx_mac_interface_mod (
         .clk(clk156_25),                                       // I
-        .reset_n(reset_n),                                     // I
+        .reset(reset156_25),                                   // I
         .tx_underrun(mac_tx_underrun),                         // O
         .tx_data(mac_tx_data),                                 // O [63:0]
         .tx_data_valid(mac_tx_data_valid),                     // O [7:0]
@@ -644,9 +596,9 @@ module my_top (
     //-------------------------------------------------------
     tx_rd_addr_synch tx_rd_addr_synch_mod (
         .clk_out(trn_clk_c),                                   // I
-        .reset_n_clk_out(reset_n_pcie_domain),                 // I
+        .reset_clk_out(reset250),                              // I
         .clk_in(clk156_25),                                    // I
-        .reset_n_clk_in(reset_n),                              // I
+        .reset_clk_in(reset156_25),                            // I
         .commited_rd_addr_in(tx_commited_rd_addr),             // I [9:0]
         .commited_rd_addr_out(tx_commited_rd_addr_synch)       // O [9:0]
         );
@@ -656,9 +608,9 @@ module my_top (
     //-------------------------------------------------------
     tx_wr_addr_synch tx_wr_addr_synch_mod (
         .clk_out(clk156_25),                                   // I
-        .reset_n_clk_out(reset_n),                             // I
+        .reset_clk_out(reset156_25),                           // I
         .clk_in(trn_clk_c),                                    // I
-        .reset_n_clk_in(reset_n_pcie_domain),                  // I
+        .reset_clk_in(reset250),                               // I
         .commited_wr_addr_in(tx_commited_wr_addr),             // I [9:0]
         .commited_wr_addr_out(tx_commited_wr_addr_synch)       // O [9:0]
         );
@@ -674,8 +626,7 @@ module my_top (
         
         // Transaction ( TRN ) Interface  //
         .trn_clk(trn_clk_c),                                      // I
-        .trn_reset_n(trn_reset_n_c),                              // I
-        .trn_lnk_up_n(trn_lnk_up_n_c),                            // I
+        .reset250(reset250),                                      // I
 
         // Tx Local-Link  //
         .trn_td(trn_td_c),                                        // O [63/31:0]
@@ -696,15 +647,14 @@ module my_top (
         .rx_change_huge_page_ack(rx_change_huge_page_ack),        // O
         .rx_send_last_tlp(rx_send_last_tlp_synch),                // I
         .rx_qwords_to_send(rx_qwords_to_send_synch),              // I [4:0]
-        .rx_huge_page_status_1(rx_huge_page_status_1),            // O 
-        .rx_huge_page_status_2(rx_huge_page_status_2),            // O 
 
         // To rx_mac_interface  //
         .rx_commited_rd_address(rx_commited_rd_address),          // O [`BF:0]
 
         // To mac_host_configuration_interface  //
         .host_clk(clk50),                                         // I 
-        .host_reset_n(dcm_for_xaui_locked),                       // I
+        .host_reset(xaui_reset),                                  // I
+        .reset156_25(reset156_25),                                // I
         .host_opcode(mac_host_opcode),                            // O [1:0] 
         .host_addr(mac_host_addr),                                // O [9:0] 
         .host_wr_data(mac_host_wr_data),                          // O [31:0] 
@@ -783,6 +733,25 @@ module my_top (
         .cfg_dcommand(cfg_dcommand_c),                            // I [15:0]
         .cfg_lstatus(cfg_lstatus_c),                              // I [15:0]
         .cfg_lcommand(cfg_lcommand_c)                             // I [15:0]
+        );
+
+    //-------------------------------------------------------
+    // pcie_endpoint_reset
+    //-------------------------------------------------------
+    pcie_endpoint_reset pcie_endpoint_reset_mod (
+        .clk250(trn_clk_c),                                    // I
+        .trn_reset_n(trn_reset_n_c),                           // I
+        .trn_lnk_up_n(trn_lnk_up_n_c),                         // I
+        .reset250(reset250)                                    // O
+        );
+
+    //-------------------------------------------------------
+    // mac_reset
+    //-------------------------------------------------------
+    mac_reset mac_reset_mod (
+        .clk156_25(clk156_25),                                 // I
+        .xaui_reset(xaui_reset),                               // I
+        .reset156_25(reset156_25)                              // O
         );
 
     //-------------------------------------------------------

@@ -55,8 +55,8 @@
 
 module tx_huge_pages_addr (
 
-    input    trn_clk,
-    input    trn_lnk_up_n,
+    input                   trn_clk,
+    input                   reset,
 
     input       [63:0]      trn_rd,
     input       [7:0]       trn_rrem_n,
@@ -89,7 +89,6 @@ module tx_huge_pages_addr (
     localparam s8 = 8'b10000000;
 
     // Local wires and reg
-    wire            reset_n = ~trn_lnk_up_n;
 
     reg     [7:0]   state;
     reg             huge_page_unlock_1;
@@ -99,9 +98,9 @@ module tx_huge_pages_addr (
     ////////////////////////////////////////////////
     // huge_page_status
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             huge_page_status_1 <= 1'b0;
             huge_page_status_2 <= 1'b0;
         end
@@ -135,9 +134,9 @@ module tx_huge_pages_addr (
     ////////////////////////////////////////////////
     // huge_page_address and unlock TLP reception
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             huge_page_unlock_1 <= 1'b0;
             huge_page_unlock_2 <= 1'b0;
             state <= s0;

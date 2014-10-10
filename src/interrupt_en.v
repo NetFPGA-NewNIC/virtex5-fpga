@@ -52,8 +52,8 @@
 
 module interrupt_en (
 
-    input    trn_clk,
-    input    trn_lnk_up_n,
+    input                   trn_clk,
+    input                   reset,
 
     input       [63:0]      trn_rd,
     input       [7:0]       trn_rrem_n,
@@ -74,16 +74,15 @@ module interrupt_en (
     localparam s4 = 8'b00001000;
 
     // Local wires and reg
-    wire            reset_n = ~trn_lnk_up_n;
 
     reg     [7:0]   state;
 
     ////////////////////////////////////////////////
     // interrupts_enabled & TLP reception
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             interrupts_enabled <= 1'b1;
             state <= s0;
         end
@@ -105,7 +104,6 @@ module interrupt_en (
 
                             6'b001000 : begin     // interrupts eneable and disable
                                 interrupts_enabled <= ~interrupts_enabled;
-                                state <= s0;
                             end
 
                             default : begin //other addresses
@@ -113,6 +111,7 @@ module interrupt_en (
                             end
 
                         endcase
+                        state <= s0;
                     end
                 end
 

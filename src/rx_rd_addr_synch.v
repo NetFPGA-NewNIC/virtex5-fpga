@@ -48,10 +48,10 @@
 module rx_rd_addr_synch (
 
     input    clk_out,
-    input    reset_n_clk_out,
+    input    reset_clk_out,
 
     input    clk_in,
-    input    reset_n_clk_in,
+    input    reset_clk_in,
 
     input         [`BF:0]     commited_rd_address_in,
     output reg    [`BF:0]     commited_rd_address_out
@@ -86,9 +86,9 @@ module rx_rd_addr_synch (
     ////////////////////////////////////////////////
     // a
     ////////////////////////////////////////////////
-    always @( posedge clk_in or negedge reset_n_clk_in ) begin
+    always @(posedge clk_in) begin
 
-        if (!reset_n_clk_in ) begin  // reset
+        if (reset_clk_in) begin  // reset
             bus_in_last <= 'b0;
             synch <= 1'b0;
             fsm_a <= s0;
@@ -134,9 +134,9 @@ module rx_rd_addr_synch (
     ////////////////////////////////////////////////
     // b
     ////////////////////////////////////////////////
-    always @( posedge clk_out or negedge reset_n_clk_out ) begin
+    always @(posedge clk_out) begin
 
-        if (!reset_n_clk_out ) begin  // reset
+        if (reset_clk_out) begin  // reset
             commited_rd_address_out <= 'b0;
             synch_reg0 <= 1'b0;
             synch_reg1 <= 1'b0;

@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        enpoint_arbitration.v
+*        pcie_endpoint_reset.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between all subsystems.
+*        Synchronizes active high reset
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -42,79 +42,83 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
+`include "includes.v"
 
-module enpoint_arbitration (
+module pcie_endpoint_reset (
 
-    input                  trn_clk,
-    input                  reset,
-
-    // Rx
-    output reg             rx_turn,
-    input                  rx_driven,
-
-    // Tx
-    output reg             tx_turn,
-    input                  tx_driven
-
+    input                     clk250,
+    input                     trn_reset_n,
+    input                     trn_lnk_up_n,
+    output reg                reset250
     );
 
     // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
+    localparam s0  = 15'b000000000000000;
+    localparam s1  = 15'b000000000000001;
+    localparam s2  = 15'b000000000000010;
+    localparam s3  = 15'b000000000000100;
+    localparam s4  = 15'b000000000001000;
+    localparam s5  = 15'b000000000010000;
+    localparam s6  = 15'b000000000100000;
+    localparam s7  = 15'b000000001000000;
+    localparam s8  = 15'b000000010000000;
+    localparam s9  = 15'b000000100000000;
+    localparam s10 = 15'b000001000000000;
+    localparam s11 = 15'b000010000000000;
+    localparam s12 = 15'b000100000000000;
+    localparam s13 = 15'b001000000000000;
+    localparam s14 = 15'b010000000000000;
+    localparam s15 = 15'b100000000000000;
 
     //-------------------------------------------------------
-    // Local send_tlps_machine
-    //-------------------------------------------------------   
-    reg     [7:0]   fsm;
-    reg             turn_bit;
+    // Local reset
+    //-------------------------------------------------------
+    reg     [14:0]   reset_fsm = 'b0;
 
     ////////////////////////////////////////////////
-    // Arbitration
+    // reset
     ////////////////////////////////////////////////
-    always @(posedge trn_clk) begin
+    always @(posedge clk250) begin
 
-        if (reset) begin  // reset
-            rx_turn <= 1'b0;
-            tx_turn <= 1'b0;
-            turn_bit <= 1'b0;
-            fsm <= s0;
+        if (!trn_reset_n) begin  // reset
+            reset_fsm <= s0;
         end
         
         else begin  // not reset
 
-            case (fsm)
+            case (reset_fsm)
 
                 s0 : begin
-                    if ( (!rx_driven) && (!tx_driven) ) begin
-                        turn_bit <= ~turn_bit;
-                        if (!turn_bit) begin
-                            rx_turn <= 1'b1;
-                        end
-                        else begin
-                            tx_turn <= 1'b1;
-                        end
-                        fsm <= s1;
+                    reset250 <= 1'b1;
+                    reset_fsm <= s1;
+                end
+
+                s1 : reset_fsm <= s2;
+                s2 : reset_fsm <= s3;
+                s3 : reset_fsm <= s4;
+                s4 : reset_fsm <= s5;
+                s5 : reset_fsm <= s6;
+
+                s6 : begin
+                    reset250 <= 1'b0;
+                    reset_fsm <= s7;
+                end
+
+                s7 : begin
+                    if (trn_lnk_up_n) begin
+                        reset_fsm <= s0;
                     end
                 end
 
-                s1 : begin
-                    rx_turn <= 1'b0;
-                    tx_turn <= 1'b0;
-                    fsm <= s0;
-                end
-
                 default : begin 
-                    fsm <= s0;
+                    reset_fsm <= s0;
                 end
 
             endcase
         end     // not reset
     end  //always
-   
 
-endmodule // enpoint_arbitration
+endmodule // pcie_endpoint_reset
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

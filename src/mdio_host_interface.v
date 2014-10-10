@@ -53,8 +53,8 @@
 
 module mdio_host_interface (
 
-    input    trn_clk,
-    input    trn_lnk_up_n,
+    input                   trn_clk,
+    input                   reset,
 
     input       [63:0]      trn_rd,
     input       [7:0]       trn_rrem_n,
@@ -70,7 +70,8 @@ module mdio_host_interface (
 
     // 50 MHz domain
     input                   host_clk,
-    input                   host_reset_n,
+    input                   host_reset,
+    input                   reset156_25,
     output reg  [1:0]       host_opcode,
     output reg  [9:0]       host_addr,
     output reg  [31:0]      host_wr_data,
@@ -99,8 +100,6 @@ module mdio_host_interface (
     localparam s14 = 15'b010000000000000;
     localparam s15 = 15'b100000000000000;
 
-    wire            reset_n = ~trn_lnk_up_n;
-
     //-------------------------------------------------------
     // Local host_conf_driver
     //-------------------------------------------------------
@@ -108,7 +107,9 @@ module mdio_host_interface (
     reg             mdio_access_reg;
     reg     [31:0]  host_data_in_reg;
     reg             generate_interrupt_50mhz;
-    reg     [2:0]   wait_mac_ready;
+    reg             reset156_25_reg0;
+    reg             reset156_25_reg1;
+    reg     [3:0]   wait_counter;
 
     //-------------------------------------------------------
     // Local generate_interrupt
@@ -127,16 +128,12 @@ module mdio_host_interface (
     ////////////////////////////////////////////////
     // host_conf_driver
     ////////////////////////////////////////////////
-    always @( posedge host_clk or negedge host_reset_n ) begin
+    always @(posedge host_clk) begin
 
-        if (!host_reset_n) begin  // reset
-            host_opcode <= 2'b11;
-            host_addr <= 10'b0;
-            host_wr_data <= 32'b0;
-            host_miim_sel <= 1'b0;
-            host_req <= 1'b0;
+        if (host_reset) begin  // reset
             generate_interrupt_50mhz <= 1'b0;
-            wait_mac_ready <= 3'b0;
+            reset156_25_reg0 <= 1'b0;
+            reset156_25_reg1 <= 1'b0;
             host_int_fsm <= s0;
         end
         
@@ -145,7 +142,8 @@ module mdio_host_interface (
             mdio_access_reg <= mdio_access;
             host_data_in_reg <= host_data_in;
 
-            wait_mac_ready <= wait_mac_ready +1;
+            reset156_25_reg0 <= reset156_25;
+            reset156_25_reg1 <= reset156_25_reg0;
 
             case (host_int_fsm)
 
@@ -155,7 +153,15 @@ module mdio_host_interface (
                     host_wr_data <= 32'b0;
                     host_miim_sel <= 1'b0;
                     host_req <= 1'b0;
-                    if (wait_mac_ready == 3'b111) begin
+                    wait_counter <= 'b0;
+                    if (!reset156_25_reg1) begin
+                        host_int_fsm <= s11;
+                    end
+                end
+
+                s11 : begin
+                    wait_counter <= wait_counter + 1;
+                    if (wait_counter == 3'b111) begin
                         host_int_fsm <= s1;
                     end
                 end
@@ -191,7 +197,7 @@ module mdio_host_interface (
                     host_miim_sel <= 1'b0;
                     host_addr <= 10'h280;
                     host_wr_data[23] <= 1'b0;               // Transmitter Preserve Preamble Enable
-                    host_wr_data[24] <= 1'b0;               // Deficit Idle Count Enable
+                    host_wr_data[24] <= 1'b1;               // Deficit Idle Count Enable
                     host_wr_data[25] <= 1'b0;               // Interframe Gap Adjust Enable
                     host_wr_data[26] <= 1'b0;               // WAN Mode Enable
                     host_wr_data[27] <= 1'b0;               // VLAN Enable
@@ -271,9 +277,9 @@ module mdio_host_interface (
     ////////////////////////////////////////////////
     // generate_interrupt
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             cfg_interrupt_n <= 1'b1;
             generate_interrupt_50mhz_reg <= 1'b0;
             interrupt_fsm <= s0;
@@ -317,9 +323,9 @@ module mdio_host_interface (
     ////////////////////////////////////////////////
     // mdio_access from pcie
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             mdio_access <= 1'b0;
             tlp_rx_fsm <= s0;
         end

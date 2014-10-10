@@ -51,7 +51,7 @@
 module rx_wr_pkt_to_hugepages (
 
     input                  trn_clk,
-    input                  trn_lnk_up_n,
+    input                  reset,
 
     // Rx Local-Link  //
     output reg  [63:0]     trn_td,
@@ -90,8 +90,6 @@ module rx_wr_pkt_to_hugepages (
     output reg             driving_interface
     );
 
-    wire            reset_n;
-    
     // localparam
     localparam s0  = 15'b000000000000000;
     localparam s1  = 15'b000000000000001;
@@ -135,19 +133,17 @@ module rx_wr_pkt_to_hugepages (
     reg                 remember_to_change_huge_page;
     reg     [`BF:0]     rd_addr_prev1;
     reg     [`BF:0]     rd_addr_prev2;
+    reg     [`BF:0]     look_ahead_commited_rd_address;
     
-    assign reset_n = ~trn_lnk_up_n;
-
     ////////////////////////////////////////////////
     // current_huge_page_addr
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             huge_page_free_1 <= 1'b0;
             huge_page_free_2 <= 1'b0;
             huge_page_available <= 1'b0;
-            current_huge_page_addr <= 64'b0;
             give_huge_page_fsm <= s0;
             free_huge_page_fsm <= s0;
         end
@@ -215,9 +211,9 @@ module rx_wr_pkt_to_hugepages (
     ////////////////////////////////////////////////
     // write request TLP generation to huge_page
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             trn_td <= 'b0;
             trn_trem_n <= 'hFF;
             trn_tsof_n <= 1'b1;
@@ -236,7 +232,6 @@ module rx_wr_pkt_to_hugepages (
             commited_rd_address <= 'b0;
             rd_addr <= 'b0;
 
-            tlp_qword_counter <= 'b0;
             tlp_number <= 'b0;
 
             send_fsm <= s0;
@@ -316,6 +311,7 @@ module rx_wr_pkt_to_hugepages (
                     look_ahead_host_mem_addr <= host_mem_addr + {qwords_in_tlp, 3'b0};
                     look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
+                    look_ahead_commited_rd_address <= commited_rd_address + qwords_in_tlp;
 
                     send_fsm <= s3;
                 end
@@ -361,8 +357,8 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s5 : begin
-                    commited_rd_address <= rd_addr_prev2;
-                    rd_addr <= rd_addr_prev2;
+                    commited_rd_address <= look_ahead_commited_rd_address;
+                    rd_addr <= look_ahead_commited_rd_address;
                     host_mem_addr <= look_ahead_host_mem_addr;
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;

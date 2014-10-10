@@ -50,7 +50,7 @@
 module rx_mac_interface (
 
     input    clk,
-    input    reset_n,
+    input    reset,
 
     // MAC Rx
     input    [63:0]      rx_data,
@@ -87,7 +87,7 @@ module rx_mac_interface (
     reg     [15:0]    byte_counter;
     reg     [`BF:0]   aux_wr_addr;
     reg     [`BF:0]   diff;
-    (* KEEP = "TRUE" *)reg     [31:0]   dropped_frames_counter;
+    /*(* KEEP = "TRUE" *)*/reg     [31:0]   dropped_frames_counter;
     
     reg     [7:0]    rx_data_valid_reg;
     reg              rx_good_frame_reg;
@@ -103,9 +103,9 @@ module rx_mac_interface (
     ////////////////////////////////////////////////
     // ts_sec-and-ts_nsec-generation
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
+    always @(posedge clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             ts_sec <= 32'b0;
             ts_nsec <= 32'b0;
             free_running <= 28'b0;
@@ -126,9 +126,9 @@ module rx_mac_interface (
     ////////////////////////////////////////////////
     // ethernet frame reception and memory write
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
+    always @(posedge clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             commited_wr_address <= 'b0;
             dropped_frames_counter <= 'b0;
             wr_en <= 1'b1;

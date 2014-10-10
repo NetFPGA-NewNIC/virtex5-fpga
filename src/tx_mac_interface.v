@@ -49,7 +49,7 @@
 module tx_mac_interface (
 
     input    clk,
-    input    reset_n,
+    input    reset,
 
     // MAC Rx
     output reg                tx_underrun,
@@ -119,9 +119,9 @@ module tx_mac_interface (
     ////////////////////////////////////////////////
     // trigger_eth_frame
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
+    always @(posedge clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             take_your_chances <= 1'b0;
             diff <= 'b0;
             trigger_tx_frame <= 1'b0;
@@ -211,9 +211,9 @@ module tx_mac_interface (
     ////////////////////////////////////////////////
     // ethernet frame transmition and memory read
     ////////////////////////////////////////////////
-    always @( posedge clk or negedge reset_n ) begin
+    always @( posedge clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             tx_underrun <= 1'b0;
             rd_addr_i <= 'b0;
             tx_start <= 1'b0;

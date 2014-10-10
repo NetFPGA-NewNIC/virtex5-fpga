@@ -54,8 +54,8 @@
 
 module tx_wr_pkt_to_bram (
 
-    input    trn_clk,
-    input    trn_lnk_up_n,
+    input                   trn_clk,
+    input                   reset,
 
     input       [63:0]      trn_rd,
     input       [7:0]       trn_rrem_n,
@@ -99,8 +99,6 @@ module tx_wr_pkt_to_bram (
     input       [9:0]       commited_rd_addr,
     output reg  [9:0]       commited_wr_addr
     );
-
-    wire            reset_n;
 
     // localparam
     localparam s0  = 16'b0000000000000000;
@@ -240,9 +238,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // health_mon
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             counter_mon <= 'b0;
             health_mon_fsm <= s0;
         end
@@ -278,20 +276,17 @@ module tx_wr_pkt_to_bram (
         end     // not reset
     end  //always
 
-    assign reset_n = ~trn_lnk_up_n;
-
     ////////////////////////////////////////////////
     // current_huge_page_addr
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             huge_page_free_1 <= 1'b0;
             huge_page_free_2 <= 1'b0;
             reading_huge_page_1 <= 1'b0;
             reading_huge_page_2 <= 1'b0;
             huge_page_available <= 1'b0;
-            current_huge_page_addr <= 64'b0;
             give_huge_page_fsm <= s0;
             free_huge_page_fsm <= s0;
         end
@@ -367,9 +362,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // trigger_rd_tlp
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             return_huge_page_to_host <= 1'b0;
             read_chunk <= 1'b0;
             send_rd_completed <= 1'b0;
@@ -585,9 +580,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // trigger_interrupts
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             send_interrupt <= 1'b0;
             trigger_interrupts_fsm <= s0;
         end
@@ -638,9 +633,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // huge_page_1_notifications
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             waiting_data_huge_page_1 <= 1'b0;
             send_notification_huge_page_1 <= 1'b0;
             huge_page_1_notifications_fsm <= s0;
@@ -708,9 +703,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // huge_page_2_notifications
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             waiting_data_huge_page_2 <= 1'b0;
             send_notification_huge_page_2 <= 1'b0;
             huge_page_2_notifications_fsm <= s0;
@@ -778,9 +773,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // huge_page_1_notifications & huge_page_2_notifications mixer
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             send_notification_huge_page_1_ack <= 1'b0;
             send_notification_huge_page_2_ack <= 1'b0;
             notify <= 1'b0;
@@ -838,9 +833,9 @@ module tx_wr_pkt_to_bram (
     ////////////////////////////////////////////////
     // completion_tlp & write to bram (wr_to_bram_fsm)
     ////////////////////////////////////////////////
-    always @( posedge trn_clk or negedge reset_n ) begin
+    always @(posedge trn_clk) begin
 
-        if (!reset_n ) begin  // reset
+        if (reset) begin  // reset
             wr_addr <= 'b0;
             look_ahead_wr_addr <= 'b0;
             wr_en <= 1'b1;
