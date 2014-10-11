@@ -53,7 +53,7 @@ module rx_tlp_trigger (
     input    reset,
 
     // Internal logic
-    input      [`BF:0]      commited_wr_address,
+    input      [`BF:0]      commited_wr_addr,
     output reg              trigger_tlp,
     input                   trigger_tlp_ack,
     output reg              change_huge_page,
@@ -87,8 +87,8 @@ module rx_tlp_trigger (
     reg     [9:0]        trigger_fsm;
     reg     [`BF:0]      diff;
     reg     [`BF:0]      diff_reg;
-    reg     [`BF:0]      commited_rd_address;
-    reg     [`BF:0]      look_ahead_commited_rd_address;
+    reg     [`BF:0]      commited_rd_addr;
+    reg     [`BF:0]      look_ahead_commited_rd_addr;
     reg                  huge_page_dirty;
     reg     [18:0]       huge_buffer_qword_counter;
     reg     [18:0]       aux_huge_buffer_qword_counter;
@@ -112,7 +112,7 @@ module rx_tlp_trigger (
             if (trigger_fsm == s0) begin
                 free_running <= free_running +1;
                 timeout <= 1'b0;
-                if (free_running == 'hA000) begin
+                if (free_running == 'hFFFF) begin
                     timeout <= 1'b1;
                 end
             end
@@ -135,7 +135,7 @@ module rx_tlp_trigger (
             send_last_tlp <= 1'b0;
 
             diff <= 'b0;
-            commited_rd_address <= 'b0;
+            commited_rd_addr <= 'b0;
             huge_buffer_qword_counter <= 'h10;
             huge_page_dirty <= 1'b0;
             qwords_remaining <= 'b0;
@@ -145,7 +145,7 @@ module rx_tlp_trigger (
 
         else begin  // not reset
 
-            diff <= commited_wr_address + (~commited_rd_address) +1;
+            diff <= commited_wr_addr + (~commited_rd_addr) +1;
             
             case (trigger_fsm)
 
@@ -188,7 +188,7 @@ module rx_tlp_trigger (
                 end
 
                 s2 : begin
-                    look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
+                    look_ahead_commited_rd_addr <= commited_rd_addr + qwords_to_send;
                     look_ahead_number_of_tlp_sent <= number_of_tlp_sent +1;
                     aux_huge_buffer_qword_counter <= huge_buffer_qword_counter + qwords_to_send;
                     if (trigger_tlp_ack) begin
@@ -198,7 +198,7 @@ module rx_tlp_trigger (
                 end
 
                 s3 : begin
-                    commited_rd_address <= look_ahead_commited_rd_address;
+                    commited_rd_addr <= look_ahead_commited_rd_addr;
                     number_of_tlp_sent <= look_ahead_number_of_tlp_sent;
                     huge_buffer_qword_counter <= aux_huge_buffer_qword_counter;
                     trigger_fsm <= s4;
@@ -224,7 +224,7 @@ module rx_tlp_trigger (
                 end
 
                 s6 : begin
-                    look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
+                    look_ahead_commited_rd_addr <= commited_rd_addr + qwords_to_send;
                     if (change_huge_page_ack) begin
                         send_last_tlp <= 1'b0;
                         trigger_fsm <= s7;
@@ -232,7 +232,7 @@ module rx_tlp_trigger (
                 end
 
                 s7 : begin
-                    commited_rd_address <= look_ahead_commited_rd_address;
+                    commited_rd_addr <= look_ahead_commited_rd_addr;
                     huge_buffer_qword_counter <= 'h10;
                     qwords_remaining <= 'b0;
                     huge_page_dirty <= 1'b0;

@@ -97,7 +97,12 @@ module pcie_endpoint_reset (
                 s2 : reset_fsm <= s3;
                 s3 : reset_fsm <= s4;
                 s4 : reset_fsm <= s5;
-                s5 : reset_fsm <= s6;
+
+                s5 : begin
+                    if (!trn_lnk_up_n) begin
+                        reset_fsm <= s6;
+                    end
+                end
 
                 s6 : begin
                     reset250 <= 1'b0;

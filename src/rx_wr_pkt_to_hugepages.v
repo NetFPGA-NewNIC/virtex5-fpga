@@ -81,7 +81,7 @@ module rx_wr_pkt_to_hugepages (
     input                  send_last_tlp,
     input       [4:0]      qwords_to_send,
 
-    output reg  [`BF:0]    commited_rd_address,
+    output reg  [`BF:0]    commited_rd_addr,
     output reg  [`BF:0]    rd_addr,
     input       [63:0]     rd_data,
 
@@ -133,7 +133,7 @@ module rx_wr_pkt_to_hugepages (
     reg                 remember_to_change_huge_page;
     reg     [`BF:0]     rd_addr_prev1;
     reg     [`BF:0]     rd_addr_prev2;
-    reg     [`BF:0]     look_ahead_commited_rd_address;
+    reg     [`BF:0]     look_ahead_commited_rd_addr;
     
     ////////////////////////////////////////////////
     // current_huge_page_addr
@@ -229,7 +229,7 @@ module rx_wr_pkt_to_hugepages (
             trigger_tlp_ack <= 1'b0;
             change_huge_page_ack <= 1'b0;
 
-            commited_rd_address <= 'b0;
+            commited_rd_addr <= 'b0;
             rd_addr <= 'b0;
 
             tlp_number <= 'b0;
@@ -311,7 +311,7 @@ module rx_wr_pkt_to_hugepages (
                     look_ahead_host_mem_addr <= host_mem_addr + {qwords_in_tlp, 3'b0};
                     look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
-                    look_ahead_commited_rd_address <= commited_rd_address + qwords_in_tlp;
+                    look_ahead_commited_rd_addr <= commited_rd_addr + qwords_in_tlp;
 
                     send_fsm <= s3;
                 end
@@ -357,8 +357,8 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s5 : begin
-                    commited_rd_address <= look_ahead_commited_rd_address;
-                    rd_addr <= look_ahead_commited_rd_address;
+                    commited_rd_addr <= look_ahead_commited_rd_addr;
+                    rd_addr <= look_ahead_commited_rd_addr;
                     host_mem_addr <= look_ahead_host_mem_addr;
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;

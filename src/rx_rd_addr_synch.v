@@ -53,8 +53,8 @@ module rx_rd_addr_synch (
     input    clk_in,
     input    reset_clk_in,
 
-    input         [`BF:0]     commited_rd_address_in,
-    output reg    [`BF:0]     commited_rd_address_out
+    input         [`BF:0]     commited_rd_addr_in,
+    output reg    [`BF:0]     commited_rd_addr_out
     );
 
     // localparam
@@ -99,8 +99,8 @@ module rx_rd_addr_synch (
             case (fsm_a)
 
                 s0 : begin
-                    if (bus_in_last != commited_rd_address_in) begin
-                        cross <= commited_rd_address_in;
+                    if (bus_in_last != commited_rd_addr_in) begin
+                        cross <= commited_rd_addr_in;
                         fsm_a <= s1;
                     end
                 end
@@ -137,7 +137,7 @@ module rx_rd_addr_synch (
     always @(posedge clk_out) begin
 
         if (reset_clk_out) begin  // reset
-            commited_rd_address_out <= 'b0;
+            commited_rd_addr_out <= 'b0;
             synch_reg0 <= 1'b0;
             synch_reg1 <= 1'b0;
         end
@@ -149,7 +149,7 @@ module rx_rd_addr_synch (
             synch_reg1 <= synch_reg0;
 
             if (synch_reg1) begin
-                commited_rd_address_out <= cross_reg0;
+                commited_rd_addr_out <= cross_reg0;
             end
 
         end     // not reset

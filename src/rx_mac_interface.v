@@ -64,8 +64,8 @@ module rx_mac_interface (
     output reg                wr_en,
     
     // Internal logic
-    output reg    [`BF:0]     commited_wr_address,
-    input         [`BF:0]     commited_rd_address
+    output reg    [`BF:0]     commited_wr_addr,
+    input         [`BF:0]     commited_rd_addr
 
     );
 
@@ -129,7 +129,7 @@ module rx_mac_interface (
     always @(posedge clk) begin
 
         if (reset) begin  // reset
-            commited_wr_address <= 'b0;
+            commited_wr_addr <= 'b0;
             dropped_frames_counter <= 'b0;
             wr_en <= 1'b1;
             rx_fsm <= s0;
@@ -137,14 +137,14 @@ module rx_mac_interface (
         
         else begin  // not reset
             
-            diff <= aux_wr_addr + (~commited_rd_address) +1;
+            diff <= aux_wr_addr + (~commited_rd_addr) +1;
             wr_en <= 1'b1;
             
             case (rx_fsm)
 
                 s0 : begin                                  // configure mac core to present preamble and save the packet timestamp while its reception
                     byte_counter <= 'b0;
-                    aux_wr_addr <= commited_wr_address +1;
+                    aux_wr_addr <= commited_wr_addr +1;
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s1;
                     end
@@ -203,9 +203,9 @@ module rx_mac_interface (
 
                 s2 : begin
                     wr_data <= {byte_counter, 32'b0};
-                    wr_addr <= commited_wr_address;
+                    wr_addr <= commited_wr_addr;
 
-                    commited_wr_address <= aux_wr_addr;                      // commit the packet
+                    commited_wr_addr <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;
                     byte_counter <= 32'b0;
 

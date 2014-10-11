@@ -62,16 +62,9 @@ module  pci_exp_64b_app (
     output                                        trn_terrfwd_n,
     input      [3:0]                              trn_tbuf_av,
 
-    // To rx_tlp_trigger  //
-    input                                         rx_trigger_tlp,
-    output                                        rx_trigger_tlp_ack,
-    input                                         rx_change_huge_page,
-    output                                        rx_change_huge_page_ack,
-    input                                         rx_send_last_tlp,
-    input      [4:0]                              rx_qwords_to_send,
-
     // To rx_mac_interface //
-    output     [`BF:0]                            rx_commited_rd_address,
+    output     [`BF:0]                            rx_commited_rd_addr,
+    input      [`BF:0]                            rx_commited_wr_addr,
 
     // To mac_host_configuration_interface  //
     input                                         host_clk,
@@ -181,6 +174,16 @@ module  pci_exp_64b_app (
     wire              rx_huge_page_status_2;
     wire              rx_huge_page_free_1;
     wire              rx_huge_page_free_2;
+
+    //-------------------------------------------------------
+    // Local Wires rx_tlp_trigger
+    //-------------------------------------------------------
+    wire                                              rx_trigger_tlp;
+    wire                                              rx_trigger_tlp_ack;
+    wire                                              rx_change_huge_page;
+    wire                                              rx_change_huge_page_ack;
+    wire                                              rx_send_last_tlp;
+    wire   [4:0]                                      rx_qwords_to_send;
 
     wire   [63:0]     rx_trn_td;
     wire   [7:0]      rx_trn_trem_n;
@@ -349,6 +352,21 @@ module  pci_exp_64b_app (
         );
 
     //-------------------------------------------------------
+    // rx_tlp_trigger
+    //-------------------------------------------------------
+    rx_tlp_trigger rx_tlp_trigger_mod (
+        .clk(trn_clk),                                         // I
+        .reset(reset250),                                      // I
+        .commited_wr_addr(rx_commited_wr_addr),                // I [`BF:0]
+        .trigger_tlp(rx_trigger_tlp),                          // O
+        .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
+        .change_huge_page(rx_change_huge_page),                // O
+        .change_huge_page_ack(rx_change_huge_page_ack),        // I
+        .send_last_tlp(rx_send_last_tlp),                      // O
+        .qwords_to_send(rx_qwords_to_send)                     // O [4:0]
+        );
+
+    //-------------------------------------------------------
     // rx_wr_pkt_to_hugepages
     //-------------------------------------------------------
     rx_wr_pkt_to_hugepages rx_wr_pkt_to_hugepages_mod (
@@ -377,7 +395,7 @@ module  pci_exp_64b_app (
         .change_huge_page_ack(rx_change_huge_page_ack),        // O
         .send_last_tlp(rx_send_last_tlp),                      // I
         .qwords_to_send(rx_qwords_to_send),                    // I [4:0]
-        .commited_rd_address(rx_commited_rd_address),          // O [`BF:0]
+        .commited_rd_addr(rx_commited_rd_addr),                // O [`BF:0]
         .rd_addr(rx_rd_addr),                                  // O [`BF:0]
         .rd_data(rx_rd_data),                                  // I [63:0]
         .my_turn(rx_turn),                                     // I
