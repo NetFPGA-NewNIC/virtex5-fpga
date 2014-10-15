@@ -156,9 +156,9 @@ module tx_wr_pkt_to_bram (
     reg     [9:0]   init_aux;
     reg     [9:0]   next_aux_value;
     reg     [9:0]   aux_diff;
-    reg     [23:0]  current_numb_of_pages;
-    reg     [23:0]  consumed_pages;
-    reg     [23:0]  page_count;
+    reg     [22:0]  current_numb_of_pages;
+    reg     [22:0]  consumed_pages;
+    reg     [22:0]  page_count;
     reg             remainder_page;
     reg     [9:0]   qwords_to_rd_i;
     reg     [9:0]   request_addr_bram;

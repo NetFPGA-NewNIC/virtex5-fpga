@@ -47,7 +47,9 @@
 `include "includes.v"
 
 `define TX_MEM_WR64_FMT_TYPE 7'b11_00000
+`define TX_MEM_WR32_FMT_TYPE 7'b10_00000
 `define TX_MEM_RD64_FMT_TYPE 7'b01_00000
+`define TX_MEM_RD32_FMT_TYPE 7'b00_00000
 
 module tx_rd_host_mem (
 
@@ -122,6 +124,8 @@ module tx_rd_host_mem (
     reg     [31:0]  next_huge_page_index;
     reg     [63:0]  notification_message_reg;
     reg     [3:0]   next_tlp_tag;
+    reg             aux0_high_mem;
+    reg             aux1_high_mem;
 
     ////////////////////////////////////////////////
     // read request TLP generation to huge_page
@@ -153,6 +157,7 @@ module tx_rd_host_mem (
             send_rd_completed_ack <= 1'b0;
             send_interrupt_ack <= 1'b0;
             notify_ack <= 1'b0;
+            next_huge_page_index <= (huge_page_index + 1) & (~NUMB_HP);
 
             case (rd_host_fsm)
 
@@ -161,6 +166,8 @@ module tx_rd_host_mem (
                     last_completed_buffer_address <= completed_buffer_address + 4'b1000;
                     driving_interface <= 1'b0;
                     host_mem_addr <= huge_page_addr;
+                    aux0_high_mem <= | huge_page_addr[63:32];
+                    aux1_high_mem <= | completed_buffer_address[63:32];
                     notification_message_reg <= notification_message;
                     next_tlp_tag <= tlp_tag +1;
                     if (my_turn) begin
@@ -168,12 +175,12 @@ module tx_rd_host_mem (
                             if (notify) begin
                                 driving_interface <= 1'b1;
                                 notify_ack <= 1'b1;
-                                rd_host_fsm <= s9;
+                                rd_host_fsm <= s10;
                             end
                             else if (send_rd_completed) begin
                                 driving_interface <= 1'b1;
                                 send_rd_completed_ack <= 1'b1;
-                                rd_host_fsm <= s4;
+                                rd_host_fsm <= s5;
                             end
                             else if (read_chunk) begin
                                 driving_interface <= 1'b1;
@@ -184,7 +191,7 @@ module tx_rd_host_mem (
                                 cfg_interrupt_n <= 1'b0;
                                 driving_interface <= 1'b1;
                                 send_interrupt_ack <= 1'b1;
-                                rd_host_fsm <= s8;
+                                rd_host_fsm <= s9;
                             end
                         end
                     end
@@ -194,7 +201,7 @@ module tx_rd_host_mem (
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `TX_MEM_RD64_FMT_TYPE, //memory read request 64bit addressing
+                                aux0_high_mem ? `TX_MEM_RD64_FMT_TYPE : `TX_MEM_RD32_FMT_TYPE, //memory read request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -214,7 +221,13 @@ module tx_rd_host_mem (
                     trn_tsrc_rdy_n <= 1'b0;
                     tlp_tag <= next_tlp_tag;
 
-                    rd_host_fsm <= s2;
+                    if (aux0_high_mem) begin
+                        rd_host_fsm <= s2;
+                    end
+                    else begin
+                        trn_trem_n <= 8'h0F;
+                        rd_host_fsm <= s3;
+                    end
                 end
 
                 s2 : begin
@@ -222,11 +235,20 @@ module tx_rd_host_mem (
                         trn_tsof_n <= 1'b1;
                         trn_teof_n <= 1'b0;
                         trn_td <= host_mem_addr;
-                        rd_host_fsm <= s3;
+                        rd_host_fsm <= s4;
                     end
                 end
 
                 s3 : begin
+                    if (!trn_tdst_rdy_n) begin
+                        trn_tsof_n <= 1'b1;
+                        trn_teof_n <= 1'b0;
+                        trn_td[63:32] <= host_mem_addr[31:0];
+                        rd_host_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_teof_n <= 1'b1;
@@ -237,11 +259,12 @@ module tx_rd_host_mem (
                     end
                 end
 
-                s4 : begin
+                s5 : begin
+                    huge_page_index <= next_huge_page_index;
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `TX_MEM_WR64_FMT_TYPE, //memory write request 64bit addressing
+                                aux1_high_mem ? `TX_MEM_WR64_FMT_TYPE : `TX_MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -260,40 +283,41 @@ module tx_rd_host_mem (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     
-                    rd_host_fsm <= s5;
-                end
-
-                s5 : begin
-                    next_huge_page_index <= (huge_page_index + 1) & (~NUMB_HP);
-                    if (!trn_tdst_rdy_n) begin
-                        trn_tsof_n <= 1'b1;
-                        trn_td <= next_completed_buffer_address;
+                    if (aux1_high_mem) begin
+                        trn_trem_n <= 8'h0F;
                         rd_host_fsm <= s6;
+                    end
+                    else begin
+                        rd_host_fsm <= s8;
                     end
                 end
 
                 s6 : begin
-                    huge_page_index <= next_huge_page_index;
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= 64'hEFBECACA00000000;
-                        trn_trem_n <= 8'h0F;
-                        trn_teof_n <= 1'b0;
+                        trn_tsof_n <= 1'b1;
+                        trn_td <= next_completed_buffer_address;
                         rd_host_fsm <= s7;
                     end
                 end
 
                 s7 : begin
                     if (!trn_tdst_rdy_n) begin
-                        trn_tsrc_rdy_n <= 1'b1;
-                        trn_teof_n <= 1'b1;
-                        trn_trem_n <= 8'hFF;
-                        trn_td <= 64'b0;
-                        driving_interface <= 1'b0;
-                        rd_host_fsm <= s0;
+                        trn_td[63:32] <= 32'hEFBECACA;
+                        trn_teof_n <= 1'b0;
+                        rd_host_fsm <= s4;
                     end
                 end
 
                 s8 : begin
+                    if (!trn_tdst_rdy_n) begin
+                        trn_tsof_n <= 1'b1;
+                        trn_teof_n <= 1'b0;
+                        trn_td <= {next_completed_buffer_address[31:0], 32'hEFBECACA};
+                        rd_host_fsm <= s4;
+                    end
+                end
+
+                s9 : begin
                     if (!cfg_interrupt_rdy_n) begin
                         cfg_interrupt_n <= 1'b1;
                         driving_interface <= 1'b0;
@@ -301,11 +325,11 @@ module tx_rd_host_mem (
                     end
                 end
 
-                s9 : begin
+                s10 : begin
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `TX_MEM_WR64_FMT_TYPE, //memory write request 64bit addressing
+                                aux1_high_mem ? `TX_MEM_WR64_FMT_TYPE : `TX_MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -324,23 +348,44 @@ module tx_rd_host_mem (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     
-                    rd_host_fsm <= s10;
-                end
-
-                s10 : begin
-                    if (!trn_tdst_rdy_n) begin
-                        trn_tsof_n <= 1'b1;
-                        trn_td <= last_completed_buffer_address;
+                    if (aux1_high_mem) begin
                         rd_host_fsm <= s11;
+                    end
+                    else begin
+                        trn_trem_n <= 8'h0F;
+                        rd_host_fsm <= s13;
                     end
                 end
 
                 s11 : begin
                     if (!trn_tdst_rdy_n) begin
+                        trn_tsof_n <= 1'b1;
+                        trn_td <= last_completed_buffer_address;
+                        rd_host_fsm <= s12;
+                    end
+                end
+
+                s12 : begin
+                    if (!trn_tdst_rdy_n) begin
                         trn_td <= {notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24], notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
-                        trn_trem_n <= 8'h00;
                         trn_teof_n <= 1'b0;
-                        rd_host_fsm <= s7;
+                        rd_host_fsm <= s4;
+                    end
+                end
+
+                s13 : begin
+                    if (!trn_tdst_rdy_n) begin
+                        trn_tsof_n <= 1'b1;
+                        trn_td <= {last_completed_buffer_address[31:0], notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24]};
+                        rd_host_fsm <= s14;
+                    end
+                end
+
+                s14 : begin
+                    if (!trn_tdst_rdy_n) begin
+                        trn_td[63:32] <= {notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
+                        trn_teof_n <= 1'b0;
+                        rd_host_fsm <= s4;
                     end
                 end
 
