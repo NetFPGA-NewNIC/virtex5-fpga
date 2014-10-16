@@ -170,32 +170,26 @@ module tx_rd_host_mem (
                     aux1_high_mem <= | completed_buffer_address[63:32];
                     notification_message_reg <= notification_message;
                     next_tlp_tag <= tlp_tag +1;
-                    if (my_turn) begin
-                        if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) ) begin
-                            if (notify) begin
-                                driving_interface <= 1'b1;
-                                notify_ack <= 1'b1;
-                                rd_host_fsm <= s10;
-                            end
-                            else if (send_rd_completed) begin
-                                driving_interface <= 1'b1;
-                                send_rd_completed_ack <= 1'b1;
-                                rd_host_fsm <= s5;
-                            end
-                            else if (send_interrupt) begin
-                                cfg_interrupt_n <= 1'b0;
-                                driving_interface <= 1'b1;
-                                send_interrupt_ack <= 1'b1;
-                                rd_host_fsm <= s9;
-                            end
-                        end
-                        else if ( (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) ) begin
-                            if (read_chunk) begin
-                                driving_interface <= 1'b1;
-                                read_chunk_ack <= 1'b1;
-                                rd_host_fsm <= s1;
-                            end
-                        end
+                    if ((my_turn) && (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (notify)) begin
+                        driving_interface <= 1'b1;
+                        notify_ack <= 1'b1;
+                        rd_host_fsm <= s10;
+                    end
+                    else if ((my_turn) && (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (send_rd_completed)) begin
+                        driving_interface <= 1'b1;
+                        send_rd_completed_ack <= 1'b1;
+                        rd_host_fsm <= s5;
+                    end
+                    else if ((my_turn) && (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (send_interrupt)) begin
+                        cfg_interrupt_n <= 1'b0;
+                        driving_interface <= 1'b1;
+                        send_interrupt_ack <= 1'b1;
+                        rd_host_fsm <= s9;
+                    end
+                    else if ((my_turn) && (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) && (read_chunk)) begin
+                        driving_interface <= 1'b1;
+                        read_chunk_ack <= 1'b1;
+                        rd_host_fsm <= s1;
                     end
                 end
 

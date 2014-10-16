@@ -542,7 +542,7 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td[63:32] <= {host_mem_addr[31:0], rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24]};
+                        trn_td <= {host_mem_addr[31:0], rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24]};
                         rd_addr <= rd_addr +1;
                         send_fsm <= s20;
                     end
