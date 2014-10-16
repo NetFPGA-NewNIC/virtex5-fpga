@@ -46,10 +46,10 @@
 //`default_nettype none
 `include "includes.v"
 
-`define TX_MEM_WR64_FMT_TYPE 7'b11_00000
-`define TX_MEM_WR32_FMT_TYPE 7'b10_00000
-`define TX_MEM_RD64_FMT_TYPE 7'b01_00000
-`define TX_MEM_RD32_FMT_TYPE 7'b00_00000
+`define MEM_WR64_FMT_TYPE 7'b11_00000
+`define MEM_WR32_FMT_TYPE 7'b10_00000
+`define MEM_RD64_FMT_TYPE 7'b01_00000
+`define MEM_RD32_FMT_TYPE 7'b00_00000
 
 module tx_rd_host_mem (
 
@@ -171,7 +171,7 @@ module tx_rd_host_mem (
                     notification_message_reg <= notification_message;
                     next_tlp_tag <= tlp_tag +1;
                     if (my_turn) begin
-                        if ( (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) ) begin
+                        if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) ) begin
                             if (notify) begin
                                 driving_interface <= 1'b1;
                                 notify_ack <= 1'b1;
@@ -182,16 +182,18 @@ module tx_rd_host_mem (
                                 send_rd_completed_ack <= 1'b1;
                                 rd_host_fsm <= s5;
                             end
-                            else if (read_chunk) begin
-                                driving_interface <= 1'b1;
-                                read_chunk_ack <= 1'b1;
-                                rd_host_fsm <= s1;
-                            end
                             else if (send_interrupt) begin
                                 cfg_interrupt_n <= 1'b0;
                                 driving_interface <= 1'b1;
                                 send_interrupt_ack <= 1'b1;
                                 rd_host_fsm <= s9;
+                            end
+                        end
+                        else if ( (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) ) begin
+                            if (read_chunk) begin
+                                driving_interface <= 1'b1;
+                                read_chunk_ack <= 1'b1;
+                                rd_host_fsm <= s1;
                             end
                         end
                     end
@@ -201,7 +203,7 @@ module tx_rd_host_mem (
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                aux0_high_mem ? `TX_MEM_RD64_FMT_TYPE : `TX_MEM_RD32_FMT_TYPE, //memory read request 64bit or 32bit addressing
+                                aux0_high_mem ? `MEM_RD64_FMT_TYPE : `MEM_RD32_FMT_TYPE, //memory read request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -264,7 +266,7 @@ module tx_rd_host_mem (
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                aux1_high_mem ? `TX_MEM_WR64_FMT_TYPE : `TX_MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
+                                aux1_high_mem ? `MEM_WR64_FMT_TYPE : `MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -329,7 +331,7 @@ module tx_rd_host_mem (
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                aux1_high_mem ? `TX_MEM_WR64_FMT_TYPE : `TX_MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
+                                aux1_high_mem ? `MEM_WR64_FMT_TYPE : `MEM_WR32_FMT_TYPE, //memory write request 64bit or 32bit addressing
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved

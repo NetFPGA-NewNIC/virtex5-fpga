@@ -43,12 +43,10 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-`define PIO_64_RX_MEM_RD32_FMT_TYPE 7'b00_00000
-`define RX_MEM_WR32_FMT_TYPE 7'b10_00000
-`define PIO_64_RX_MEM_RD64_FMT_TYPE 7'b01_00000
-`define RX_MEM_WR64_FMT_TYPE 7'b11_00000
-`define PIO_64_RX_IO_RD32_FMT_TYPE  7'b00_00010
-`define PIO_64_RX_IO_WR32_FMT_TYPE  7'b10_00010
+`define MEM_WR64_FMT_TYPE 7'b11_00000
+`define MEM_WR32_FMT_TYPE 7'b10_00000
+`define MEM_RD64_FMT_TYPE 7'b01_00000
+`define MEM_RD32_FMT_TYPE 7'b00_00000
 
 module interrupt_en (
 
@@ -72,6 +70,10 @@ module interrupt_en (
     localparam s2 = 8'b00000010;
     localparam s3 = 8'b00000100;
     localparam s4 = 8'b00001000;
+    localparam s5 = 8'b00010000;
+    localparam s6 = 8'b00100000;
+    localparam s7 = 8'b01000000;
+    localparam s8 = 8'b10000000;
 
     // Local wires and reg
 
@@ -92,8 +94,11 @@ module interrupt_en (
 
                 s0 : begin
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[2])) begin
-                        if (trn_rd[62:56] == `RX_MEM_WR32_FMT_TYPE) begin   // extend this to receive RX_MEM_WR64_FMT_TYPE
+                        if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
                             state <= s1;
+                        end
+                        else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
+                            state <= s2;
                         end
                     end
                 end
@@ -112,6 +117,23 @@ module interrupt_en (
 
                         endcase
                         state <= s0;
+                    end
+                end
+
+                s2 : begin
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        case (trn_rd[7:2])
+
+                            6'b001000 : begin     // interrupts eneable and disable
+                                interrupts_enabled <= ~interrupts_enabled;
+                            end
+
+                            default : begin //other addresses
+                                state <= s0;
+                            end
+
+                        endcase
+                        state <= s3;
                     end
                 end
 

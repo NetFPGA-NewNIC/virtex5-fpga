@@ -44,12 +44,10 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-`define PIO_64_RX_MEM_RD32_FMT_TYPE 7'b00_00000
-`define RX_MEM_WR32_FMT_TYPE 7'b10_00000
-`define PIO_64_RX_MEM_RD64_FMT_TYPE 7'b01_00000
-`define RX_MEM_WR64_FMT_TYPE 7'b11_00000
-`define PIO_64_RX_IO_RD32_FMT_TYPE  7'b00_00010
-`define PIO_64_RX_IO_WR32_FMT_TYPE  7'b10_00010
+`define MEM_WR64_FMT_TYPE 7'b11_00000
+`define MEM_WR32_FMT_TYPE 7'b10_00000
+`define MEM_RD64_FMT_TYPE 7'b01_00000
+`define MEM_RD32_FMT_TYPE 7'b00_00000
 
 module mdio_host_interface (
 
@@ -104,7 +102,8 @@ module mdio_host_interface (
     // Local host_conf_driver
     //-------------------------------------------------------
     reg     [14:0]  host_int_fsm;
-    reg             mdio_access_reg;
+    reg             mdio_access_reg0;
+    reg             mdio_access_reg1;
     reg     [31:0]  host_data_in_reg;
     reg             generate_interrupt_50mhz;
     reg             reset156_25_reg0;
@@ -139,8 +138,8 @@ module mdio_host_interface (
         
         else begin  // not reset
             
-            mdio_access_reg <= mdio_access;
-            host_data_in_reg <= host_data_in;
+            mdio_access_reg0 <= mdio_access;
+            mdio_access_reg1 <= mdio_access_reg0;
 
             reset156_25_reg0 <= reset156_25;
             reset156_25_reg1 <= reset156_25_reg0;
@@ -238,7 +237,8 @@ module mdio_host_interface (
                 s7 : begin                                              // wait host configuration
                     host_miim_sel <= 1'b1;
                     generate_interrupt_50mhz <= 1'b0;
-                    if (mdio_access_reg) begin
+                    host_data_in_reg <= host_data_in;
+                    if (mdio_access_reg1) begin
                         host_int_fsm <= s8;
                     end
                 end
@@ -335,9 +335,13 @@ module mdio_host_interface (
             case (tlp_rx_fsm)
 
                 s0 : begin
+                    mdio_access_counter <= 4'b0;
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[0])) begin
-                        if (trn_rd[62:56] == `RX_MEM_WR32_FMT_TYPE) begin   // extend this to receive RX_MEM_WR64_FMT_TYPE
+                        if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
                             tlp_rx_fsm <= s1;
+                        end
+                        else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
+                            tlp_rx_fsm <= s2;
                         end
                     end
                 end
@@ -350,19 +354,41 @@ module mdio_host_interface (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[37:34])
                             4'b0100 : begin
-                                tlp_rx_fsm <= s2;
+                                tlp_rx_fsm <= s4;
                             end
             
                             default : begin //other addresses
                                 tlp_rx_fsm <= s0;
                             end
-
                         endcase
                     end
-                    mdio_access_counter <= 4'b0;
                 end
 
                 s2 : begin
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        case (trn_rd[5:2])
+                            4'b0100 : begin
+                                tlp_rx_fsm <= s3;
+                            end
+            
+                            default : begin //other addresses
+                                tlp_rx_fsm <= s0;
+                            end
+                        endcase
+                    end
+                end
+
+                s3 : begin
+                    host_data_in[7:0] <= trn_rd[63:56];
+                    host_data_in[15:8] <= trn_rd[55:48];
+                    host_data_in[23:16] <= trn_rd[47:40];
+                    host_data_in[31:24] <= trn_rd[39:32];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        tlp_rx_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
                     mdio_access <= 1'b1;  // this up for 5 250Mhz ticks (1 50MHz tick)
                     mdio_access_counter <= mdio_access_counter +1;
                     if (mdio_access_counter == 4'h6) begin

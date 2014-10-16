@@ -46,12 +46,10 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-`define PIO_64_RX_MEM_RD32_FMT_TYPE 7'b00_00000
-`define RX_MEM_WR32_FMT_TYPE 7'b10_00000
-`define PIO_64_RX_MEM_RD64_FMT_TYPE 7'b01_00000
-`define RX_MEM_WR64_FMT_TYPE 7'b11_00000
-`define PIO_64_RX_IO_RD32_FMT_TYPE  7'b00_00010
-`define PIO_64_RX_IO_WR32_FMT_TYPE  7'b10_00010
+`define MEM_WR64_FMT_TYPE 7'b11_00000
+`define MEM_WR32_FMT_TYPE 7'b10_00000
+`define MEM_RD64_FMT_TYPE 7'b01_00000
+`define MEM_RD32_FMT_TYPE 7'b00_00000
 
 module tx_huge_pages_addr (
 
@@ -78,19 +76,21 @@ module tx_huge_pages_addr (
     );
 
     // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
-    localparam s4 = 8'b00001000;
-    localparam s5 = 8'b00010000;
-    localparam s6 = 8'b00100000;
-    localparam s7 = 8'b01000000;
-    localparam s8 = 8'b10000000;
+    localparam s0  = 10'b0000000000;
+    localparam s1  = 10'b0000000001;
+    localparam s2  = 10'b0000000010;
+    localparam s3  = 10'b0000000100;
+    localparam s4  = 10'b0000001000;
+    localparam s5  = 10'b0000010000;
+    localparam s6  = 10'b0000100000;
+    localparam s7  = 10'b0001000000;
+    localparam s8  = 10'b0010000000;
+    localparam s9  = 10'b0100000000;
+    localparam s10 = 10'b1000000000;
 
     // Local wires and reg
 
-    reg     [7:0]   state;
+    reg     [9:0]   state;
     reg             huge_page_unlock_1;
     reg             huge_page_unlock_2;
     reg     [31:0]  aux_dw;
@@ -143,14 +143,19 @@ module tx_huge_pages_addr (
         end
         
         else begin  // not reset
+
+            huge_page_unlock_1 <= 1'b0;
+            huge_page_unlock_2 <= 1'b0;
+
             case (state)
 
                 s0 : begin
-                    huge_page_unlock_1 <= 1'b0;
-                    huge_page_unlock_2 <= 1'b0;
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[2])) begin
-                        if (trn_rd[62:56] == `RX_MEM_WR32_FMT_TYPE) begin   // extend this to receive RX_MEM_WR64_FMT_TYPE
+                        if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
                             state <= s1;
+                        end
+                        else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
+                            state <= s5;
                         end
                     end
                 end
@@ -230,6 +235,99 @@ module tx_huge_pages_addr (
                     completed_buffer_address[47:40] <= trn_rd[55:48];
                     completed_buffer_address[55:48] <= trn_rd[47:40];
                     completed_buffer_address[63:56] <= trn_rd[39:32];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
+                    end
+                end
+
+                s5 : begin
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        case (trn_rd[7:2])
+
+                            6'b100000 : begin     // huge page address
+                                state <= s6;
+                            end
+
+                            6'b100010 : begin     // huge page address
+                                state <= s7;
+                            end
+
+                            6'b101000 : begin     // huge page un-lock
+                                state <= s8;
+                            end
+
+                            6'b101001 : begin     // huge page un-lock
+                                state <= s9;
+                            end
+
+                            6'b101100 : begin     // completion buffer address
+                                state <= s10;
+                            end
+
+                            default : begin //other addresses
+                                state <= s0;
+                            end
+
+                        endcase
+                    end
+                end
+
+                s6 : begin
+                    huge_page_addr_1[7:0]   <= trn_rd[63:56];
+                    huge_page_addr_1[15:8]  <= trn_rd[55:48];
+                    huge_page_addr_1[23:16] <= trn_rd[47:40];
+                    huge_page_addr_1[31:24] <= trn_rd[39:32];
+
+                    huge_page_addr_1[39:32] <= trn_rd[31:24];
+                    huge_page_addr_1[47:40] <= trn_rd[23:16];
+                    huge_page_addr_1[55:48] <= trn_rd[15:8];
+                    huge_page_addr_1[63:56] <= trn_rd[7:0];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
+                    end
+                end
+
+                s7 : begin
+                    huge_page_addr_2[7:0]   <= trn_rd[63:56];
+                    huge_page_addr_2[15:8]  <= trn_rd[55:48];
+                    huge_page_addr_2[23:16] <= trn_rd[47:40];
+                    huge_page_addr_2[31:24] <= trn_rd[39:32];
+
+                    huge_page_addr_2[39:32] <= trn_rd[31:24];
+                    huge_page_addr_2[47:40] <= trn_rd[23:16];
+                    huge_page_addr_2[55:48] <= trn_rd[15:8];
+                    huge_page_addr_2[63:56] <= trn_rd[7:0];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
+                    end
+                end
+
+                s8 : begin
+                    huge_page_unlock_1 <= 1'b1;
+                    aux_dw <= trn_rd[63:32];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
+                    end
+                end
+
+                s9 : begin
+                    huge_page_unlock_2 <= 1'b1;
+                    aux_dw <= trn_rd[63:32];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
+                    end
+                end
+
+                s10 : begin
+                    completed_buffer_address[7:0]   <= trn_rd[63:56];
+                    completed_buffer_address[15:8]  <= trn_rd[55:48];
+                    completed_buffer_address[23:16] <= trn_rd[47:40];
+                    completed_buffer_address[31:24] <= trn_rd[39:32];
+
+                    completed_buffer_address[39:32] <= trn_rd[31:24];
+                    completed_buffer_address[47:40] <= trn_rd[23:16];
+                    completed_buffer_address[55:48] <= trn_rd[15:8];
+                    completed_buffer_address[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         state <= s0;
                     end

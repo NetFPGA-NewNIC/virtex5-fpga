@@ -48,7 +48,7 @@
 //`default_nettype none
 `include "includes.v"
 
-`define CPL_MEM_RD64_FMT_TYPE 7'b10_01010
+`define CPL_W_DATA_FMT_TYPE 7'b10_01010
 `define SC 3'b000
 
 
@@ -893,7 +893,7 @@ module tx_wr_pkt_to_bram (
                     dwords_on_tlp <= trn_rd[41:32];
                     this_tlp_odd <= trn_rd[32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n)) begin
-                        if ( (trn_rd[62:56] == `CPL_MEM_RD64_FMT_TYPE) && (trn_rd[15:13] == `SC) ) begin
+                        if ( (trn_rd[62:56] == `CPL_W_DATA_FMT_TYPE) && (trn_rd[15:13] == `SC) ) begin
                             wr_to_bram_fsm <= s1;
                         end
                     end
