@@ -255,6 +255,7 @@ module my_top (
     // Local Wires rx_mac_interface
     //-------------------------------------------------------
     wire   [`BF:0]                                    rx_commited_wr_addr;
+    wire                                              rx_activity;
 
     //-------------------------------------------------------
     // Local Wires rx_wr_addr_synch
@@ -483,6 +484,7 @@ module my_top (
         .wr_addr(rx_wr_addr),                                  // O [`BF:0]
         .wr_data(rx_wr_data),                                  // O [63:0]
         .wr_en(rx_wr_en),                                      // O
+        .rx_activity(rx_activity),                             // O
         .commited_wr_addr(rx_commited_wr_addr),                // O [`BF:0]
         .commited_rd_addr(rx_commited_rd_addr_synch)           // I [`BF:0]
         );
@@ -582,7 +584,7 @@ module my_top (
     //-------------------------------------------------------
     // Endpoint Implementation Application
     //-------------------------------------------------------
-    pci_exp_64b_app app (
+    pcie_endpoint_driver pcie_endpoint_driver_mod (
         
         // Transaction ( TRN ) Interface  //
         .trn_clk(trn_clk_c),                                      // I
@@ -601,6 +603,7 @@ module my_top (
         .trn_tbuf_av(trn_tbuf_av_c),                              // I [4/3:0]
 
         // To rx_mac_interface  //
+        .rx_activity(rx_activity),                                // I
         .rx_commited_rd_addr(rx_commited_rd_addr),                // O [`BF:0]
         .rx_commited_wr_addr(rx_commited_wr_addr_synch),          // I [`BF:0]
 

@@ -64,6 +64,7 @@ module rx_mac_interface (
     output reg                wr_en,
     
     // Internal logic
+    output reg                rx_activity,
     output reg    [`BF:0]     commited_wr_addr,
     input         [`BF:0]     commited_rd_addr
 
@@ -132,6 +133,7 @@ module rx_mac_interface (
             commited_wr_addr <= 'b0;
             dropped_frames_counter <= 'b0;
             wr_en <= 1'b1;
+            rx_activity <= 1'b0;
             rx_fsm <= s0;
         end
         
@@ -139,6 +141,7 @@ module rx_mac_interface (
             
             diff <= aux_wr_addr + (~commited_rd_addr) +1;
             wr_en <= 1'b1;
+            rx_activity <= 1'b0;
             
             case (rx_fsm)
 
@@ -154,6 +157,7 @@ module rx_mac_interface (
                     wr_data <= rx_data;
                     wr_addr <= aux_wr_addr;
                     aux_wr_addr <= aux_wr_addr +1;
+                    rx_activity <= 1'b1;
 
                     rx_data_valid_reg <= rx_data_valid;
                     rx_good_frame_reg <= rx_good_frame;
@@ -204,6 +208,7 @@ module rx_mac_interface (
                 s2 : begin
                     wr_data <= {byte_counter, 32'b0};
                     wr_addr <= commited_wr_addr;
+                    rx_activity <= 1'b1
 
                     commited_wr_addr <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;

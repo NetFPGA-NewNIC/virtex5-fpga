@@ -59,6 +59,9 @@ module rx_tlp_trigger (
     output reg              change_huge_page,
     input                   change_huge_page_ack,
     output reg              send_last_tlp,
+    output reg              send_tail_tlp,
+    output reg              send_numb_qws,
+    input                   send_numb_qws_ack,
     output reg [4:0]        qwords_to_send
     );
 
@@ -92,11 +95,13 @@ module rx_tlp_trigger (
     reg                  huge_page_dirty;
     reg     [18:0]       huge_buffer_qword_counter;
     reg     [18:0]       aux_huge_buffer_qword_counter;
+    reg     [18:0]       aux2_huge_buffer_qword_counter;
     reg     [18:0]       look_ahead_huge_buffer_qword_counter;
     reg     [3:0]        qwords_remaining;
     reg     [4:0]        number_of_tlp_sent;
     reg     [4:0]        look_ahead_number_of_tlp_sent;
     reg     [4:0]        number_of_tlp_to_send;
+    reg                  rx_idle;
 
     ////////////////////////////////////////////////
     // timeout logic
@@ -109,16 +114,14 @@ module rx_tlp_trigger (
         
         else begin  // not reset
 
-            if (trigger_fsm == s0) begin
+            timeout <= 1'b0;
+            free_running <= 'b0;
+
+            if (!rx_idle) begin
                 free_running <= free_running +1;
-                timeout <= 1'b0;
-                if (free_running == 'hFFFF) begin
+                if (free_running == 'h40) begin
                     timeout <= 1'b1;
                 end
-            end
-            else begin
-                timeout <= 1'b0;
-                free_running <= 'b0;
             end
 
         end     // not reset
@@ -133,6 +136,8 @@ module rx_tlp_trigger (
             trigger_tlp <= 1'b0;
             change_huge_page <= 1'b0;
             send_last_tlp <= 1'b0;
+            send_tail_tlp <= 1'b0;
+            send_numb_qws <= 1'b0;
 
             diff <= 'b0;
             commited_rd_addr <= 'b0;
@@ -140,16 +145,20 @@ module rx_tlp_trigger (
             huge_page_dirty <= 1'b0;
             qwords_remaining <= 'b0;
 
+            rx_idle <= 1'b0;
             trigger_fsm <= s0;
         end
 
         else begin  // not reset
+
+            rx_idle <= 1'b0;
 
             diff <= commited_wr_addr + (~commited_rd_addr) +1;
             
             case (trigger_fsm)
 
                 s0 : begin
+                    rx_idle <= 1'b1;
                     look_ahead_huge_buffer_qword_counter <= huge_buffer_qword_counter + diff;
                     diff_reg <= diff;
                     number_of_tlp_to_send <= diff[`BF:4];
@@ -161,7 +170,7 @@ module rx_tlp_trigger (
                         trigger_fsm <= s9;
                     end
                     else if ( (diff) && (timeout) ) begin
-                        trigger_fsm <= s10;
+                        trigger_fsm <= s14;
                     end
                 end
 
@@ -240,25 +249,68 @@ module rx_tlp_trigger (
                 end
 
                 s8 : begin
+                    // delay: diff
                     trigger_fsm <= s0;
                 end
 
                 s9 : begin
                     if (!qwords_remaining) begin
-                        change_huge_page <= 1'b1;
-                        trigger_fsm <= s5;
+                        send_numb_qws <= 1'b1;
+                        trigger_fsm <= s10;
                     end
                     else begin
-                        qwords_to_send <= {1'b0, qwords_remaining};
-                        send_last_tlp <= 1'b1;
-                        trigger_fsm <= s6;
+                        trigger_fsm <= s11;
                     end
                 end
 
                 s10 : begin
+                    huge_page_dirty <= 1'b0;
+                    if (send_numb_qws_ack) begin
+                        send_numb_qws <= 1'b0;
+                        trigger_fsm <= s0;
+                    end
+                end
+
+                s11 : begin
+                    aux2_huge_buffer_qword_counter <= huge_buffer_qword_counter + 'h10;
+                    qwords_to_send <= {1'b0, qwords_remaining};
+                    if (huge_buffer_qword_counter == 'h3FFF0) begin
+                        send_last_tlp <= 1'b1;
+                        trigger_fsm <= s6;
+                    end
+                    else begin
+                        send_tail_tlp <= 1'b1;
+                        trigger_fsm <= s12;
+                    end
+                end
+
+                s12 : begin
+                    look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
+                    if (send_numb_qws_ack) begin
+                        send_tail_tlp <= 1'b0;
+                        trigger_fsm <= s13;
+                    end
+                end
+
+                s13 : begin
+                    commited_rd_address <= look_ahead_commited_rd_address;
+                    huge_buffer_qword_counter <= aux2_huge_buffer_qword_counter;
+                    qwords_remaining <= 'b0;
+                    huge_page_dirty <= 1'b0;
+                    trigger_fsm <= s8;
+                end
+
+                s14 : begin
+                    aux2_huge_buffer_qword_counter <= huge_buffer_qword_counter + 'h10;
                     qwords_to_send <= diff_reg;
-                    send_last_tlp <= 1'b1;
-                    trigger_fsm <= s6;
+                    if (huge_buffer_qword_counter == 'h3FFF0) begin
+                        send_last_tlp <= 1'b1;
+                        trigger_fsm <= s6;
+                    end
+                    else begin
+                        send_tail_tlp <= 1'b1;
+                        trigger_fsm <= s12;
+                    end
                 end
                 
                 default : begin

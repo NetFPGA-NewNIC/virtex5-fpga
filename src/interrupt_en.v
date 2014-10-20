@@ -61,7 +61,8 @@ module interrupt_en (
     input                   trn_rsrc_dsc_n,
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
-    output reg              interrupts_enabled
+    output reg              interrupts_enabled,
+    output reg  [31:0]      interrupt_period
     );
 
     // localparam
@@ -78,6 +79,50 @@ module interrupt_en (
     // Local wires and reg
 
     reg     [7:0]   state;
+    reg     [7:0]   period_fsm;
+    reg             interrupts_enabled_i;
+    reg             interrupts_not_enabled_i;
+    reg             period_received;
+    reg     [31:0]  aux_dw;
+    reg     [31:0]  aux_period;
+
+    ////////////////////////////////////////////////
+    // output
+    ////////////////////////////////////////////////
+    always @(posedge trn_clk) begin
+
+        if (reset) begin  // reset
+            interrupts_enabled <= 1'b1;
+            interrupt_period <= 'h3D090;
+            period_fsm <= s0;
+        end
+        
+        else begin  // not reset
+            if (interrupts_enabled_i) begin
+                interrupts_enabled <= 1'b1;
+            end
+            else if (interrupts_not_enabled_i) begin
+                interrupts_enabled <= 1'b0;
+            end
+
+            case (period_fsm)
+                s0 : begin
+                    aux_period[7:0]   <= aux_dw[31:24];
+                    aux_period[15:8]  <= aux_dw[23:16];
+                    aux_period[23:16] <= aux_dw[15:8];
+                    aux_period[31:24] <= aux_dw[7:0];
+                    if (period_received) begin
+                        period_fsm <= s1;
+                    end
+                end
+                s1 : begin
+                    interrupt_period[29:0] <= aux_period[31:2];
+                    period_fsm <= s0;
+                end
+            endcase
+
+        end     // not reset
+    end  //always
 
     ////////////////////////////////////////////////
     // interrupts_enabled & TLP reception
@@ -85,11 +130,18 @@ module interrupt_en (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            interrupts_enabled <= 1'b1;
+            interrupts_enabled_i <= 1'b0;
+            interrupts_not_enabled_i <= 1'b0;
+            period_received <= 1'b0;
             state <= s0;
         end
         
         else begin  // not reset
+
+            interrupts_enabled_i <= 1'b0;
+            interrupts_not_enabled_i <= 1'b0;
+            period_received <= 1'b0;
+
             case (state)
 
                 s0 : begin
@@ -104,11 +156,23 @@ module interrupt_en (
                 end
 
                 s1 : begin
+                    aux_dw <= trn_rd[31:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[39:34])
 
-                            6'b001000 : begin     // interrupts eneable and disable
-                                interrupts_enabled <= ~interrupts_enabled;
+                            6'b001000 : begin     // interrupts eneable
+                                interrupts_enabled_i <= 1'b1;
+                                state <= s0;
+                            end
+
+                            6'b001001 : begin     // interrupts disable
+                                interrupts_not_enabled_i <= 1'b1;
+                                state <= s0;
+                            end
+
+                            6'b001010 : begin     // interrupts period
+                                period_received <= 1'b1;
+                                state <= s0;
                             end
 
                             default : begin //other addresses
@@ -116,7 +180,6 @@ module interrupt_en (
                             end
 
                         endcase
-                        state <= s0;
                     end
                 end
 
@@ -124,8 +187,18 @@ module interrupt_en (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[7:2])
 
-                            6'b001000 : begin     // interrupts eneable and disable
-                                interrupts_enabled <= ~interrupts_enabled;
+                            6'b001000 : begin     // interrupts eneable
+                                interrupts_enabled_i <= 1'b1;
+                                state <= s0;
+                            end
+
+                            6'b001001 : begin     // interrupts disable
+                                interrupts_not_enabled_i <= 1'b1;
+                                state <= s0;
+                            end
+
+                            6'b001010 : begin     // interrupts period
+                                state <= s3;
                             end
 
                             default : begin //other addresses
@@ -133,7 +206,14 @@ module interrupt_en (
                             end
 
                         endcase
-                        state <= s3;
+                    end
+                end
+
+                s3 : begin
+                    aux_dw <= trn_rd[63:32];
+                    period_received <= 1'b1;
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        state <= s0;
                     end
                 end
 
