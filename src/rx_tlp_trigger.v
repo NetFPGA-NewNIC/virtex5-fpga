@@ -66,17 +66,23 @@ module rx_tlp_trigger (
     );
 
     // localparam
-    localparam s0  = 10'b0000000000;
-    localparam s1  = 10'b0000000001;
-    localparam s2  = 10'b0000000010;
-    localparam s3  = 10'b0000000100;
-    localparam s4  = 10'b0000001000;
-    localparam s5  = 10'b0000010000;
-    localparam s6  = 10'b0000100000;
-    localparam s7  = 10'b0001000000;
-    localparam s8  = 10'b0010000000;
-    localparam s9  = 10'b0100000000;
-    localparam s10 = 10'b1000000000;
+    localparam s0  = 16'b0000000000000000;
+    localparam s1  = 16'b0000000000000001;
+    localparam s2  = 16'b0000000000000010;
+    localparam s3  = 16'b0000000000000100;
+    localparam s4  = 16'b0000000000001000;
+    localparam s5  = 16'b0000000000010000;
+    localparam s6  = 16'b0000000000100000;
+    localparam s7  = 16'b0000000001000000;
+    localparam s8  = 16'b0000000010000000;
+    localparam s9  = 16'b0000000100000000;
+    localparam s10 = 16'b0000001000000000;
+    localparam s11 = 16'b0000010000000000;
+    localparam s12 = 16'b0000100000000000;
+    localparam s13 = 16'b0001000000000000;
+    localparam s14 = 16'b0010000000000000;
+    localparam s15 = 16'b0100000000000000;
+    localparam s16 = 16'b1000000000000000;
 
     //-------------------------------------------------------
     // Local timeout-generation
@@ -87,7 +93,7 @@ module rx_tlp_trigger (
     //-------------------------------------------------------
     // Local trigger-logic
     //-------------------------------------------------------
-    reg     [9:0]        trigger_fsm;
+    reg     [15:0]       trigger_fsm;
     reg     [`BF:0]      diff;
     reg     [`BF:0]      diff_reg;
     reg     [`BF:0]      commited_rd_addr;
@@ -117,7 +123,7 @@ module rx_tlp_trigger (
             timeout <= 1'b0;
             free_running <= 'b0;
 
-            if (!rx_idle) begin
+            if (rx_idle) begin
                 free_running <= free_running +1;
                 if (free_running == 'h40) begin
                     timeout <= 1'b1;

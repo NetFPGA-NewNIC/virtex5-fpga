@@ -493,6 +493,7 @@ module rx_wr_pkt_to_hugepages (
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
                         if (change_huge_page || remember_to_change_huge_page) begin
                             remember_to_change_huge_page <= 1'b0;
+                            notify_huge_page_change <= 1'b1;
                             change_huge_page_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s24;
