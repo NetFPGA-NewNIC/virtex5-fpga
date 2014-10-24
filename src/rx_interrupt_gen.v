@@ -81,7 +81,7 @@ module rx_interrupt_gen (
     ////////////////////////////////////////////////
     // interrupts_gen
     ////////////////////////////////////////////////
-    always @(posedge trn_clk) begin
+    always @(posedge clk) begin
 
         if (reset) begin  // reset
             cfg_interrupt_n <= 1'b1;

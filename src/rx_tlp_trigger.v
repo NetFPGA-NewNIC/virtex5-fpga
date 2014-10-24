@@ -291,7 +291,7 @@ module rx_tlp_trigger (
                 end
 
                 s12 : begin
-                    look_ahead_commited_rd_address <= commited_rd_address + qwords_to_send;
+                    look_ahead_commited_rd_addr <= commited_rd_addr + qwords_to_send;
                     if (send_numb_qws_ack) begin
                         send_tail_tlp <= 1'b0;
                         trigger_fsm <= s13;
@@ -299,7 +299,7 @@ module rx_tlp_trigger (
                 end
 
                 s13 : begin
-                    commited_rd_address <= look_ahead_commited_rd_address;
+                    commited_rd_addr <= look_ahead_commited_rd_addr;
                     huge_buffer_qword_counter <= aux2_huge_buffer_qword_counter;
                     qwords_remaining <= 'b0;
                     huge_page_dirty <= 1'b0;

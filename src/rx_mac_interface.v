@@ -208,7 +208,7 @@ module rx_mac_interface (
                 s2 : begin
                     wr_data <= {byte_counter, 32'b0};
                     wr_addr <= commited_wr_addr;
-                    rx_activity <= 1'b1
+                    rx_activity <= 1'b1;
 
                     commited_wr_addr <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;
