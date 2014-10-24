@@ -342,6 +342,9 @@
       <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="137"/>
       <association xil_pn:name="Implementation" xil_pn:seqID="53"/>
     </file>
+    <file xil_pn:name="../chipscope/my_chipscope.cdc" xil_pn:type="FILE_CDC">
+      <association xil_pn:name="Implementation" xil_pn:seqID="138"/>
+    </file>
   </files>
 
   <properties>
