@@ -311,17 +311,17 @@ module rx_wr_pkt_to_hugepages (
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s2;
                         end
-                        else if (send_tail_tlp) begin
-                            remember_to_send_numb_qws <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s2;
-                        end
                         else if (send_numb_qws || remember_to_send_numb_qws) begin
                             remember_to_send_numb_qws <= 1'b0;
                             notify_huge_page_change <= 1'b0;
                             send_numb_qws_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s10;
+                        end
+                        else if (send_tail_tlp) begin
+                            remember_to_send_numb_qws <= 1'b1;
+                            driving_interface <= 1'b1;
+                            send_fsm <= s2;
                         end
                     end
                 end
@@ -508,17 +508,17 @@ module rx_wr_pkt_to_hugepages (
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s15;
                         end
-                        else if (send_tail_tlp) begin
-                            remember_to_send_numb_qws <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s15;
-                        end
                         else if (send_numb_qws || remember_to_send_numb_qws) begin
                             remember_to_send_numb_qws <= 1'b0;
                             notify_huge_page_change <= 1'b0;
                             send_numb_qws_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s24;
+                        end
+                        else if (send_tail_tlp) begin
+                            remember_to_send_numb_qws <= 1'b1;
+                            driving_interface <= 1'b1;
+                            send_fsm <= s15;
                         end
                     end
                 end
