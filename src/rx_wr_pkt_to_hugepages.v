@@ -351,7 +351,7 @@ module rx_wr_pkt_to_hugepages (
                     rd_addr <= rd_addr +1;
 
                     look_ahead_host_mem_addr <= host_mem_addr + 'h80;
-                    look_ahead_huge_page_qword_counter <= huge_page_qword_counter + 'h10;
+                    look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
                     look_ahead_commited_rd_addr <= commited_rd_addr + qwords_in_tlp;
 
@@ -462,7 +462,7 @@ module rx_wr_pkt_to_hugepages (
                 s11 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        return_huge_page_to_host <= 1'b1;
+                        return_huge_page_to_host <= notify_huge_page_change;
                         trn_td <= current_huge_page_addr;
                         send_fsm <= s12;
                     end
@@ -480,7 +480,12 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
-                        send_fsm <= s0;
+                        if (notify_huge_page_change) begin
+                            send_fsm <= s0;
+                        end
+                        else begin
+                            send_fsm <= s1;
+                        end
                     end
                 end
 
@@ -553,7 +558,7 @@ module rx_wr_pkt_to_hugepages (
                     rd_addr <= rd_addr +1;
 
                     look_ahead_host_mem_addr <= host_mem_addr + 'h80;
-                    look_ahead_huge_page_qword_counter <= huge_page_qword_counter + 'h10;
+                    look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
                     look_ahead_commited_rd_addr <= commited_rd_addr + qwords_in_tlp;
 
@@ -664,7 +669,7 @@ module rx_wr_pkt_to_hugepages (
                 s25 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        return_huge_page_to_host <= 1'b1;
+                        return_huge_page_to_host <= notify_huge_page_change;
                         trn_td <= {current_huge_page_addr[31:0], huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24]};
                         send_fsm <= s26;
                     end
@@ -682,7 +687,12 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
-                        send_fsm <= s0;
+                        if (notify_huge_page_change) begin
+                            send_fsm <= s0;
+                        end
+                        else begin
+                            send_fsm <= s14;
+                        end
                     end
                 end
 
