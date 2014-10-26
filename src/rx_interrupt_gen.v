@@ -52,6 +52,16 @@ module rx_interrupt_gen (
     input                   cfg_interrupt_rdy_n,
 
     input                   rx_activity,
+    input                   trigger_tlp,
+    input                   trigger_tlp_ack,
+    input                   change_huge_page,
+    input                   change_huge_page_ack,
+    input                   send_last_tlp,
+    input                   send_tail_tlp,
+    input                   send_numb_qws,
+    input                   send_numb_qws_ack,
+    input                   huge_page_status_1,
+    input                   huge_page_status_2,
     input                   interrupts_enabled,
     input       [31:0]      interrupt_period
     );
@@ -103,11 +113,26 @@ module rx_interrupt_gen (
                     if (rx_activity_reg1) begin
                         interrupt_gen_fsm <= s1;
                     end
+                    else if (trigger_tlp && trigger_tlp_ack) begin
+                        interrupt_gen_fsm <= s1;
+                    end
+                    else if (change_huge_page && change_huge_page_ack) begin
+                        interrupt_gen_fsm <= s1;
+                    end
+                    else if (send_last_tlp && change_huge_page_ack) begin
+                        interrupt_gen_fsm <= s1;
+                    end
+                    else if (send_tail_tlp && send_numb_qws_ack) begin
+                        interrupt_gen_fsm <= s1;
+                    end
+                    else if (send_numb_qws && send_numb_qws_ack) begin
+                        interrupt_gen_fsm <= s1;
+                    end
                 end
 
                 s1 : begin
                     counter <= 'b0;
-                    if (interrupts_enabled) begin
+                    if (interrupts_enabled && (huge_page_status_1 || huge_page_status_2)) begin
                         cfg_interrupt_n <= 1'b0;
                         interrupt_gen_fsm <= s2;
                     end

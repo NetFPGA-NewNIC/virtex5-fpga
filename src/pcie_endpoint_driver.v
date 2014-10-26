@@ -258,6 +258,7 @@ module  pcie_endpoint_driver (
     wire              interrupts_enabled;
     wire   [31:0]     interrupt_period;
     wire              mdio_access_cfg_interrupt_n;
+    wire              ctrl_cfg_interrupt_n;
 
     //-------------------------------------------------------
     // Core input tie-offs
@@ -383,6 +384,16 @@ module  pcie_endpoint_driver (
         .cfg_interrupt_n(rx_cfg_interrupt_n),                  // O
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .rx_activity(rx_activity),                             // I
+        .trigger_tlp(rx_trigger_tlp),                          // I
+        .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
+        .change_huge_page(rx_change_huge_page),                // I
+        .change_huge_page_ack(rx_change_huge_page_ack),        // I
+        .send_last_tlp(rx_send_last_tlp),                      // I
+        .send_tail_tlp(rx_send_tail_tlp),                      // I
+        .send_numb_qws(rx_send_numb_qws),                      // I
+        .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
+        .huge_page_status_1(rx_huge_page_status_1),            // I
+        .huge_page_status_2(rx_huge_page_status_2),            // I
         .interrupts_enabled(interrupts_enabled),               // I
         .interrupt_period(interrupt_period)                    // I [31:0]
         );
@@ -553,12 +564,12 @@ module  pcie_endpoint_driver (
     assign trn_tsof_n = rx_trn_tsof_n & tx_trn_tsof_n;
     assign trn_teof_n = rx_trn_teof_n & tx_trn_teof_n;
     assign trn_tsrc_rdy_n = rx_trn_tsrc_rdy_n & tx_trn_tsrc_rdy_n;
-    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & rx_cfg_interrupt_n & tx_cfg_interrupt_n;               // Active low
+    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & rx_cfg_interrupt_n & tx_cfg_interrupt_n & ctrl_cfg_interrupt_n;               // Active low
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Interrupt control logic
     //////////////////////////////////////////////////////////////////////////////////////////
-    interrupt_en interrupt_en_mod (
+    interrupt_ctrl interrupt_ctrl_mod (
         .trn_clk(trn_clk),                                     // I
         .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
@@ -569,6 +580,8 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .cfg_interrupt_n(ctrl_cfg_interrupt_n),                // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .interrupts_enabled(interrupts_enabled),               // O
         .interrupt_period(interrupt_period)                    // O [31:0]
         );

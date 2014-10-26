@@ -49,6 +49,7 @@
 #define PCI_BAR2 2
 
 irqreturn_t mdio_access_interrupt_handler(int irq, void *dev_id);
+irqreturn_t simple_rtt_test_interrupt_handler(int irq, void *dev_id);
 
 void rx_wq_function(struct work_struct *wk);
 
@@ -94,8 +95,13 @@ struct my_driver_host_data {
 
     atomic_t mdio_access_rdy;
 
+    atomic_t rtt_access_rdy;
+    u64 rtt;
+    u64 tstamp_b;
+
 };
 
 int configure_ael2005_phy_chips(struct my_driver_host_data *my_drv_data);
+int simple_rtt_test(struct my_driver_host_data *my_drv_data);
 
 #endif

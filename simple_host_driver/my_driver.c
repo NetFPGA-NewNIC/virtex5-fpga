@@ -74,15 +74,14 @@ void rx_wq_function(struct work_struct *wk)
     u32 timeout;
     unsigned long flags;
     u32 polling_counter;
+    u32 interrupts_enabled = 0;
 
     spin_lock_irqsave(&rx_subsys, flags);
 
     polling_counter = 0;
     init:
-    if (polling_counter == 0xffff)
+    if (polling_counter == 2)
     {
-        printk(KERN_INFO "Myd: no pkts. exit polling. enable interrupts\n");
-        *(((u32 *)my_drv_data->bar2) + 8) = 0xcacabeef; // enable interrupts
         spin_unlock_irqrestore(&rx_subsys, flags);
         return;
     }
@@ -97,32 +96,51 @@ void rx_wq_function(struct work_struct *wk)
     {
         timeout = 0;
         do {
-            
             current_pkt_len = current_hp_addr[my_drv_data->current_pkt_dw_index+1];
+            rmb();
             if (current_pkt_len)
                 goto alloc_my_skb;
 
-            timeout++;
-        } while (timeout < 1000);
+            huge_page_status = *((u64 *)current_hp_addr);            //QW0 contains this information
+            rmb();
+            if ( (((u32)huge_page_status) << 1) > (my_drv_data->current_pkt_dw_index - 32) )
+                goto next_pkt;
 
-        huge_page_status = *((u64 *)current_hp_addr);            //QW0 contains this information
-        if ( (((u32)huge_page_status) << 1) > (my_drv_data->current_pkt_dw_index - 32) )
+            if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
+            {
+                if ( (((u32)huge_page_status) << 1) == (my_drv_data->current_pkt_dw_index - 32) )
+                    goto close_hp;
+                else
+                {
+                    printk(KERN_ERR "Myd: B huge_page_status: 0x%08x %08x\n", (u32)(huge_page_status >>32), (u32)huge_page_status);
+                    printk(KERN_ERR "Myd: current_pkt_dw_index: 0x%08x\n", my_drv_data->current_pkt_dw_index);
+                    spin_unlock_irqrestore(&rx_subsys, flags);
+                    return;
+                }
+            }
+
+            timeout++;
+        } while (timeout < 10000);
+
+        if (!interrupts_enabled)
         {
-            printk(KERN_ERR "Myd: invalid current_pkt_len\n");
-            spin_unlock_irqrestore(&rx_subsys, flags);
-            return;
+            interrupts_enabled = 1;
+            *(((u32 *)my_drv_data->bar2) + 8) = 0xcacabeef; // enable interrupts            
         }
-        if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
-            goto close_hp;
 
         polling_counter++;
         goto init;
         
         alloc_my_skb:
+        if (!interrupts_enabled)
+        {
+            interrupts_enabled = 0;
+            *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;     // disable interrupts
+        }
         polling_counter = 0;
         if (current_pkt_len > 1514)
         {
-            printk(KERN_ERR "Myd: invalid current_pkt_len\n");
+            printk(KERN_ERR "Myd: A invalid current_pkt_len: 0x%08x\n", current_pkt_len);
             spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
@@ -149,7 +167,7 @@ void rx_wq_function(struct work_struct *wk)
         timeout = 0;
         do {
             next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
-            
+            rmb();
             if (next_pkt_len)
                 goto eat_pkt;
 
@@ -158,6 +176,11 @@ void rx_wq_function(struct work_struct *wk)
             {
                 if ( (((u32)huge_page_status) << 1) == (my_drv_data->current_pkt_dw_index - 32 + (__ALIGN_KERNEL_MASK(current_pkt_len, 0x7) >> 2) + 2) )
                 {
+                    rmb();
+                    next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
+                    if (next_pkt_len)
+                        goto eat_pkt;
+
                     if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
                         goto eat_pkt_close_hp;
                     else
@@ -168,12 +191,17 @@ void rx_wq_function(struct work_struct *wk)
                 }
                 else if ( (((u32)huge_page_status) << 1) < (my_drv_data->current_pkt_dw_index - 32 + (__ALIGN_KERNEL_MASK(current_pkt_len, 0x7) >> 2) + 2) )
                 {
-                    printk(KERN_ERR "Myd: invalid current_pkt_len\n");
+                    printk(KERN_ERR "Myd: C invalid current_pkt_len: 0x%08x\n", current_pkt_len);
                     spin_unlock_irqrestore(&rx_subsys, flags);
                     return;
                 }
                 else
                 {
+                    rmb();
+                    next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
+                    if (next_pkt_len)
+                        goto eat_pkt;
+
                     next_pkt_dw_index = __ALIGN_KERNEL_MASK(next_pkt_dw_index, 0x1f);
                     goto eat_pkt;
                 }
@@ -182,9 +210,9 @@ void rx_wq_function(struct work_struct *wk)
             timeout++;
         } while (timeout < 100000);
 
-        printk(KERN_ERR "Myd: invalid current_pkt_len\n");
+        printk(KERN_ERR "Myd: D invalid current_pkt_len: 0x%08x\n", current_pkt_len);
         spin_unlock_irqrestore(&rx_subsys, flags);
-        return; 
+        return;
 
         eat_pkt:
         memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->current_pkt_dw_index + 2), current_pkt_len);
@@ -209,6 +237,7 @@ void rx_wq_function(struct work_struct *wk)
 
         close_hp:
         memset((void *)current_hp_addr, 0, 8);
+        wmb();
         my_drv_data->current_pkt_dw_index = 32;
         if (!my_drv_data->huge_page_index)
         {
@@ -235,6 +264,7 @@ void rx_wq_function(struct work_struct *wk)
         if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
         {
             memset((void *)current_hp_addr, 0, 8);
+            wmb();
             my_drv_data->current_pkt_dw_index = 32;
             if (!my_drv_data->huge_page_index)
             {
@@ -265,7 +295,7 @@ irqreturn_t card_interrupt_handler(int irq, void *dev_id)
     int ret;
 
     #ifdef MY_DEBUG
-    printk(KERN_INFO "Myd: Interruption received\n");
+    //printk(KERN_INFO "Myd: Interruption received\n");
     #endif
 
     ret = queue_work(my_drv_data->rx_wq, (struct work_struct *)&my_drv_data->rx_work);
@@ -273,10 +303,7 @@ irqreturn_t card_interrupt_handler(int irq, void *dev_id)
     if (!ret)
         printk(KERN_INFO "busy\n");
     else
-    {
-        *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;
-        printk(KERN_INFO "Myd: Disable interrupt\n");
-    }
+        *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;     // disable interrupts
 
     return IRQ_HANDLED;
 }
@@ -402,6 +429,21 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         goto err_07;
     }
 
+    // RTT
+    ret = request_irq(pdev->irq, simple_rtt_test_interrupt_handler, 0, DRV_NAME, pdev);
+    if (ret)
+    {
+        printk(KERN_ERR "Myd: request_irq\n");
+        goto err_08;
+    }
+    ret = simple_rtt_test(my_drv_data);
+    if (ret)
+    {
+        printk(KERN_ERR "Myd: warning, RTT not working\n");
+    }
+    free_irq(pdev->irq, pdev);
+    // RTT ready
+
     // AEL2005 MDIO configuration
     ret = request_irq(pdev->irq, mdio_access_interrupt_handler, 0, DRV_NAME, pdev);
     if (ret)
@@ -409,13 +451,11 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         printk(KERN_ERR "Myd: request_irq\n");
         goto err_08;
     }
-    
     ret = configure_ael2005_phy_chips(my_drv_data);
     if (ret)
     {
         printk(KERN_ERR "Myd: warning, AEL2005 not configured\n");
     }
- 
     free_irq(pdev->irq, pdev);
     // AEL2005 MDIO configuration ready
 
@@ -440,6 +480,7 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         goto err_10;
     }
 
+    // Hwanju says that pci_alloc_consistent zeros the memory. This is not mandatory
     memset(my_drv_data->huge_page_kern_address1, 0, 2*1024*1024);
     memset(my_drv_data->huge_page_kern_address2, 0, 2*1024*1024);
 
