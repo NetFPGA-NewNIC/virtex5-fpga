@@ -459,7 +459,7 @@ module rx_wr_pkt_to_hugepages (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     aux_qw_count <= huge_page_qword_counter;
-                    next_qw_counter <= huge_page_qword_counter + 'h7F;
+                    next_qw_counter <= huge_page_qword_counter + 'hF;
                     send_fsm <= s11;
                 end
 
@@ -473,7 +473,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s12 : begin
-                    huge_page_qword_counter <= {next_qw_counter[31:7], 7'b0};
+                    huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
                         trn_td <= {aux_qw_count[7:0], aux_qw_count[15:8], aux_qw_count[23:16], aux_qw_count[31:24], {7'b0, notify_huge_page_change}, 24'b0};
                         trn_teof_n <= 1'b0;
@@ -669,7 +669,7 @@ module rx_wr_pkt_to_hugepages (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     aux_qw_count <= huge_page_qword_counter;
-                    next_qw_counter <= huge_page_qword_counter + 'h7F;
+                    next_qw_counter <= huge_page_qword_counter + 'hF;
                     send_fsm <= s25;
                 end
 
@@ -683,7 +683,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s26 : begin
-                    huge_page_qword_counter <= {next_qw_counter[31:7], 7'b0};
+                    huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
                         trn_td[63:32] <= {{7'b0, notify_huge_page_change}, 24'b0};
                         trn_teof_n <= 1'b0;
