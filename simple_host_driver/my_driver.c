@@ -172,6 +172,11 @@ void rx_wq_function(struct work_struct *wk)
                     spin_unlock_irqrestore(&rx_subsys, flags);
                     return;
                 }
+                else
+                {
+                    next_pkt_dw_index = __ALIGN_KERNEL_MASK(next_pkt_dw_index, 0x1f);
+                    goto eat_pkt;
+                }
             }
 
             timeout++;
@@ -183,24 +188,24 @@ void rx_wq_function(struct work_struct *wk)
 
         eat_pkt:
         memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->current_pkt_dw_index + 2), current_pkt_len);
+        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
         my_skb->protocol = eth_type_trans(my_skb, my_drv_data->my_net_device);
         my_skb->ip_summed = CHECKSUM_NONE;
         netif_receive_skb(my_skb);
         my_drv_data->my_net_device->stats.rx_packets++;
-        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
 
         my_drv_data->current_pkt_dw_index = next_pkt_dw_index;
         goto next_pkt;
 
         eat_pkt_close_hp:
         memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->current_pkt_dw_index + 2), current_pkt_len);
+        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
         my_skb->protocol = eth_type_trans(my_skb, my_drv_data->my_net_device);
         my_skb->ip_summed = CHECKSUM_NONE;
         netif_receive_skb(my_skb);
         my_drv_data->my_net_device->stats.rx_packets++;
-        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
 
         close_hp:
         memset((void *)current_hp_addr, 0, 8);

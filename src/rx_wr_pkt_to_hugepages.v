@@ -145,6 +145,8 @@ module rx_wr_pkt_to_hugepages (
     reg     [63:0]      host_mem_addr;
     reg     [63:0]      look_ahead_host_mem_addr;
     reg     [31:0]      huge_page_qword_counter;
+    reg     [31:0]      aux_qw_count;
+    reg     [31:0]      next_qw_counter;
     reg     [31:0]      look_ahead_huge_page_qword_counter;
     reg                 remember_to_change_huge_page;
     reg                 remember_to_send_numb_qws;
@@ -456,6 +458,8 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    aux_qw_count <= huge_page_qword_counter;
+                    next_qw_counter <= huge_page_qword_counter + 'h7F;
                     send_fsm <= s11;
                 end
 
@@ -469,8 +473,9 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s12 : begin
+                    huge_page_qword_counter <= {next_qw_counter[31:7], 7'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24], {7'b0, notify_huge_page_change}, 24'b0};
+                        trn_td <= {aux_qw_count[7:0], aux_qw_count[15:8], aux_qw_count[23:16], aux_qw_count[31:24], {7'b0, notify_huge_page_change}, 24'b0};
                         trn_teof_n <= 1'b0;
                         send_fsm <= s13;
                     end
@@ -663,6 +668,8 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    aux_qw_count <= huge_page_qword_counter;
+                    next_qw_counter <= huge_page_qword_counter + 'h7F;
                     send_fsm <= s25;
                 end
 
@@ -670,12 +677,13 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         return_huge_page_to_host <= notify_huge_page_change;
-                        trn_td <= {current_huge_page_addr[31:0], huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24]};
+                        trn_td <= {current_huge_page_addr[31:0], aux_qw_count[7:0], aux_qw_count[15:8], aux_qw_count[23:16], aux_qw_count[31:24]};
                         send_fsm <= s26;
                     end
                 end
 
                 s26 : begin
+                    huge_page_qword_counter <= {next_qw_counter[31:7], 7'b0};
                     if (!trn_tdst_rdy_n) begin
                         trn_td[63:32] <= {{7'b0, notify_huge_page_change}, 24'b0};
                         trn_teof_n <= 1'b0;
