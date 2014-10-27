@@ -12,9 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Simple test for rtt. TCP like
-*        RTT = 0.875 * RTT + 0.125 * sampleRTT
-*        sampleRTT = tstamp_b - tstamp_a
+*        Simple test for rtt.
 *        Network should be fixed after init
 *
 *
@@ -48,14 +46,14 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h> 
-#include <linux/jiffies.h>      /* Needed for jiffies */
+#include <linux/ktime.h>        /* Needed for time */
 #include "my_driver.h"
 
 irqreturn_t simple_rtt_test_interrupt_handler(int irq, void *dev_id) {
     struct pci_dev *pdev = dev_id;
     struct my_driver_host_data *my_drv_data = (struct my_driver_host_data *)pci_get_drvdata(pdev);
 
-    my_drv_data->tstamp_b = (long)jiffies;
+    my_drv_data->tstamp_b = ktime_get();
     atomic_set(&my_drv_data->rtt_access_rdy, 1);
 
     return IRQ_HANDLED;
@@ -65,13 +63,11 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
     int ret;
     int i;
     int timeout;
-    u64 tstamp_a;
     u64 sample;
-
-    printk(KERN_INFO "Myd: Test rtt...\n");
+    ktime_t tstamp_a;
 
     atomic_set(&my_drv_data->rtt_access_rdy, 0);
-    tstamp_a = (long)jiffies;
+    tstamp_a = ktime_get();
     wmb();
     *(((u32 *)my_drv_data->bar2) + 11) = 0xcacabeef;
     wmb();
@@ -81,15 +77,15 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
         timeout++;
         if (timeout > 1000)
             ret = 0;
-    } while (!atomic_read(&my_drv_data->mdio_access_rdy));
+    } while (!atomic_read(&my_drv_data->rtt_access_rdy));
 
-    my_drv_data->rtt = my_drv_data->tstamp_b - tstamp_a;
-    printk(KERN_INFO "Myd: first rtt: %d\n", my_drv_data->rtt);
+    my_drv_data->rtt = ktime_to_ns(ktime_sub(my_drv_data->tstamp_b, tstamp_a));
+    printk(KERN_INFO "Myd: first rtt: %dns\n", (u32)my_drv_data->rtt);
 
-    for (i = 0; i < 100; i++)
+    for (i = 0; i < 200; i++)
     {
         atomic_set(&my_drv_data->rtt_access_rdy, 0);
-        tstamp_a = (long)jiffies;
+        tstamp_a = ktime_get();
         wmb();
         *(((u32 *)my_drv_data->bar2) + 11) = 0xcacabeef;
         wmb();
@@ -99,13 +95,14 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
             timeout++;
             if (timeout > 1000)
                 ret = 0;
-        } while (!atomic_read(&my_drv_data->mdio_access_rdy));
+        } while (!atomic_read(&my_drv_data->rtt_access_rdy));
 
-        sample = my_drv_data->tstamp_b - tstamp_a;
-        my_drv_data->rtt = 0.875 * my_drv_data->rtt + 0.125 * sample;
+        sample = ktime_to_ns(ktime_sub(my_drv_data->tstamp_b, tstamp_a));
+        if (sample > my_drv_data->rtt)
+            my_drv_data->rtt = sample;
     }
 
-    printk(KERN_INFO "Myd: rtt: %d\n", my_drv_data->rtt);
+    printk(KERN_INFO "Myd: final rtt: %dns\n", (u32)my_drv_data->rtt);
 
     return 0;
 }

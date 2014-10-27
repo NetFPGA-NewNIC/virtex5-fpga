@@ -47,6 +47,7 @@
 #define DRV_NAME "my_driver"
 #define PCI_BAR0 0
 #define PCI_BAR2 2
+#define HW_RX_TIMEOUT 256
 
 irqreturn_t mdio_access_interrupt_handler(int irq, void *dev_id);
 irqreturn_t simple_rtt_test_interrupt_handler(int irq, void *dev_id);
@@ -97,7 +98,7 @@ struct my_driver_host_data {
 
     atomic_t rtt_access_rdy;
     u64 rtt;
-    u64 tstamp_b;
+    ktime_t tstamp_b;
 
 };
 

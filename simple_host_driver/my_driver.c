@@ -71,20 +71,16 @@ void rx_wq_function(struct work_struct *wk)
     volatile u32 next_pkt_len;
     u32 next_pkt_dw_index;
     volatile u64 huge_page_status;
-    u32 timeout;
+    u64 timeout;
+    u32 polling;
     unsigned long flags;
-    u32 polling_counter;
     u32 interrupts_enabled = 0;
+    ktime_t tstamp_a, tstamp_b;
 
     spin_lock_irqsave(&rx_subsys, flags);
 
-    polling_counter = 0;
     init:
-    if (polling_counter == 2)
-    {
-        spin_unlock_irqrestore(&rx_subsys, flags);
-        return;
-    }
+    polling = 0;
 
     if (!my_drv_data->huge_page_index)
         current_hp_addr = (u32 *)my_drv_data->huge_page_kern_address1;
@@ -92,9 +88,9 @@ void rx_wq_function(struct work_struct *wk)
         current_hp_addr = (u32 *)my_drv_data->huge_page_kern_address2;
     
     next_pkt:
+    polling = 0;
     if (my_drv_data->current_pkt_dw_index < (2*1024*1024/4))
     {
-        timeout = 0;
         do {
             current_pkt_len = current_hp_addr[my_drv_data->current_pkt_dw_index+1];
             rmb();
@@ -119,25 +115,33 @@ void rx_wq_function(struct work_struct *wk)
                 }
             }
 
-            timeout++;
-        } while (timeout < 10000);
+            if (!polling)
+            {
+                polling = 1;
+                tstamp_a = ktime_get();
+            }
+            tstamp_b = ktime_get();
 
-        if (!interrupts_enabled)
-        {
-            interrupts_enabled = 1;
-            *(((u32 *)my_drv_data->bar2) + 8) = 0xcacabeef; // enable interrupts            
-        }
+            timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
+            if (timeout > (HW_RX_TIMEOUT + my_drv_data->rtt*98))
+            {
+                if (!interrupts_enabled)
+                {
+                    interrupts_enabled = 1;
+                    *(((u32 *)my_drv_data->bar2) + 8) = 0xcacabeef; // enable interrupts            
+                }
+            }
+        } while (timeout < (HW_RX_TIMEOUT + my_drv_data->rtt*100));
 
-        polling_counter++;
-        goto init;
+        spin_unlock_irqrestore(&rx_subsys, flags);
+        return;
         
         alloc_my_skb:
-        if (!interrupts_enabled)
+        if (interrupts_enabled)
         {
             interrupts_enabled = 0;
             *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;     // disable interrupts
         }
-        polling_counter = 0;
         if (current_pkt_len > 1514)
         {
             printk(KERN_ERR "Myd: A invalid current_pkt_len: 0x%08x\n", current_pkt_len);
@@ -164,7 +168,7 @@ void rx_wq_function(struct work_struct *wk)
             return;
         }
 
-        timeout = 0;
+        polling = 0;
         do {
             next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
             rmb();
@@ -207,8 +211,15 @@ void rx_wq_function(struct work_struct *wk)
                 }
             }
 
-            timeout++;
-        } while (timeout < 100000);
+            if (!polling)
+            {
+                polling = 1;
+                tstamp_a = ktime_get();
+            }
+            tstamp_b = ktime_get();
+
+            timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
+        } while (timeout < (HW_RX_TIMEOUT + my_drv_data->rtt*1000));
 
         printk(KERN_ERR "Myd: D invalid current_pkt_len: 0x%08x\n", current_pkt_len);
         spin_unlock_irqrestore(&rx_subsys, flags);
@@ -249,7 +260,6 @@ void rx_wq_function(struct work_struct *wk)
             my_drv_data->huge_page_index = 0;
             *(((u32 *)my_drv_data->bar2) + 25) = 0xcacabeef;
         }
-        polling_counter = 0;
         goto init;
     }
     else if (my_drv_data->current_pkt_dw_index > (2*1024*1024/4))
@@ -283,7 +293,6 @@ void rx_wq_function(struct work_struct *wk)
             spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
-        polling_counter = 0;
         goto init;
     }
 }
@@ -491,6 +500,10 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         printk(KERN_ERR "Myd: my_linux_network_interface\n");
         goto err_11;
     }
+
+    // Set interrupt min period
+    *(((u32 *)my_drv_data->bar2) + 10) = my_drv_data->rtt * 20;
+    printk(KERN_INFO "Myd: Rx interrupt min period set to: %dns\n", (u32)(my_drv_data->rtt * 20));
 
     my_drv_data->current_pkt_dw_index = 32;
 
