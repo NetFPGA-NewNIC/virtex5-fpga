@@ -688,6 +688,17 @@ module tx_wr_pkt_to_bram (
                     if (send_notification_huge_page_1_ack) begin
                         waiting_data_huge_page_1 <= 1'b0;
                         send_notification_huge_page_1 <= 1'b0;
+                        if (!reading_huge_page_1) begin
+                            huge_page_1_notifications_fsm <= s0;
+                        end
+                        else begin
+                            huge_page_1_notifications_fsm <= s5;
+                        end
+                    end
+                end
+
+                s5 : begin
+                    if (!reading_huge_page_1) begin
                         huge_page_1_notifications_fsm <= s0;
                     end
                 end
@@ -758,6 +769,17 @@ module tx_wr_pkt_to_bram (
                     if (send_notification_huge_page_2_ack) begin
                         waiting_data_huge_page_2 <= 1'b0;
                         send_notification_huge_page_2 <= 1'b0;
+                        if (!reading_huge_page_2) begin
+                            huge_page_2_notifications_fsm <= s0;
+                        end
+                        else begin
+                            huge_page_2_notifications_fsm <= s5;
+                        end
+                    end
+                end
+
+                s5 : begin
+                    if (!reading_huge_page_2) begin
                         huge_page_2_notifications_fsm <= s0;
                     end
                 end
