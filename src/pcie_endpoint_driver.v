@@ -183,8 +183,6 @@ module  pcie_endpoint_driver (
     wire                                              rx_trigger_tlp_ack;
     wire                                              rx_change_huge_page;
     wire                                              rx_change_huge_page_ack;
-    wire                                              rx_send_last_tlp;
-    wire                                              send_tail_tlp;
     wire                                              send_numb_qws;
     wire                                              send_numb_qws_ack;
     wire   [4:0]                                      rx_qwords_to_send;
@@ -368,8 +366,6 @@ module  pcie_endpoint_driver (
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
         .change_huge_page(rx_change_huge_page),                // O
         .change_huge_page_ack(rx_change_huge_page_ack),        // I
-        .send_last_tlp(rx_send_last_tlp),                      // O
-        .send_tail_tlp(rx_send_tail_tlp),                      // O
         .send_numb_qws(rx_send_numb_qws),                      // O
         .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
         .qwords_to_send(rx_qwords_to_send)                     // O [4:0]
@@ -388,8 +384,6 @@ module  pcie_endpoint_driver (
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
         .change_huge_page(rx_change_huge_page),                // I
         .change_huge_page_ack(rx_change_huge_page_ack),        // I
-        .send_last_tlp(rx_send_last_tlp),                      // I
-        .send_tail_tlp(rx_send_tail_tlp),                      // I
         .send_numb_qws(rx_send_numb_qws),                      // I
         .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
         .huge_page_status_1(rx_huge_page_status_1),            // I
@@ -422,8 +416,6 @@ module  pcie_endpoint_driver (
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // O
         .change_huge_page(rx_change_huge_page),                // I
         .change_huge_page_ack(rx_change_huge_page_ack),        // O
-        .send_last_tlp(rx_send_last_tlp),                      // I
-        .send_tail_tlp(rx_send_tail_tlp),                      // I
         .send_numb_qws(rx_send_numb_qws),                      // I
         .send_numb_qws_ack(rx_send_numb_qws_ack),              // O
         .qwords_to_send(rx_qwords_to_send),                    // I [4:0]

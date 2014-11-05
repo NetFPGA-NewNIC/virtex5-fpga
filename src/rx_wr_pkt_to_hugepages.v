@@ -78,8 +78,6 @@ module rx_wr_pkt_to_hugepages (
     output reg             trigger_tlp_ack,
     input                  change_huge_page,
     output reg             change_huge_page_ack,
-    input                  send_last_tlp,
-    input                  send_tail_tlp,
     input                  send_numb_qws,
     output reg             send_numb_qws_ack,
     input       [4:0]      qwords_to_send,
@@ -148,8 +146,6 @@ module rx_wr_pkt_to_hugepages (
     reg     [31:0]      aux_qw_count;
     reg     [31:0]      next_qw_counter;
     reg     [31:0]      look_ahead_huge_page_qword_counter;
-    reg                 remember_to_change_huge_page;
-    reg                 remember_to_send_numb_qws;
     reg     [`BF:0]     rd_addr_prev1;
     reg     [`BF:0]     rd_addr_prev2;
     reg     [`BF:0]     look_ahead_commited_rd_addr;
@@ -243,8 +239,6 @@ module rx_wr_pkt_to_hugepages (
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
 
-            remember_to_change_huge_page <= 1'b0;
-            remember_to_send_numb_qws <= 1'b0;
             return_huge_page_to_host <= 1'b0;
             driving_interface <= 1'b0;
 
@@ -296,34 +290,22 @@ module rx_wr_pkt_to_hugepages (
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
-                        if (change_huge_page || remember_to_change_huge_page) begin
-                            remember_to_change_huge_page <= 1'b0;
+                        if (change_huge_page) begin
                             notify_huge_page_change <= 1'b1;
                             change_huge_page_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s10;
-                        end
-                        else if (send_last_tlp) begin
-                            remember_to_change_huge_page <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s2;
                         end
                         else if (trigger_tlp) begin
                             driving_interface <= 1'b1;
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s2;
                         end
-                        else if (send_numb_qws || remember_to_send_numb_qws) begin
-                            remember_to_send_numb_qws <= 1'b0;
+                        else if (send_numb_qws) begin
                             notify_huge_page_change <= 1'b0;
                             send_numb_qws_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s10;
-                        end
-                        else if (send_tail_tlp) begin
-                            remember_to_send_numb_qws <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s2;
                         end
                     end
                 end
@@ -501,34 +483,22 @@ module rx_wr_pkt_to_hugepages (
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
-                        if (change_huge_page || remember_to_change_huge_page) begin
-                            remember_to_change_huge_page <= 1'b0;
+                        if (change_huge_page) begin
                             notify_huge_page_change <= 1'b1;
                             change_huge_page_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s24;
-                        end
-                        else if (send_last_tlp) begin
-                            remember_to_change_huge_page <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s15;
                         end
                         else if (trigger_tlp) begin
                             driving_interface <= 1'b1;
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s15;
                         end
-                        else if (send_numb_qws || remember_to_send_numb_qws) begin
-                            remember_to_send_numb_qws <= 1'b0;
+                        else if (send_numb_qws) begin
                             notify_huge_page_change <= 1'b0;
                             send_numb_qws_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s24;
-                        end
-                        else if (send_tail_tlp) begin
-                            remember_to_send_numb_qws <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s15;
                         end
                     end
                 end
