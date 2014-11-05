@@ -80,7 +80,7 @@ module rx_wr_pkt_to_hugepages (
     output reg             change_huge_page_ack,
     input                  send_numb_qws,
     output reg             send_numb_qws_ack,
-    input       [4:0]      qwords_to_send,
+    input       [5:0]      qwords_to_send,
 
     output reg  [`BF:0]    commited_rd_addr,
     output reg  [`BF:0]    rd_addr,
@@ -284,7 +284,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s1 : begin
-                    qwords_in_tlp <= {4'b0, qwords_to_send};
+                    qwords_in_tlp <= {3'b0, qwords_to_send};
 
                     driving_interface <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;
@@ -477,7 +477,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s14 : begin
-                    qwords_in_tlp <= {4'b0, qwords_to_send};
+                    qwords_in_tlp <= {3'b0, qwords_to_send};
 
                     driving_interface <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;

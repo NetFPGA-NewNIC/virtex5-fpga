@@ -185,7 +185,7 @@ module  pcie_endpoint_driver (
     wire                                              rx_change_huge_page_ack;
     wire                                              send_numb_qws;
     wire                                              send_numb_qws_ack;
-    wire   [4:0]                                      rx_qwords_to_send;
+    wire   [5:0]                                      rx_qwords_to_send;
 
     wire   [63:0]     rx_trn_td;
     wire   [7:0]      rx_trn_trem_n;
@@ -361,6 +361,7 @@ module  pcie_endpoint_driver (
     rx_tlp_trigger rx_tlp_trigger_mod (
         .clk(trn_clk),                                         // I
         .reset(reset250),                                      // I
+        .cfg_max_payload_size(cfg_max_payload_size),           // I
         .commited_wr_addr(rx_commited_wr_addr),                // I [`BF:0]
         .trigger_tlp(rx_trigger_tlp),                          // O
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
@@ -368,7 +369,7 @@ module  pcie_endpoint_driver (
         .change_huge_page_ack(rx_change_huge_page_ack),        // I
         .send_numb_qws(rx_send_numb_qws),                      // O
         .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
-        .qwords_to_send(rx_qwords_to_send)                     // O [4:0]
+        .qwords_to_send(rx_qwords_to_send)                     // O [5:0]
         );
 
     //-------------------------------------------------------
@@ -418,7 +419,7 @@ module  pcie_endpoint_driver (
         .change_huge_page_ack(rx_change_huge_page_ack),        // O
         .send_numb_qws(rx_send_numb_qws),                      // I
         .send_numb_qws_ack(rx_send_numb_qws_ack),              // O
-        .qwords_to_send(rx_qwords_to_send),                    // I [4:0]
+        .qwords_to_send(rx_qwords_to_send),                    // I [5:0]
         .commited_rd_addr(rx_commited_rd_addr),                // O [`BF:0]
         .rd_addr(rx_rd_addr),                                  // O [`BF:0]
         .rd_data(rx_rd_data),                                  // I [63:0]
