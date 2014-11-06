@@ -361,7 +361,7 @@ module  pcie_endpoint_driver (
     rx_tlp_trigger rx_tlp_trigger_mod (
         .clk(trn_clk),                                         // I
         .reset(reset250),                                      // I
-        .cfg_max_payload_size(cfg_max_payload_size),           // I
+        .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
         .commited_wr_addr(rx_commited_wr_addr),                // I [`BF:0]
         .trigger_tlp(rx_trigger_tlp),                          // O
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
