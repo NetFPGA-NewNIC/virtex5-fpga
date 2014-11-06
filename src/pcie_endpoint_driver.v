@@ -183,8 +183,8 @@ module  pcie_endpoint_driver (
     wire                                              rx_trigger_tlp_ack;
     wire                                              rx_change_huge_page;
     wire                                              rx_change_huge_page_ack;
-    wire                                              send_numb_qws;
-    wire                                              send_numb_qws_ack;
+    wire                                              rx_send_numb_qws;
+    wire                                              rx_send_numb_qws_ack;
     wire   [5:0]                                      rx_qwords_to_send;
 
     wire   [63:0]     rx_trn_td;
