@@ -74,7 +74,7 @@ module tx_rd_host_mem (
 
     input       [63:0]     huge_page_addr,
     input                  read_chunk,
-    output reg  [3:0]      tlp_tag,
+    output reg  [4:0]      tlp_tag,
     input       [8:0]      qwords_to_rd,
     output reg             read_chunk_ack,
     input                  send_rd_completed,
@@ -123,7 +123,7 @@ module tx_rd_host_mem (
     reg     [31:0]  huge_page_index;
     reg     [31:0]  next_huge_page_index;
     reg     [63:0]  notification_message_reg;
-    reg     [3:0]   next_tlp_tag;
+    reg     [4:0]   next_tlp_tag;
     reg             aux0_high_mem;
     reg             aux1_high_mem;
 
@@ -209,7 +209,7 @@ module tx_rd_host_mem (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_tag },   //Tag
+                                {3'b0, tlp_tag },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };

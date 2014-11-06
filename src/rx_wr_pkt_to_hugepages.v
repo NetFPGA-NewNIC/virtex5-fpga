@@ -137,8 +137,8 @@ module rx_wr_pkt_to_hugepages (
     reg     [27:0]      send_fsm;
     reg                 return_huge_page_to_host;
     reg     [8:0]       tlp_qword_counter;
-    reg     [31:0]      tlp_number;
-    reg     [31:0]      look_ahead_tlp_number;
+    reg     [4:0]       tlp_number;
+    reg     [4:0]       look_ahead_tlp_number;
     reg     [8:0]       qwords_in_tlp;
     reg     [63:0]      host_mem_addr;
     reg     [63:0]      look_ahead_host_mem_addr;
@@ -326,7 +326,7 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_number[3:0] },   //Tag
+                                {3'b0, tlp_number },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
@@ -524,7 +524,7 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_number[3:0] },   //Tag
+                                {3'b0, tlp_number },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };

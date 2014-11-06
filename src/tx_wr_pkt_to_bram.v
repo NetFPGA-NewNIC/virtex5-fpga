@@ -78,7 +78,7 @@ module tx_wr_pkt_to_bram (
 
     output reg   [63:0]     huge_page_addr_read_from,
     output reg              read_chunk,
-    input        [3:0]      tlp_tag,
+    input        [4:0]      tlp_tag,
     output       [8:0]      qwords_to_rd,
     input                   read_chunk_ack,
     output reg              send_rd_completed,
@@ -146,7 +146,7 @@ module tx_wr_pkt_to_bram (
     reg     [63:0]  look_ahead_huge_page_addr_read_from;
     reg     [31:0]  huge_page_remaining_qwords;
     reg     [1:0]   tag_to_hp[0:3];
-    reg     [3:0]   tlp_tag_sent;
+    reg     [4:0]   tlp_tag_sent;
     reg     [9:0]   aux_diff_horror;
     reg     [9:0]   current_page_qwords;
     reg     [9:0]   page_qwords_counter;
@@ -183,7 +183,7 @@ module tx_wr_pkt_to_bram (
     reg             send_notification_huge_page_1;
     reg             send_notification_huge_page_1_ack;
     reg             waiting_data_huge_page_1;
-    reg     [3:0]   this_tlp_tag_hp1_copy;
+    reg     [4:0]   this_tlp_tag_hp1_copy;
 
     //-------------------------------------------------------
     // Local huge_page_2_notifications
@@ -196,7 +196,7 @@ module tx_wr_pkt_to_bram (
     reg             send_notification_huge_page_2;
     reg             send_notification_huge_page_2_ack;
     reg             waiting_data_huge_page_2;
-    reg     [3:0]   this_tlp_tag_hp2_copy;
+    reg     [4:0]   this_tlp_tag_hp2_copy;
 
     //-------------------------------------------------------
     // Local huge_page_1_notifications & huge_page_2_notifications mixer
@@ -213,7 +213,7 @@ module tx_wr_pkt_to_bram (
     reg             completion_received;
     reg     [31:0]  dw_aux;
     reg     [9:0]   look_ahead_wr_addr;
-    reg     [3:0]   this_tlp_tag;
+    reg     [4:0]   this_tlp_tag;
     reg     [9:0]   tlp_addr[0:3];
     reg     [9:0]   received_size[0:3];
     reg     [3:0]   target_tlp;

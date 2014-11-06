@@ -218,7 +218,7 @@ module  pcie_endpoint_driver (
     wire              tx_trn_teof_n;
     wire              tx_trn_tsrc_rdy_n;
     wire              tx_cfg_interrupt_n;
-    wire   [3:0]      tx_tlp_tag;
+    wire   [4:0]      tx_tlp_tag;
 
     //-------------------------------------------------------
     // Local tx_wr_pkt_to_bram_mod
@@ -478,7 +478,7 @@ module  pcie_endpoint_driver (
         .completed_buffer_address(tx_completed_buffer_address),// I [63:0]
         .huge_page_addr(tx_huge_page_addr_read_from),          // I [63:0]
         .read_chunk(tx_read_chunk),                            // I
-        .tlp_tag(tx_tlp_tag),                                  // O [3:0]
+        .tlp_tag(tx_tlp_tag),                                  // O [4:0]
         .qwords_to_rd(tx_qwords_to_rd),                        // I [8:0]
         .read_chunk_ack(tx_read_chunk_ack),                    // O
         .send_rd_completed(tx_send_rd_completed),              // I
@@ -517,7 +517,7 @@ module  pcie_endpoint_driver (
         .interrupts_enabled(interrupts_enabled),               // I
         .huge_page_addr_read_from(tx_huge_page_addr_read_from),// O [63:0]
         .read_chunk(tx_read_chunk),                            // O
-        .tlp_tag(tx_tlp_tag),                                  // I [3:0]
+        .tlp_tag(tx_tlp_tag),                                  // I [4:0]
         .qwords_to_rd(tx_qwords_to_rd),                        // O [8:0]
         .read_chunk_ack(tx_read_chunk_ack),                    // I
         .send_rd_completed(tx_send_rd_completed),              // O
