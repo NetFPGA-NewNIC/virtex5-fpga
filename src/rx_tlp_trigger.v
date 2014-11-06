@@ -52,7 +52,7 @@ module rx_tlp_trigger (
     input    clk,
     input    reset,
 
-    input                   cfg_max_payload_size,
+    input      [2:0]        cfg_max_payload_size,
 
     // Internal logic
     input      [`BF:0]      commited_wr_addr,
