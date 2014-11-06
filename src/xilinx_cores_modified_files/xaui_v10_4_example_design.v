@@ -187,8 +187,10 @@ module xaui_v10_4_example_design
      xgmii_rxc <= xgmii_rxc_int;
    end
 
+// MF: clk will be used internally
   assign clk156_out = clk156;
 
+// MF: clk will be used internally
 //      ODDR 
 //    clk156out_ddr (
 //      .Q(clk156_out),
