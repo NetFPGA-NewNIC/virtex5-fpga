@@ -133,8 +133,6 @@ module tx_rd_host_mem (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            trn_td <= 64'b0;
-            trn_trem_n <= 8'hFF;
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
@@ -162,6 +160,8 @@ module tx_rd_host_mem (
             case (rd_host_fsm)
 
                 s0 : begin
+                    trn_td <= 64'b0;
+                    trn_trem_n <= 8'hFF;
                     next_completed_buffer_address <= completed_buffer_address + {huge_page_index, 2'b00};
                     last_completed_buffer_address <= completed_buffer_address + 4'b1000;
                     driving_interface <= 1'b0;

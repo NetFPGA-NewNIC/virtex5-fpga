@@ -88,7 +88,9 @@ module rx_wr_pkt_to_hugepages (
 
     // Arbitrations handshake  //
     input                  my_turn,
-    output reg             driving_interface
+    output reg             driving_interface,
+
+    input       [15:0]     rx_dropped_pkts
     );
 
     // localparam
@@ -142,6 +144,7 @@ module rx_wr_pkt_to_hugepages (
     reg     [8:0]       qwords_in_tlp;
     reg     [63:0]      host_mem_addr;
     reg     [63:0]      look_ahead_host_mem_addr;
+    reg     [63:0]      aux1_host_mem_addr;
     reg     [31:0]      huge_page_qword_counter;
     reg     [31:0]      aux_qw_count;
     reg     [31:0]      next_qw_counter;
@@ -151,6 +154,7 @@ module rx_wr_pkt_to_hugepages (
     reg     [`BF:0]     look_ahead_commited_rd_addr;
     reg     [31:0]      aux_rd_data;
     reg                 notify_huge_page_change;
+    reg     [15:0]      rx_dropped_pkts_reg;
     
     ////////////////////////////////////////////////
     // current_huge_page_addr
@@ -233,8 +237,6 @@ module rx_wr_pkt_to_hugepages (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            trn_td <= 'b0;
-            trn_trem_n <= 'hFF;
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
@@ -263,6 +265,8 @@ module rx_wr_pkt_to_hugepages (
 
             rd_addr_prev1 <= rd_addr;
             rd_addr_prev2 <= rd_addr_prev1;
+
+            rx_dropped_pkts_reg <= rx_dropped_pkts;
 
             case (send_fsm)
 
@@ -334,7 +338,7 @@ module rx_wr_pkt_to_hugepages (
                     trn_tsrc_rdy_n <= 1'b0;
                     rd_addr <= rd_addr +1;
 
-                    look_ahead_host_mem_addr <= host_mem_addr + 'h80;
+                    look_ahead_host_mem_addr <= host_mem_addr + {qwords_in_tlp, 3'b0};
                     look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
                     look_ahead_commited_rd_addr <= commited_rd_addr + qwords_in_tlp;
@@ -373,6 +377,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s6 : begin
+                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         trn_td <= {rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24], rd_data[39:32], rd_data[47:40], rd_data[55:48] ,rd_data[63:56]};
@@ -408,7 +413,7 @@ module rx_wr_pkt_to_hugepages (
                 s9 : begin
                     commited_rd_addr <= look_ahead_commited_rd_addr;
                     rd_addr <= look_ahead_commited_rd_addr;
-                    host_mem_addr <= look_ahead_host_mem_addr;
+                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;
                     if (!trn_tdst_rdy_n) begin
@@ -457,7 +462,7 @@ module rx_wr_pkt_to_hugepages (
                 s12 : begin
                     huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {aux_qw_count[7:0], aux_qw_count[15:8], aux_qw_count[23:16], aux_qw_count[31:24], {7'b0, notify_huge_page_change}, 24'b0};
+                        trn_td <= {aux_qw_count[7:0], aux_qw_count[15:8], aux_qw_count[23:16], aux_qw_count[31:24], {7'b0, notify_huge_page_change}, rx_dropped_pkts_reg[7:0], rx_dropped_pkts_reg[15:8], 8'b0};
                         trn_teof_n <= 1'b0;
                         send_fsm <= s13;
                     end
@@ -532,7 +537,7 @@ module rx_wr_pkt_to_hugepages (
                     trn_tsrc_rdy_n <= 1'b0;
                     rd_addr <= rd_addr +1;
 
-                    look_ahead_host_mem_addr <= host_mem_addr + 'h80;
+                    look_ahead_host_mem_addr <= host_mem_addr + {qwords_in_tlp, 3'b0};
                     look_ahead_huge_page_qword_counter <= huge_page_qword_counter + qwords_in_tlp;
                     look_ahead_tlp_number <= tlp_number +1;
                     look_ahead_commited_rd_addr <= commited_rd_addr + qwords_in_tlp;
@@ -572,6 +577,7 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s20 : begin
+                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         aux_rd_data <= rd_data[63:32];
@@ -606,7 +612,7 @@ module rx_wr_pkt_to_hugepages (
                 s23 : begin
                     commited_rd_addr <= look_ahead_commited_rd_addr;
                     rd_addr <= look_ahead_commited_rd_addr;
-                    host_mem_addr <= look_ahead_host_mem_addr;
+                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;
                     if (!trn_tdst_rdy_n) begin
@@ -655,7 +661,7 @@ module rx_wr_pkt_to_hugepages (
                 s26 : begin
                     huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td[63:32] <= {{7'b0, notify_huge_page_change}, 24'b0};
+                        trn_td[63:32] <= {{7'b0, notify_huge_page_change}, rx_dropped_pkts_reg[7:0], rx_dropped_pkts_reg[15:8], 8'b0};
                         trn_teof_n <= 1'b0;
                         send_fsm <= s27;
                     end

@@ -66,6 +66,10 @@ module  pcie_endpoint_driver (
     input                                         rx_activity,
     output     [`BF:0]                            rx_commited_rd_addr,
     input      [`BF:0]                            rx_commited_wr_addr,
+    output     [31:0]                             sys_nsecs,
+    output     [31:0]                             sys_secs,
+    output                                        rx_timestamp_en,
+    input      [15:0]                             rx_dropped_pkts,
 
     // To mac_host_configuration_interface  //
     input                                         host_clk,
@@ -258,6 +262,16 @@ module  pcie_endpoint_driver (
     wire              mdio_access_cfg_interrupt_n;
     wire              ctrl_cfg_interrupt_n;
 
+    //////////////////////////////////////////////////////////////////////////////////////////
+    // System time
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //-------------------------------------------------------
+    // Local System time
+    //-------------------------------------------------------
+    //wire   [31:0]     sys_nsecs;
+    //wire   [31:0]     sys_secs;
+    //wire              rx_timestamp_en;
+
     //-------------------------------------------------------
     // Core input tie-offs
     //-------------------------------------------------------
@@ -424,7 +438,8 @@ module  pcie_endpoint_driver (
         .rd_addr(rx_rd_addr),                                  // O [`BF:0]
         .rd_data(rx_rd_data),                                  // I [63:0]
         .my_turn(rx_turn),                                     // I
-        .driving_interface(rx_driven)                          // O
+        .driving_interface(rx_driven),                         // O
+        .rx_dropped_pkts(rx_dropped_pkts)                      // I [15:0]
         );
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -577,6 +592,25 @@ module  pcie_endpoint_driver (
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .interrupts_enabled(interrupts_enabled),               // O
         .interrupt_period(interrupt_period)                    // O [31:0]
+        );
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    // System time
+    //////////////////////////////////////////////////////////////////////////////////////////
+    sys_time sys_time_mod (
+        .trn_clk(trn_clk),                                     // I
+        .reset(reset250),                                      // I
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .sys_nsecs(sys_nsecs),                                 // O [31:0]
+        .sys_secs(sys_secs),                                   // O [31:0]
+        .rx_timestamp_en(rx_timestamp_en)                      // O
         );
 
 endmodule // pcie_endpoint_driver
