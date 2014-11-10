@@ -71,6 +71,7 @@
 #define RX_HUGE_PAGE_STATUS_QW_SIZE 8                         // byte
 #define RX_FRAME_DW_HEADER 2
 #define RX_HUGE_PAGE_CLOSED_BIT_POS 32
+//#define RX_TIMESTAMP_TEST 1
 
 //Simple RTT
 #define RTT_BAR2_SEND_TEST_OFFSET 44

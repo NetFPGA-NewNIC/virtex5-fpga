@@ -65,14 +65,19 @@ void rx_wq_function(struct work_struct *wk)
     struct my_driver_host_data *my_drv_data = ((struct my_work_t *)wk)->my_drv_data_ptr;
     struct sk_buff *my_skb;
     u32 *current_hp_addr;
-    volatile u32 current_pkt_len;
-    volatile u32 next_pkt_len;
+    volatile u16 current_pkt_len;
+    volatile u16 next_pkt_len;
     u32 next_pkt_dw_index;
     volatile u64 huge_page_status;
     u64 timeout;
     u32 polling;
     u32 interrupts_enabled = 0;
     ktime_t tstamp_a, tstamp_b;
+    #ifdef RX_TIMESTAMP_TEST
+    struct timespec time_now;
+    u32 pkt_nsec;
+    u32 pkt_sec;
+    #endif
 
     init:
 
@@ -113,7 +118,7 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-            if (timeout > (RX_HW_TIMEOUT + my_drv_data->rtt*98))
+            if (timeout > (RX_HW_TIMEOUT + my_drv_data->rtt*250))       // some number
             {
                 if (!interrupts_enabled)
                 {
@@ -121,7 +126,7 @@ void rx_wq_function(struct work_struct *wk)
                     rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);   
                 }
             }
-        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*100));
+        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*280));     // some number
 
         return;
         
@@ -210,6 +215,12 @@ void rx_wq_function(struct work_struct *wk)
         return;
 
         eat_pkt:
+        #ifdef RX_TIMESTAMP_TEST    // every pkt should be served in less than 1 sec
+        time_now = current_kernel_time();
+        pkt_nsec = current_hp_addr[my_drv_data->rx.current_pkt_dw_index];
+        pkt_sec = (time_now.tv_sec & 0x1) == ((current_hp_addr[my_drv_data->rx.current_pkt_dw_index+1] >> 31) & 0x1) ? (u32)time_now.tv_sec : (u32)time_now.tv_sec-1;
+        printk(KERN_INFO "Myd: timestamp: 0x%08x sec 0x%08x nsec\n", pkt_sec, pkt_nsec);
+        #endif
         memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index + RX_FRAME_DW_HEADER), current_pkt_len);
         memset((void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index), 0, ALIGN(current_pkt_len, QW_ALIGNED) + RX_FRAME_DW_HEADER*DW_WIDTH);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
@@ -222,6 +233,12 @@ void rx_wq_function(struct work_struct *wk)
         goto next_pkt;
 
         eat_pkt_close_hp:
+        #ifdef RX_TIMESTAMP_TEST    // every pkt should be served in less than 1 sec
+        time_now = current_kernel_time();
+        pkt_nsec = current_hp_addr[my_drv_data->rx.current_pkt_dw_index];
+        pkt_sec = (time_now.tv_sec & 0x1) == ((current_hp_addr[my_drv_data->rx.current_pkt_dw_index+1] >> 31) & 0x1) ? (u32)time_now.tv_sec : (u32)time_now.tv_sec-1;
+        printk(KERN_INFO "Myd: timestamp: 0x%08x sec 0x%08x nsec\n", pkt_sec, pkt_nsec);
+        #endif
         memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index + RX_FRAME_DW_HEADER), current_pkt_len);
         memset((void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index), 0, ALIGN(current_pkt_len, QW_ALIGNED) + RX_FRAME_DW_HEADER*DW_WIDTH);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
@@ -231,6 +248,7 @@ void rx_wq_function(struct work_struct *wk)
         my_drv_data->my_net_device->stats.rx_packets++;
 
         close_hp:
+        //printk(KERN_ERR "Myd: pkts dropped in hw: 0x%04x\n", (u16)(huge_page_status >> 40) );
         memset((void *)current_hp_addr, 0, RX_HUGE_PAGE_STATUS_QW_SIZE);
         wmb();
         my_drv_data->rx.current_pkt_dw_index = RX_HUGE_PAGE_DW_HEADER_OFFSET;
@@ -330,6 +348,9 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     int ret = -ENODEV;
     int i;
     struct my_driver_host_data *my_drv_data;
+    #ifdef RX_TIMESTAMP_TEST
+    struct timespec time_now;
+    #endif
 
     #ifdef MY_DEBUG
     printk(KERN_INFO "Myd: pcie card with VENDOR_ID:SYSTEM_ID matched with this module advertised systems support\n");
@@ -458,7 +479,20 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         goto err_10;
     }
     // Rx - Set interrupt min period
-    rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * 20);
+    rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * 50);        // some number
+
+    #ifdef RX_TIMESTAMP_TEST
+    writel(0xcacabeef, my_drv_data->bar0+40);   // enable timstamp
+    time_now = current_kernel_time();
+    //printk(KERN_ERR "Myd: nsecs: 0x%08x\n", (u32)time_now.tv_nsec);
+    //printk(KERN_ERR "Myd:  secs: 0x%08x\n", (u32)time_now.tv_sec);
+    /*RTT here should be calculated not as the worst case detected latency but like in TCP:
+     *EstimatedRTT = 0.875 * EstimatedRTT + 0.125 * SampleRTT
+     *The nanoseconds sent to the board should be something like the EstimatedRTT / 2
+    */
+    writel(((u32)time_now.tv_nsec) + my_drv_data->rtt/2 , my_drv_data->bar0+32);    // system nanoseconds
+    writel((u32)time_now.tv_sec, my_drv_data->bar0+36);    // system seconds
+    #endif
 
     // Send huge pages' address for Rx
     for (i = 0; i < RX_HUGE_PAGE_COUNT; i++)
