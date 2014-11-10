@@ -69,7 +69,7 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
     atomic_set(&my_drv_data->rtt_access_rdy, 0);
     tstamp_a = ktime_get();
     wmb();
-    *(((u32 *)my_drv_data->bar2) + 11) = 0xcacabeef;
+    writel(0xcacabeef, my_drv_data->bar2+RTT_BAR2_SEND_TEST_OFFSET);
     wmb();
     
     timeout =0;
@@ -87,7 +87,7 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
         atomic_set(&my_drv_data->rtt_access_rdy, 0);
         tstamp_a = ktime_get();
         wmb();
-        *(((u32 *)my_drv_data->bar2) + 11) = 0xcacabeef;
+        writel(0xcacabeef, my_drv_data->bar2+RTT_BAR2_SEND_TEST_OFFSET);
         wmb();
 
         timeout =0;

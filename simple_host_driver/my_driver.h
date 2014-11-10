@@ -47,12 +47,45 @@
 #define DRV_NAME "my_driver"
 #define PCI_BAR0 0
 #define PCI_BAR2 2
-#define HW_RX_TIMEOUT 256
+#define QW_WIDTH 8                                          // bytes
+#define DW_WIDTH 4                                          // bytes
+#define HUGE_PAGE_SIZE 2*1024*1024                          // bytes
+#define HUGE_PAGE_SIZE_DW 2*1024*1024/4                     // dwords
+#define MAX_ETH_SIZE 1514
+#define QW_ALIGNED 0x7
+#define QW_ALIGNED 0x7
+
+// Interrupt ctrl
+#define BAR2_ENABLE_INTERRUPTS 32
+#define BAR2_DISABLE_INTERRUPTS 36
+#define ENABLE_INTERRUPT true
+#define DISABLE_INTERRUPT false
+
+//RX
+#define RX_HW_TIMEOUT 256                                     // ns
+#define RX_BAR2_HUGE_PAGE_ADDR_OFFSET 64
+#define RX_BAR2_HUGE_PAGE_BUFFER_READY_OFFSET 96
+#define RX_HUGE_PAGE_COUNT 2
+#define RX_BAR2_SET_INTERRUPT_PERIOD_OFFSET 40
+#define RX_HUGE_PAGE_DW_HEADER_OFFSET 32                      // dwords of huge page header
+#define RX_HUGE_PAGE_STATUS_QW_SIZE 8                         // byte
+#define RX_FRAME_DW_HEADER 2
+#define RX_HUGE_PAGE_CLOSED_BIT_POS 32
+
+//Simple RTT
+#define RTT_BAR2_SEND_TEST_OFFSET 44
 
 irqreturn_t mdio_access_interrupt_handler(int irq, void *dev_id);
 irqreturn_t simple_rtt_test_interrupt_handler(int irq, void *dev_id);
 
 void rx_wq_function(struct work_struct *wk);
+
+struct rx {
+    u64 huge_page_dma_addr[RX_HUGE_PAGE_COUNT];
+    void *huge_page_kern_addr[RX_HUGE_PAGE_COUNT];
+    u8 huge_page_index;
+    u32 current_pkt_dw_index;
+};
 
 struct my_work_t {
     struct work_struct work;
@@ -60,49 +93,31 @@ struct my_work_t {
 };
 
 struct my_driver_host_data {
-    
     struct workqueue_struct *rx_wq;
     struct my_work_t rx_work;
-
     struct net_device *my_net_device;
-
     struct pci_dev *pdev;
-    
-    u64 huge_page1_dma_addr;
-    u64 huge_page2_dma_addr;
-
-    void *huge_page_kern_address1;
-    void *huge_page_kern_address2;
-
-    u8 huge_page_index;
-    u32 current_pkt_dw_index;
-
-    #ifdef MY_DEBUG
-    int total_numb_of_huge_pages_processed;
-    #endif
-
     void *bar2;
     void *bar0;
 
-    // Tx
-    struct page *tx_completion_buff;
-    struct page *tx_test_page;
+    struct rx rx;
 
-    u64 tx_completion_buff_dma_addr;
-    u64 tx_test_page_dma_addr;
-
-    void *tx_completion_buff_kern_address;
-    void *tx_test_page_kern_address;
-
+    // MDIO simple_conf
     atomic_t mdio_access_rdy;
 
+    // RTT simple_test
     atomic_t rtt_access_rdy;
     u64 rtt;
     ktime_t tstamp_b;
-
 };
 
 int configure_ael2005_phy_chips(struct my_driver_host_data *my_drv_data);
 int simple_rtt_test(struct my_driver_host_data *my_drv_data);
+int rx_init(struct my_driver_host_data *my_drv_data);
+void rx_release(struct my_driver_host_data *my_drv_data);
+void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interrupt_period);
+inline void rx_send_addr(struct my_driver_host_data *my_drv_data, u64 huge_page_dma_addr, u32 target_huge_page);
+inline void rx_send_desc(struct my_driver_host_data *my_drv_data, u32 size, u32 target_huge_page);
+inline void rx_interrupt_ctrl(struct my_driver_host_data *my_drv_data, bool set);
 
 #endif

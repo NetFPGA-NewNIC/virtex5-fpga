@@ -41,6 +41,7 @@
 obj-m += myd.o
 myd-objs += ael2005_simple_conf.o
 myd-objs += simple_rtt_test.o
+myd-objs += rx.o
 myd-objs += my_driver.o
 
 all:

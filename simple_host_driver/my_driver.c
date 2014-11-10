@@ -54,8 +54,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Cambridge NaaS Team");
 MODULE_DESCRIPTION("A simple approach");	/* What does this module do */
 
-static DEFINE_SPINLOCK(rx_subsys);
-
 static struct pci_device_id pci_id[] = {
     {PCI_DEVICE(XILINX_VENDOR_ID, MY_APPLICATION_ID)},
     {0}
@@ -73,44 +71,36 @@ void rx_wq_function(struct work_struct *wk)
     volatile u64 huge_page_status;
     u64 timeout;
     u32 polling;
-    unsigned long flags;
     u32 interrupts_enabled = 0;
     ktime_t tstamp_a, tstamp_b;
 
-    spin_lock_irqsave(&rx_subsys, flags);
-
     init:
-    polling = 0;
 
-    if (!my_drv_data->huge_page_index)
-        current_hp_addr = (u32 *)my_drv_data->huge_page_kern_address1;
-    else
-        current_hp_addr = (u32 *)my_drv_data->huge_page_kern_address2;
+    current_hp_addr = (u32 *)my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index];
     
     next_pkt:
     polling = 0;
-    if (my_drv_data->current_pkt_dw_index < (2*1024*1024/4))
+    if (my_drv_data->rx.current_pkt_dw_index < HUGE_PAGE_SIZE_DW)
     {
         do {
-            current_pkt_len = current_hp_addr[my_drv_data->current_pkt_dw_index+1];
+            current_pkt_len = current_hp_addr[my_drv_data->rx.current_pkt_dw_index+1];
             rmb();
             if (current_pkt_len)
                 goto alloc_my_skb;
 
             huge_page_status = *((u64 *)current_hp_addr);            //QW0 contains this information
             rmb();
-            if ( (((u32)huge_page_status) << 1) > (my_drv_data->current_pkt_dw_index - 32) )
+            if ( (((u32)huge_page_status) << 1) > (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET) )
                 goto next_pkt;
 
-            if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
+            if ((huge_page_status >> RX_HUGE_PAGE_CLOSED_BIT_POS) & 0x1)                             // check if hp was closed
             {
-                if ( (((u32)huge_page_status) << 1) == (my_drv_data->current_pkt_dw_index - 32) )
+                if ( (((u32)huge_page_status) << 1) == (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET) )
                     goto close_hp;
                 else
                 {
                     printk(KERN_ERR "Myd: B huge_page_status: 0x%08x %08x\n", (u32)(huge_page_status >>32), (u32)huge_page_status);
-                    printk(KERN_ERR "Myd: current_pkt_dw_index: 0x%08x\n", my_drv_data->current_pkt_dw_index);
-                    spin_unlock_irqrestore(&rx_subsys, flags);
+                    printk(KERN_ERR "Myd: current_pkt_dw_index: 0x%08x\n", my_drv_data->rx.current_pkt_dw_index);
                     return;
                 }
             }
@@ -123,29 +113,27 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-            if (timeout > (HW_RX_TIMEOUT + my_drv_data->rtt*98))
+            if (timeout > (RX_HW_TIMEOUT + my_drv_data->rtt*98))
             {
                 if (!interrupts_enabled)
                 {
                     interrupts_enabled = 1;
-                    *(((u32 *)my_drv_data->bar2) + 8) = 0xcacabeef; // enable interrupts            
+                    rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);   
                 }
             }
-        } while (timeout < (HW_RX_TIMEOUT + my_drv_data->rtt*100));
+        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*100));
 
-        spin_unlock_irqrestore(&rx_subsys, flags);
         return;
         
         alloc_my_skb:
         if (interrupts_enabled)
         {
             interrupts_enabled = 0;
-            *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;     // disable interrupts
+            rx_interrupt_ctrl(my_drv_data, DISABLE_INTERRUPT);   
         }
-        if (current_pkt_len > 1514)
+        if (current_pkt_len > MAX_ETH_SIZE)
         {
             printk(KERN_ERR "Myd: A invalid current_pkt_len: 0x%08x\n", current_pkt_len);
-            spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
 
@@ -153,18 +141,16 @@ void rx_wq_function(struct work_struct *wk)
         if (!my_skb)
         {
             printk(KERN_ERR "Myd: failed netdev_alloc_skb: current_pkt_len = %d\n", current_pkt_len);
-            spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
         skb_reserve(my_skb, NET_IP_ALIGN);
 
-        next_pkt_dw_index = my_drv_data->current_pkt_dw_index + (__ALIGN_KERNEL_MASK(current_pkt_len, 0x7) >> 2) + 2;
+        next_pkt_dw_index = my_drv_data->rx.current_pkt_dw_index + (ALIGN(current_pkt_len, QW_ALIGNED) >> 2) + 2;
 
-        if (next_pkt_dw_index > (2*1024*1024/4))
+        if (next_pkt_dw_index > HUGE_PAGE_SIZE_DW)
         {
             printk(KERN_ERR "Myd: Something happend and I received an overwritten huge page\n");
             dev_kfree_skb(my_skb);
-            spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
 
@@ -176,27 +162,26 @@ void rx_wq_function(struct work_struct *wk)
                 goto eat_pkt;
 
             huge_page_status = *((u64 *)current_hp_addr);            //QW0 contains this information
-            if ( (((u32)huge_page_status) << 1) > (my_drv_data->current_pkt_dw_index - 32) )
+            if ( (((u32)huge_page_status) << 1) > (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET) )
             {
-                if ( (((u32)huge_page_status) << 1) == (my_drv_data->current_pkt_dw_index - 32 + (__ALIGN_KERNEL_MASK(current_pkt_len, 0x7) >> 2) + 2) )
+                if ( (((u32)huge_page_status) << 1) == (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET + (ALIGN(current_pkt_len, QW_ALIGNED) >> 2) + 2) )
                 {
                     rmb();
                     next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
                     if (next_pkt_len)
                         goto eat_pkt;
 
-                    if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
+                    if ((huge_page_status >> RX_HUGE_PAGE_CLOSED_BIT_POS) & 0x1)                             // check if hp was closed
                         goto eat_pkt_close_hp;
                     else
                     {
-                        next_pkt_dw_index = __ALIGN_KERNEL_MASK(next_pkt_dw_index, 0x1f);
+                        next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x1f);
                         goto eat_pkt;
                     }
                 }
-                else if ( (((u32)huge_page_status) << 1) < (my_drv_data->current_pkt_dw_index - 32 + (__ALIGN_KERNEL_MASK(current_pkt_len, 0x7) >> 2) + 2) )
+                else if ( (((u32)huge_page_status) << 1) < (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET + (ALIGN(current_pkt_len, QW_ALIGNED) >> 2) + 2) )
                 {
                     printk(KERN_ERR "Myd: C invalid current_pkt_len: 0x%08x\n", current_pkt_len);
-                    spin_unlock_irqrestore(&rx_subsys, flags);
                     return;
                 }
                 else
@@ -206,7 +191,7 @@ void rx_wq_function(struct work_struct *wk)
                     if (next_pkt_len)
                         goto eat_pkt;
 
-                    next_pkt_dw_index = __ALIGN_KERNEL_MASK(next_pkt_dw_index, 0x1f);
+                    next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x1f);
                     goto eat_pkt;
                 }
             }
@@ -219,27 +204,26 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-        } while (timeout < (HW_RX_TIMEOUT + my_drv_data->rtt*1000));
+        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*1000));
 
         printk(KERN_ERR "Myd: D invalid current_pkt_len: 0x%08x\n", current_pkt_len);
-        spin_unlock_irqrestore(&rx_subsys, flags);
         return;
 
         eat_pkt:
-        memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->current_pkt_dw_index + 2), current_pkt_len);
-        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
+        memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index + RX_FRAME_DW_HEADER), current_pkt_len);
+        memset((void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index), 0, ALIGN(current_pkt_len, QW_ALIGNED) + RX_FRAME_DW_HEADER*DW_WIDTH);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
         my_skb->protocol = eth_type_trans(my_skb, my_drv_data->my_net_device);
         my_skb->ip_summed = CHECKSUM_NONE;
         netif_receive_skb(my_skb);
         my_drv_data->my_net_device->stats.rx_packets++;
 
-        my_drv_data->current_pkt_dw_index = next_pkt_dw_index;
+        my_drv_data->rx.current_pkt_dw_index = next_pkt_dw_index;
         goto next_pkt;
 
         eat_pkt_close_hp:
-        memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->current_pkt_dw_index + 2), current_pkt_len);
-        memset((void *)(current_hp_addr + my_drv_data->current_pkt_dw_index), 0, __ALIGN_KERNEL_MASK(current_pkt_len, 0x7) + 8);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
+        memcpy(my_skb->data, (void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index + RX_FRAME_DW_HEADER), current_pkt_len);
+        memset((void *)(current_hp_addr + my_drv_data->rx.current_pkt_dw_index), 0, ALIGN(current_pkt_len, QW_ALIGNED) + RX_FRAME_DW_HEADER*DW_WIDTH);         // this will be implemented in the memory's sense amplifiers (destructive readout memories)
         skb_put(my_skb, current_pkt_len);
         my_skb->protocol = eth_type_trans(my_skb, my_drv_data->my_net_device);
         my_skb->ip_summed = CHECKSUM_NONE;
@@ -247,50 +231,32 @@ void rx_wq_function(struct work_struct *wk)
         my_drv_data->my_net_device->stats.rx_packets++;
 
         close_hp:
-        memset((void *)current_hp_addr, 0, 8);
+        memset((void *)current_hp_addr, 0, RX_HUGE_PAGE_STATUS_QW_SIZE);
         wmb();
-        my_drv_data->current_pkt_dw_index = 32;
-        if (!my_drv_data->huge_page_index)
-        {
-            my_drv_data->huge_page_index = 1;
-            *(((u32 *)my_drv_data->bar2) + 24) = 0xcacabeef;
-        }
-        else
-        {
-            my_drv_data->huge_page_index = 0;
-            *(((u32 *)my_drv_data->bar2) + 25) = 0xcacabeef;
-        }
+        my_drv_data->rx.current_pkt_dw_index = RX_HUGE_PAGE_DW_HEADER_OFFSET;
+        rx_send_desc(my_drv_data, HUGE_PAGE_SIZE, my_drv_data->rx.huge_page_index);
+        my_drv_data->rx.huge_page_index = (my_drv_data->rx.huge_page_index + 1) % RX_HUGE_PAGE_COUNT;
         goto init;
     }
-    else if (my_drv_data->current_pkt_dw_index > (2*1024*1024/4))
+    else if (my_drv_data->rx.current_pkt_dw_index > HUGE_PAGE_SIZE_DW)
     {
         printk(KERN_ERR "Myd: Something happend and I received an overwritten huge page\n");
-        spin_unlock_irqrestore(&rx_subsys, flags);
         return;
     }
     else
     {
         huge_page_status = *((u64 *)current_hp_addr);            //QW0 contains this information
-        if ((huge_page_status >> 32) & 0x1)                             // check if hp was closed
+        if ((huge_page_status >> RX_HUGE_PAGE_CLOSED_BIT_POS) & 0x1)                             // check if hp was closed
         {
-            memset((void *)current_hp_addr, 0, 8);
+            memset((void *)current_hp_addr, 0, RX_HUGE_PAGE_STATUS_QW_SIZE);
             wmb();
-            my_drv_data->current_pkt_dw_index = 32;
-            if (!my_drv_data->huge_page_index)
-            {
-                my_drv_data->huge_page_index = 1;
-                *(((u32 *)my_drv_data->bar2) + 24) = 0xcacabeef;
-            }
-            else
-            {
-                my_drv_data->huge_page_index = 0;
-                *(((u32 *)my_drv_data->bar2) + 25) = 0xcacabeef;
-            }
+            my_drv_data->rx.current_pkt_dw_index = RX_HUGE_PAGE_DW_HEADER_OFFSET;
+            rx_send_desc(my_drv_data, HUGE_PAGE_SIZE, my_drv_data->rx.huge_page_index);
+            my_drv_data->rx.huge_page_index = (my_drv_data->rx.huge_page_index + 1) % RX_HUGE_PAGE_COUNT;
         }
         else
         {
             printk(KERN_ERR "Myd: Something happend and I received an overwritten huge page\n");
-            spin_unlock_irqrestore(&rx_subsys, flags);
             return;
         }
         goto init;
@@ -312,7 +278,7 @@ irqreturn_t card_interrupt_handler(int irq, void *dev_id)
     if (!ret)
         printk(KERN_INFO "busy\n");
     else
-        *(((u32 *)my_drv_data->bar2) + 9) = 0xcacabeef;     // disable interrupts
+        rx_interrupt_ctrl(my_drv_data, DISABLE_INTERRUPT);
 
     return IRQ_HANDLED;
 }
@@ -362,6 +328,7 @@ static inline int my_linux_network_interface(struct my_driver_host_data *my_drv_
 static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
     int ret = -ENODEV;
+    int i;
     struct my_driver_host_data *my_drv_data;
 
     #ifdef MY_DEBUG
@@ -376,34 +343,25 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     }
 
     my_drv_data->pdev = pdev;
-    
-    my_drv_data->rx_wq = alloc_workqueue("rx_wq", WQ_HIGHPRI, 0);
-    if (!my_drv_data->rx_wq)
-    {
-        printk(KERN_ERR "Myd: alloc work queue\n");
-        goto err_01;
-    }
-    INIT_WORK((struct work_struct *)&my_drv_data->rx_work, rx_wq_function);
-    my_drv_data->rx_work.my_drv_data_ptr = my_drv_data;
 
     ret = pci_enable_device(pdev);
     if (ret)
     {
         printk(KERN_ERR "Myd: pci_enable_device\n");
-        goto err_02;
+        goto err_01;
     }
 
     ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
     if (ret)
     {
         printk(KERN_ERR "Myd: pci_set_dma_mask\n");
-        goto err_03;
+        goto err_02;
     }
     ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
     if (ret)
     {
         printk(KERN_ERR "Myd: pci_set_consistent_dma_mask\n");
-        goto err_03;
+        goto err_02;
     }
 
     pci_set_drvdata(pdev, my_drv_data);
@@ -412,21 +370,21 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     if (ret)
     {
         printk(KERN_ERR "Myd: pci_request_regions\n");
-        goto err_04;
+        goto err_03;
     }
 
     my_drv_data->bar2 = pci_iomap(pdev, PCI_BAR2, pci_resource_len(pdev, PCI_BAR2));            // BAR2 used to communicate rx and tx meta information
     if (my_drv_data->bar2 == NULL)
     {
         printk(KERN_ERR "Myd: pci_iomap bar2\n");
-        goto err_05;
+        goto err_04;
     }
 
     my_drv_data->bar0 = pci_iomap(pdev, PCI_BAR0, pci_resource_len(pdev, PCI_BAR0));            // BAR0 used for register interface
     if (my_drv_data->bar0 == NULL)
     {
         printk(KERN_ERR "Myd: pci_iomap bar0\n");
-        goto err_06;
+        goto err_05;
     }
 
     pci_set_master(pdev);
@@ -435,7 +393,7 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     if (ret)
     {
         printk(KERN_ERR "Myd: pci_enable_msi\n");
-        goto err_07;
+        goto err_06;
     }
 
     // RTT
@@ -443,7 +401,7 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     if (ret)
     {
         printk(KERN_ERR "Myd: request_irq\n");
-        goto err_08;
+        goto err_07;
     }
     ret = simple_rtt_test(my_drv_data);
     if (ret)
@@ -458,7 +416,7 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     if (ret)
     {
         printk(KERN_ERR "Myd: request_irq\n");
-        goto err_08;
+        goto err_07;
     }
     ret = configure_ael2005_phy_chips(my_drv_data);
     if (ret)
@@ -468,6 +426,15 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     free_irq(pdev->irq, pdev);
     // AEL2005 MDIO configuration ready
 
+    my_drv_data->rx_wq = alloc_workqueue("rx_wq", WQ_HIGHPRI, 0);
+    if (!my_drv_data->rx_wq)
+    {
+        printk(KERN_ERR "Myd: alloc work queue\n");
+        goto err_07;
+    }
+    INIT_WORK((struct work_struct *)&my_drv_data->rx_work, rx_wq_function);
+    my_drv_data->rx_work.my_drv_data_ptr = my_drv_data;
+
     ret = request_irq(pdev->irq, card_interrupt_handler, 0, DRV_NAME, pdev);
     if (ret)
     {
@@ -475,72 +442,57 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         goto err_08;
     }
 
-    // Reserve Huge Pages
-    my_drv_data->huge_page_kern_address1 = pci_alloc_consistent(pdev, 2*1024*1024, &my_drv_data->huge_page1_dma_addr);
-    if (my_drv_data->huge_page_kern_address1 == NULL)
-    {
-        printk(KERN_ERR "Myd: alloc huge page\n");
-        goto err_09;
-    }
-    my_drv_data->huge_page_kern_address2 = pci_alloc_consistent(pdev, 2*1024*1024, &my_drv_data->huge_page2_dma_addr);
-    if (my_drv_data->huge_page_kern_address2 == NULL)
-    {
-        printk(KERN_ERR "Myd: alloc huge page\n");
-        goto err_10;
-    }
-
-    // Hwanju says that pci_alloc_consistent zeros the memory. This is not mandatory
-    memset(my_drv_data->huge_page_kern_address1, 0, 2*1024*1024);
-    memset(my_drv_data->huge_page_kern_address2, 0, 2*1024*1024);
-
     // Instantiate an ethX interface in linux
     ret = my_linux_network_interface(my_drv_data);
     if (ret)
     {
         printk(KERN_ERR "Myd: my_linux_network_interface\n");
-        goto err_11;
+        goto err_09;
     }
 
-    // Set interrupt min period
-    *(((u32 *)my_drv_data->bar2) + 10) = my_drv_data->rtt * 20;
-    printk(KERN_INFO "Myd: Rx interrupt min period set to: %dns\n", (u32)(my_drv_data->rtt * 20));
-
-    my_drv_data->current_pkt_dw_index = 32;
+    // Rx
+    ret = rx_init(my_drv_data);
+    if (ret)
+    {
+        printk(KERN_ERR "Myd: rx allocation failed\n");
+        goto err_10;
+    }
+    // Rx - Set interrupt min period
+    rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * 20);
 
     // Send huge pages' address for Rx
-    *(((u64 *)my_drv_data->bar2) + 8) = my_drv_data->huge_page1_dma_addr;
-    *(((u64 *)my_drv_data->bar2) + 9) = my_drv_data->huge_page2_dma_addr;
+    for (i = 0; i < RX_HUGE_PAGE_COUNT; i++)
+        rx_send_addr(my_drv_data, my_drv_data->rx.huge_page_dma_addr[i], i);
 
     // Send huge pages' card-lock-up
-    *(((u32 *)my_drv_data->bar2) + 24) = 0xcacabeef;
-    *(((u32 *)my_drv_data->bar2) + 25) = 0xcacabeef;
+    for (i = 0; i < RX_HUGE_PAGE_COUNT; i++)
+        rx_send_desc(my_drv_data, HUGE_PAGE_SIZE, i);
 
     #ifdef MY_DEBUG
     printk(KERN_INFO "Myd: my_pcie_probe finished\n");
     #endif
     return ret;
 
-err_11:
-    pci_free_consistent(pdev, 2*1024*1024, my_drv_data->huge_page_kern_address2, my_drv_data->huge_page2_dma_addr);
 err_10:
-    pci_free_consistent(pdev, 2*1024*1024, my_drv_data->huge_page_kern_address1, my_drv_data->huge_page1_dma_addr);
+    unregister_netdev(my_drv_data->my_net_device);
+    free_netdev(my_drv_data->my_net_device);
 err_09:
     free_irq(pdev->irq, pdev);
 err_08:
-    pci_disable_msi(pdev);
+    destroy_workqueue(my_drv_data->rx_wq);
 err_07:
+    pci_disable_msi(pdev);
+err_06:
     pci_clear_master(pdev);
     pci_iounmap(pdev, my_drv_data->bar0);
-err_06:
-    pci_iounmap(pdev, my_drv_data->bar2);
 err_05:
-    pci_release_regions(pdev);
+    pci_iounmap(pdev, my_drv_data->bar2);
 err_04:
+    pci_release_regions(pdev);
+err_03:    
     pci_set_drvdata(pdev, NULL);
-err_03:
-    pci_disable_device(pdev);
 err_02:
-    destroy_workqueue(my_drv_data->rx_wq);
+    pci_disable_device(pdev);
 err_01:
     kfree(my_drv_data);
     return ret;
@@ -558,9 +510,7 @@ static void my_pcie_remove(struct pci_dev *pdev)
         flush_workqueue(my_drv_data->rx_wq);
         destroy_workqueue(my_drv_data->rx_wq);
         
-        pci_free_consistent(pdev, 2*1024*1024, my_drv_data->huge_page_kern_address2, my_drv_data->huge_page2_dma_addr);
-        pci_free_consistent(pdev, 2*1024*1024, my_drv_data->huge_page_kern_address1, my_drv_data->huge_page1_dma_addr);
-
+        rx_release(my_drv_data);
         unregister_netdev(my_drv_data->my_net_device);
         free_netdev(my_drv_data->my_net_device);
 
