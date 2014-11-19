@@ -90,7 +90,10 @@ module rx_wr_pkt_to_hugepages (
     input                  my_turn,
     output reg             driving_interface,
 
-    input       [15:0]     rx_dropped_pkts
+    input       [15:0]     rx_dropped_pkts,
+
+    // Hw Sw Synch //
+    output      [63:0]     hw_pointer
     );
 
     // localparam
@@ -230,6 +233,8 @@ module rx_wr_pkt_to_hugepages (
 
         end     // not reset
     end  //always
+
+    assign hw_pointer = host_mem_addr;
 
     ////////////////////////////////////////////////
     // write request TLP generation to huge_page

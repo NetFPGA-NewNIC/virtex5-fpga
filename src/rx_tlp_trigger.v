@@ -89,7 +89,7 @@ module rx_tlp_trigger (
     //-------------------------------------------------------
     // Local timeout-generation
     //-------------------------------------------------------
-    reg     [15:0]       free_running;
+    reg     [5:0]        free_running;
     reg                  timeout;
 
     //-------------------------------------------------------
@@ -133,7 +133,7 @@ module rx_tlp_trigger (
 
             if (rx_idle) begin
                 free_running <= free_running +1;
-                if (free_running == 'h40) begin
+                if (free_running == 'h3F) begin
                     timeout <= 1'b1;
                 end
             end

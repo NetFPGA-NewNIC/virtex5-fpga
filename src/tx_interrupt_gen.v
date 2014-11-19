@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_interrupt_gen.v
+*        tx_interrupt_gen.v
 *
 *  Project:
 *
@@ -43,23 +43,18 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_interrupt_gen (
+module tx_interrupt_gen (
 
     input                   clk,
     input                   reset,
 
     output reg              cfg_interrupt_n,
     input                   cfg_interrupt_rdy_n,
-
-    input                   rx_activity,
-    input                   change_huge_page,
-    input                   change_huge_page_ack,
-    input                   send_numb_qws,
-    input                   send_numb_qws_ack,
-    input                   huge_page_status_1,
-    input                   huge_page_status_2,
     input                   interrupts_enabled,
-    input       [31:0]      interrupt_period,
+
+    input                   condition,
+    output reg              condition_ack,
+    
     input                   resend_interrupt,
     output reg              resend_interrupt_ack
     );
@@ -81,10 +76,6 @@ module rx_interrupt_gen (
     // Local interrupts_gen
     //-------------------------------------------------------  
     reg     [7:0]   interrupt_gen_fsm;
-    reg     [31:0]  counter;
-    reg     [31:0]  max_count;
-    reg             rx_activity_reg0;
-    reg             rx_activity_reg1;
 
     ////////////////////////////////////////////////
     // interrupts_gen
@@ -93,64 +84,45 @@ module rx_interrupt_gen (
 
         if (reset) begin  // reset
             cfg_interrupt_n <= 1'b1;
-            rx_activity_reg0 <= 1'b0;
-            rx_activity_reg1 <= 1'b0;
             interrupt_gen_fsm <= s0;
         end
         
         else begin  // not reset
 
+            condition_ack <= 1'b0;
             resend_interrupt_ack <= 1'b0;
-
-            rx_activity_reg0 <= rx_activity;
-            rx_activity_reg1 <= rx_activity_reg0;
-
-            max_count <= interrupt_period;
 
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (change_huge_page && change_huge_page_ack) begin
+                    if (condition) begin
+                        condition_ack <= 1'b1;
                         interrupt_gen_fsm <= s1;
                     end
-                    else if (send_numb_qws && send_numb_qws_ack) begin
-                        interrupt_gen_fsm <= s1;
-                    end
-                    //else if (rx_activity_reg1) begin
-                    //    interrupt_gen_fsm <= s1;
-                    //end
                     else if (resend_interrupt) begin
                         resend_interrupt_ack <= 1'b1;
-                        interrupt_gen_fsm <= s4;
+                        interrupt_gen_fsm <= s3;
                     end
                 end
 
                 s1 : begin
-                    counter <= 'b0;
-                    if (interrupts_enabled && (huge_page_status_1 || huge_page_status_2)) begin
+                    if (interrupts_enabled) begin
                         cfg_interrupt_n <= 1'b0;
                         interrupt_gen_fsm <= s2;
                     end
                     else begin
-                        interrupt_gen_fsm <= s3;
+                        interrupt_gen_fsm <= s0;
                     end
                 end
 
                 s2 : begin
                     if (!cfg_interrupt_rdy_n) begin
                         cfg_interrupt_n <= 1'b1;
-                        interrupt_gen_fsm <= s3;
-                    end
-                end
-
-                s3 : begin
-                    counter <= counter + 1;
-                    if (counter == max_count) begin
                         interrupt_gen_fsm <= s0;
                     end
                 end
 
-                s4 : begin
+                s3 : begin
                     if (interrupts_enabled) begin
                         cfg_interrupt_n <= 1'b0;
                         interrupt_gen_fsm <= s2;
@@ -166,7 +138,7 @@ module rx_interrupt_gen (
     end  //always
    
 
-endmodule // rx_interrupt_gen
+endmodule // tx_interrupt_gen
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

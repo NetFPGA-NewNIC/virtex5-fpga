@@ -65,8 +65,6 @@ module tx_rd_host_mem (
     input                  trn_tdst_rdy_n,
     input       [3:0]      trn_tbuf_av,
     input       [15:0]     cfg_completer_id,
-    output reg             cfg_interrupt_n,
-    input                  cfg_interrupt_rdy_n,
 
     // Internal logic
 
@@ -84,13 +82,12 @@ module tx_rd_host_mem (
     input       [63:0]     notification_message,
     output reg             notify_ack,
 
-    input                  send_interrupt,
-    output reg             send_interrupt_ack,
-
     // Arbitrations hanshake
 
     input                  my_turn,
-    output reg             driving_interface
+    output reg             driving_interface,
+
+    output reg  [63:0]     hw_pointer
 
     );
     parameter NUMB_HP = 2;      // = 2^something
@@ -136,12 +133,10 @@ module tx_rd_host_mem (
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
-            cfg_interrupt_n <= 1'b1;
 
             read_chunk_ack <= 1'b0;
             send_rd_completed_ack <= 1'b0;
             huge_page_index <= 'b0;
-            send_interrupt_ack <= 1'b0;
             notify_ack <= 1'b0;
             tlp_tag <= 'b0;
 
@@ -153,7 +148,6 @@ module tx_rd_host_mem (
 
             read_chunk_ack <= 1'b0;
             send_rd_completed_ack <= 1'b0;
-            send_interrupt_ack <= 1'b0;
             notify_ack <= 1'b0;
             next_huge_page_index <= (huge_page_index + 1) & (~NUMB_HP);
 
@@ -179,12 +173,6 @@ module tx_rd_host_mem (
                         driving_interface <= 1'b1;
                         send_rd_completed_ack <= 1'b1;
                         rd_host_fsm <= s5;
-                    end
-                    else if ((my_turn) && (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (send_interrupt)) begin
-                        cfg_interrupt_n <= 1'b0;
-                        driving_interface <= 1'b1;
-                        send_interrupt_ack <= 1'b1;
-                        rd_host_fsm <= s9;
                     end
                     else if ((my_turn) && (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) && (read_chunk)) begin
                         driving_interface <= 1'b1;
@@ -313,15 +301,8 @@ module tx_rd_host_mem (
                     end
                 end
 
-                s9 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        driving_interface <= 1'b0;
-                        rd_host_fsm <= s0;
-                    end
-                end
-
                 s10 : begin
+                    hw_pointer <= notification_message_reg;
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
