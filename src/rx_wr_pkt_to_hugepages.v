@@ -361,7 +361,7 @@ module rx_wr_pkt_to_hugepages (
                         send_fsm <= s6;
                     end
                     else begin
-                        rd_addr <= rd_addr_prev2;
+                        rd_addr <= rd_addr_prev1;
                         send_fsm <= s4;
                     end
                 end
@@ -371,14 +371,8 @@ module rx_wr_pkt_to_hugepages (
                         rd_addr <= rd_addr +1;
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_tsof_n <= 1'b1;
-                        send_fsm <= s5;
+                        send_fsm <= s3;
                     end
-                end
-
-                s5 : begin
-                    trn_tsrc_rdy_n <= 1'b1;
-                    rd_addr <= rd_addr +1;
-                    send_fsm <= s3;
                 end
 
                 s6 : begin
