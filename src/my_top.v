@@ -569,7 +569,7 @@ module my_top (
     //-------------------------------------------------------
     // rx_dropped_pkts_synch
     //-------------------------------------------------------
-    synch_type1 #(15,0) rx_dropped_pkts_synch_mod (
+    synch_type1 #(15,1) rx_dropped_pkts_synch_mod (
         .clk_out(trn_clk_c),                                    // I
         .reset_clk_out(reset250),                               // I
         .clk_in(clk156_25),                                     // I

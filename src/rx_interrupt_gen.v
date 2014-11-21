@@ -151,6 +151,7 @@ module rx_interrupt_gen (
                 end
 
                 s4 : begin
+                    counter <= 'b0;
                     if (interrupts_enabled) begin
                         cfg_interrupt_n <= 1'b0;
                         interrupt_gen_fsm <= s2;
