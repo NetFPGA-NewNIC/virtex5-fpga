@@ -87,6 +87,7 @@ struct rx {
     void *huge_page_kern_addr[RX_HUGE_PAGE_COUNT];
     u8 huge_page_index;
     u32 current_pkt_dw_index;
+    u64 interrupt_period_index;
 };
 
 struct my_work_t {

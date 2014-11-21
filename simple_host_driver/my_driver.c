@@ -73,6 +73,7 @@ void rx_wq_function(struct work_struct *wk)
     u64 timeout;
     u32 polling;
     ktime_t tstamp_a, tstamp_b;
+    u64 last_addr;
     #ifdef RX_TIMESTAMP_TEST
     struct timespec time_now;
     u32 pkt_nsec;
@@ -121,8 +122,8 @@ void rx_wq_function(struct work_struct *wk)
         } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));     // some number
 
         // send rx synch
-        //rx_synch_hw_sw(my_drv_data, virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index]));
-        rx_synch_hw_sw(my_drv_data, 0xa1a2a3a4a5a6a7);
+        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index >> 2));
+        rx_synch_hw_sw(my_drv_data, last_addr);
         rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);
         return;
         
@@ -200,9 +201,12 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*1000));
+        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));
 
-        printk(KERN_ERR "Myd: D invalid current_pkt_len: 0x%08x\n", current_pkt_len);
+        // send rx synch
+        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index >> 2));
+        rx_synch_hw_sw(my_drv_data, last_addr);
+        rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);
         return;
 
         eat_pkt:
@@ -284,8 +288,11 @@ irqreturn_t card_interrupt_handler(int irq, void *dev_id)
 
     ret = queue_work(my_drv_data->rx_wq, (struct work_struct *)&my_drv_data->rx_work);
 
-    if (!ret)
-        printk(KERN_INFO "busy\n");
+    if (!ret) {
+        my_drv_data->rx.interrupt_period_index = my_drv_data->rx.interrupt_period_index << 2;
+        rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * my_drv_data->rx.interrupt_period_index);
+        printk(KERN_INFO "Myd: busy\n");
+    }
     else
         rx_interrupt_ctrl(my_drv_data, DISABLE_INTERRUPT);
 
@@ -470,7 +477,8 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
         goto err_10;
     }
     // Rx - Set interrupt min period
-    rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * 50);        // some number
+    my_drv_data->rx.interrupt_period_index = 10;
+    rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * my_drv_data->rx.interrupt_period_index);        // some number
 
     #ifdef RX_TIMESTAMP_TEST
     writel(0xcacabeef, my_drv_data->bar0+40);   // enable timstamp

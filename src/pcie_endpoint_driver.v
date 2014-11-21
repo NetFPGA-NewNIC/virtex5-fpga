@@ -402,6 +402,7 @@ module  pcie_endpoint_driver (
         .reset(reset250),                                      // I
         .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
         .commited_wr_addr(rx_commited_wr_addr),                // I [`BF:0]
+        .rx_activity(rx_activity),                             // I
         .trigger_tlp(rx_trigger_tlp),                          // O
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
         .change_huge_page(rx_change_huge_page),                // O

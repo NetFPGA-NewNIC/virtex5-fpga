@@ -56,6 +56,7 @@ module rx_tlp_trigger (
 
     // Internal logic
     input      [`BF:0]      commited_wr_addr,
+    input                   rx_activity,
     output reg              trigger_tlp,
     input                   trigger_tlp_ack,
     output reg              change_huge_page,
@@ -91,6 +92,8 @@ module rx_tlp_trigger (
     //-------------------------------------------------------
     reg     [5:0]        free_running;
     reg                  timeout;
+    reg                  rx_activity_reg0;
+    reg                  rx_activity_reg1;
 
     //-------------------------------------------------------
     // Local trigger-logic
@@ -122,6 +125,8 @@ module rx_tlp_trigger (
     always @(posedge clk) begin
         if (reset) begin  // reset
             timeout <= 1'b0;
+            rx_activity_reg0 <= 1'b0;
+            rx_activity_reg1 <= 1'b0;
             free_running <= 'b0;
         end
         
@@ -130,7 +135,10 @@ module rx_tlp_trigger (
             timeout <= 1'b0;
             free_running <= 'b0;
 
-            if (rx_idle) begin
+            rx_activity_reg0 <= rx_activity;
+            rx_activity_reg1 <= rx_activity_reg0;
+
+            if (rx_idle && !rx_activity_reg1) begin
                 free_running <= free_running +1;
                 if (free_running == 'h3F) begin
                     timeout <= 1'b1;

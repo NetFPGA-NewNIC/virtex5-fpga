@@ -68,9 +68,7 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
 
     atomic_set(&my_drv_data->rtt_access_rdy, 0);
     tstamp_a = ktime_get();
-    wmb();
     writel(0xcacabeef, my_drv_data->bar2+RTT_BAR2_SEND_TEST_OFFSET);
-    wmb();
     
     timeout =0;
     do {
@@ -81,6 +79,7 @@ int simple_rtt_test(struct my_driver_host_data *my_drv_data) {
 
     my_drv_data->rtt = ktime_to_ns(ktime_sub(my_drv_data->tstamp_b, tstamp_a));
     printk(KERN_INFO "Myd: first rtt: %dns\n", (u32)my_drv_data->rtt);
+    my_drv_data->rtt = 0; // we will ignore the first one, because it's very different
 
     for (i = 0; i < 200; i++)
     {
