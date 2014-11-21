@@ -105,7 +105,6 @@ module rx_tlp_trigger (
     reg     [18:0]       aux0_huge_page_qw_offset;
     reg     [18:0]       aux1_huge_page_qw_offset;
     reg     [18:0]       aux_ethframe_endaddr;
-    reg     [18:0]       aux_256offset;
     reg     [3:0]        qwords_remaining;
     reg     [`BF-4:0]    number_of_tlp_sent;
     reg     [`BF-4:0]    aux0_number_of_tlp_sent;
@@ -214,13 +213,12 @@ module rx_tlp_trigger (
                     commited_rd_addr <= aux_commited_rd_addr;
                     number_of_tlp_sent <= double_inc ? aux1_number_of_tlp_sent : aux0_number_of_tlp_sent;
                     huge_page_qw_offset <= aux0_huge_page_qw_offset;
-                    aux_256offset <= aux0_huge_page_qw_offset + 'h20;
                     trigger_fsm <= s4;
                 end
 
                 s4 : begin
                     //delay: diff_tlp
-                    if (max_tlp_size256 && (aux_256offset[9] == huge_page_qw_offset[9])) begin
+                    if (max_tlp_size256 && (huge_page_qw_offset[8:4] != 5'h1F)) begin                 // not the last in a 4kpage
                         trigger_fsm <= s5;
                     end
                     else begin
@@ -320,7 +318,7 @@ module rx_tlp_trigger (
                     aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
                     qwords_to_send <= {2'b0, qwords_remaining};
                     trigger_tlp <= 1'b1;
-                    if (huge_page_qw_offset == 'h3FFF0) begin
+                    if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
                         trigger_fsm <= s9;
                     end
                     else begin
@@ -352,7 +350,7 @@ module rx_tlp_trigger (
                     aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
                     qwords_to_send <= diff_reg;
                     trigger_tlp <= 1'b1;
-                    if (huge_page_qw_offset == 'h3FFF0) begin
+                    if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
                         trigger_fsm <= s9;
                     end
                     else begin

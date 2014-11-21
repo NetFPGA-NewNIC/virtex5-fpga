@@ -110,3 +110,8 @@ inline void rx_interrupt_ctrl(struct my_driver_host_data *my_drv_data, bool set)
     else
         writel(0xcacabeef, my_drv_data->bar2+BAR2_DISABLE_INTERRUPTS);
 }
+
+inline void rx_synch_hw_sw(struct my_driver_host_data *my_drv_data, u64 huge_page_dma_addr)
+{
+    writeq(huge_page_dma_addr, my_drv_data->bar2+RX_BAR2_HW_SW_SYNCH);
+}

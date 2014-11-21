@@ -72,6 +72,7 @@
 #define RX_FRAME_DW_HEADER 2
 #define RX_HUGE_PAGE_CLOSED_BIT_POS 32
 //#define RX_TIMESTAMP_TEST 1
+#define RX_BAR2_HW_SW_SYNCH 120
 
 //Simple RTT
 #define RTT_BAR2_SEND_TEST_OFFSET 44
@@ -120,5 +121,6 @@ void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interr
 inline void rx_send_addr(struct my_driver_host_data *my_drv_data, u64 huge_page_dma_addr, u32 target_huge_page);
 inline void rx_send_desc(struct my_driver_host_data *my_drv_data, u32 size, u32 target_huge_page);
 inline void rx_interrupt_ctrl(struct my_driver_host_data *my_drv_data, bool set);
+inline void rx_synch_hw_sw(struct my_driver_host_data *my_drv_data, u64 huge_page_dma_addr);
 
 #endif

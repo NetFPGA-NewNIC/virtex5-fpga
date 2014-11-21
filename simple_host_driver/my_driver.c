@@ -42,6 +42,7 @@
 #include <linux/kernel.h>       /* Needed for KERN_INFO */
 #include <linux/init.h>         /* Needed for the macros */
 #include <linux/types.h>        /* Needed for the macros */
+#include <asm/io.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h> 
@@ -71,7 +72,6 @@ void rx_wq_function(struct work_struct *wk)
     volatile u64 huge_page_status;
     u64 timeout;
     u32 polling;
-    u32 interrupts_enabled = 0;
     ktime_t tstamp_a, tstamp_b;
     #ifdef RX_TIMESTAMP_TEST
     struct timespec time_now;
@@ -118,24 +118,15 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-            if (timeout > (RX_HW_TIMEOUT + my_drv_data->rtt*250))       // some number
-            {
-                if (!interrupts_enabled)
-                {
-                    interrupts_enabled = 1;
-                    rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);   
-                }
-            }
-        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*280));     // some number
+        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));     // some number
 
+        // send rx synch
+        //rx_synch_hw_sw(my_drv_data, virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index]));
+        rx_synch_hw_sw(my_drv_data, 0xa1a2a3a4a5a6a7);
+        rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);
         return;
         
         alloc_my_skb:
-        if (interrupts_enabled)
-        {
-            interrupts_enabled = 0;
-            rx_interrupt_ctrl(my_drv_data, DISABLE_INTERRUPT);   
-        }
         if (current_pkt_len > MAX_ETH_SIZE)
         {
             printk(KERN_ERR "Myd: A invalid current_pkt_len: 0x%08x\n", current_pkt_len);
