@@ -52,8 +52,7 @@
 #define HUGE_PAGE_SIZE 2*1024*1024                          // bytes
 #define HUGE_PAGE_SIZE_DW 2*1024*1024/4                     // dwords
 #define MAX_ETH_SIZE 1514
-#define QW_ALIGNED 0x7
-#define QW_ALIGNED 0x7
+#define QW_ALIGNED 0x8
 
 // Interrupt ctrl
 #define BAR2_ENABLE_INTERRUPTS 32

@@ -79,11 +79,12 @@ void rx_wq_function(struct work_struct *wk)
     u32 pkt_nsec;
     u32 pkt_sec;
     #endif
+    int i;
 
     init:
 
     current_hp_addr = (u32 *)my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index];
-    
+
     next_pkt:
     polling = 0;
     if (my_drv_data->rx.current_pkt_dw_index < HUGE_PAGE_SIZE_DW)
@@ -122,7 +123,7 @@ void rx_wq_function(struct work_struct *wk)
         } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));     // some number
 
         // send rx synch
-        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index >> 2));
+        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index << 2));
         rx_synch_hw_sw(my_drv_data, last_addr);
         rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);
         return;
@@ -204,7 +205,7 @@ void rx_wq_function(struct work_struct *wk)
         } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));
 
         // send rx synch
-        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index >> 2));
+        last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index << 2));
         rx_synch_hw_sw(my_drv_data, last_addr);
         rx_interrupt_ctrl(my_drv_data, ENABLE_INTERRUPT);
         return;
@@ -289,7 +290,7 @@ irqreturn_t card_interrupt_handler(int irq, void *dev_id)
     ret = queue_work(my_drv_data->rx_wq, (struct work_struct *)&my_drv_data->rx_work);
 
     if (!ret) {
-        my_drv_data->rx.interrupt_period_index = my_drv_data->rx.interrupt_period_index << 2;
+        my_drv_data->rx.interrupt_period_index = my_drv_data->rx.interrupt_period_index << 1;
         rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * my_drv_data->rx.interrupt_period_index);
         printk(KERN_INFO "Myd: busy\n");
     }
@@ -431,17 +432,17 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     // RTT ready
 
     // AEL2005 MDIO configuration
-    ret = request_irq(pdev->irq, mdio_access_interrupt_handler, 0, DRV_NAME, pdev);
-    if (ret)
-    {
-        printk(KERN_ERR "Myd: request_irq\n");
-        goto err_07;
-    }
-    ret = configure_ael2005_phy_chips(my_drv_data);
-    if (ret)
-    {
-        printk(KERN_ERR "Myd: warning, AEL2005 not configured\n");
-    }
+    //ret = request_irq(pdev->irq, mdio_access_interrupt_handler, 0, DRV_NAME, pdev);
+    //if (ret)
+    //{
+    //    printk(KERN_ERR "Myd: request_irq\n");
+    //    goto err_07;
+    //}
+    //ret = configure_ael2005_phy_chips(my_drv_data);
+    //if (ret)
+    //{
+    //    printk(KERN_ERR "Myd: warning, AEL2005 not configured\n");
+    //}
     free_irq(pdev->irq, pdev);
     // AEL2005 MDIO configuration ready
 
