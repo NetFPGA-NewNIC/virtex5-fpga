@@ -94,12 +94,11 @@ inline void rx_send_desc(struct my_driver_host_data *my_drv_data, u32 size, u32 
     writel(0xcacabeef, my_drv_data->bar2+RX_BAR2_HUGE_PAGE_BUFFER_READY_OFFSET+target_huge_page*DW_WIDTH);
 }
 
-void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interrupt_period)
+inline void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interrupt_period)
 {
     if ((interrupt_period >> 32) & 0xffffffff)
         printk(KERN_INFO "Myd: warning interrupt period is too large\n");
 
-    printk(KERN_INFO "Myd: Rx interrupt min period set to: %dns\n", (u32)interrupt_period);
     writel((u32)interrupt_period, my_drv_data->bar2+RX_BAR2_SET_INTERRUPT_PERIOD_OFFSET);
 }
 

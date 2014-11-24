@@ -117,7 +117,7 @@ int configure_ael2005_phy_chips(struct my_driver_host_data *my_drv_data);
 int simple_rtt_test(struct my_driver_host_data *my_drv_data);
 int rx_init(struct my_driver_host_data *my_drv_data);
 void rx_release(struct my_driver_host_data *my_drv_data);
-void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interrupt_period);
+inline void rx_set_interrupt_period(struct my_driver_host_data *my_drv_data, u64 interrupt_period);
 inline void rx_send_addr(struct my_driver_host_data *my_drv_data, u64 huge_page_dma_addr, u32 target_huge_page);
 inline void rx_send_desc(struct my_driver_host_data *my_drv_data, u32 size, u32 target_huge_page);
 inline void rx_interrupt_ctrl(struct my_driver_host_data *my_drv_data, bool set);

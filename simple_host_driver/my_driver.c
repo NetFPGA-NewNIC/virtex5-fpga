@@ -79,7 +79,6 @@ void rx_wq_function(struct work_struct *wk)
     u32 pkt_nsec;
     u32 pkt_sec;
     #endif
-    int i;
 
     init:
 
@@ -164,16 +163,11 @@ void rx_wq_function(struct work_struct *wk)
             {
                 if ( (((u32)huge_page_status) << 1) == (my_drv_data->rx.current_pkt_dw_index - RX_HUGE_PAGE_DW_HEADER_OFFSET + (ALIGN(current_pkt_len, QW_ALIGNED) >> 2) + 2) )
                 {
-                    rmb();
-                    next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
-                    if (next_pkt_len)
-                        goto eat_pkt;
-
                     if ((huge_page_status >> RX_HUGE_PAGE_CLOSED_BIT_POS) & 0x1)                             // check if hp was closed
                         goto eat_pkt_close_hp;
                     else
                     {
-                        next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x1f);
+                        next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x20);
                         goto eat_pkt;
                     }
                 }
@@ -189,7 +183,7 @@ void rx_wq_function(struct work_struct *wk)
                     if (next_pkt_len)
                         goto eat_pkt;
 
-                    next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x1f);
+                    next_pkt_dw_index = ALIGN(next_pkt_dw_index, 0x20);
                     goto eat_pkt;
                 }
             }
@@ -480,6 +474,7 @@ static int my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     // Rx - Set interrupt min period
     my_drv_data->rx.interrupt_period_index = 10;
     rx_set_interrupt_period(my_drv_data, my_drv_data->rtt * my_drv_data->rx.interrupt_period_index);        // some number
+    printk(KERN_INFO "Myd: Rx interrupt min period set to: %dns\n", (u32)(my_drv_data->rtt * my_drv_data->rx.interrupt_period_index));
 
     #ifdef RX_TIMESTAMP_TEST
     writel(0xcacabeef, my_drv_data->bar0+40);   // enable timstamp
