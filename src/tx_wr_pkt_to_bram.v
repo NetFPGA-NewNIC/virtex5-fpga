@@ -645,7 +645,7 @@ module tx_wr_pkt_to_bram (
         
         else begin  // not reset
 
-            notification_huge_page_1 <= address_to_notify_huge_page_1 + qwords_to_rd_huge_page_1;
+            notification_huge_page_1 <= address_to_notify_huge_page_1 + {qwords_to_rd_huge_page_1, 3'b0};
 
             case (huge_page_1_notifications_fsm)
 
@@ -728,7 +728,7 @@ module tx_wr_pkt_to_bram (
         
         else begin  // not reset
 
-            notification_huge_page_2 <= address_to_notify_huge_page_2 + qwords_to_rd_huge_page_2;
+            notification_huge_page_2 <= address_to_notify_huge_page_2 + {qwords_to_rd_huge_page_2, 3'b0};
 
             case (huge_page_2_notifications_fsm)
 
