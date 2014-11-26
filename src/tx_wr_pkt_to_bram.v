@@ -184,6 +184,7 @@ module tx_wr_pkt_to_bram (
     reg             send_notification_huge_page_1_ack;
     reg             waiting_data_huge_page_1;
     reg     [4:0]   this_tlp_tag_hp1_copy;
+    reg     [63:0]  notification_huge_page_1;
 
     //-------------------------------------------------------
     // Local huge_page_2_notifications
@@ -197,6 +198,7 @@ module tx_wr_pkt_to_bram (
     reg             send_notification_huge_page_2_ack;
     reg             waiting_data_huge_page_2;
     reg     [4:0]   this_tlp_tag_hp2_copy;
+    reg     [63:0]  notification_huge_page_2;
 
     //-------------------------------------------------------
     // Local huge_page_1_notifications & huge_page_2_notifications mixer
@@ -643,6 +645,8 @@ module tx_wr_pkt_to_bram (
         
         else begin  // not reset
 
+            notification_huge_page_1 <= address_to_notify_huge_page_1 + qwords_to_rd_huge_page_1;
+
             case (huge_page_1_notifications_fsm)
 
                 s0 : begin
@@ -723,6 +727,8 @@ module tx_wr_pkt_to_bram (
         end
         
         else begin  // not reset
+
+            notification_huge_page_2 <= address_to_notify_huge_page_2 + qwords_to_rd_huge_page_2;
 
             case (huge_page_2_notifications_fsm)
 
@@ -812,7 +818,7 @@ module tx_wr_pkt_to_bram (
             case (notification_mixer_fsm)
 
                 s0 : begin
-                    notification_message <= address_to_notify_huge_page_1;
+                    notification_message <= notification_huge_page_1;
                     if (send_notification_huge_page_1) begin
                         send_notification_huge_page_1_ack <= 1'b1;
                         notify <= 1'b1;
@@ -828,7 +834,7 @@ module tx_wr_pkt_to_bram (
                 end
 
                 s2 : begin
-                    notification_message <= address_to_notify_huge_page_2;
+                    notification_message <= notification_huge_page_2;
                     if (send_notification_huge_page_2) begin
                         send_notification_huge_page_2_ack <= 1'b1;
                         notify <= 1'b1;
