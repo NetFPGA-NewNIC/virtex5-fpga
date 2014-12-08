@@ -148,6 +148,10 @@ module rx_interrupt_gen (
                     if (counter == max_count) begin
                         interrupt_gen_fsm <= s0;
                     end
+                    else if (resend_interrupt) begin
+                        resend_interrupt_ack <= 1'b1;
+                        interrupt_gen_fsm <= s4;
+                    end
                 end
 
                 s4 : begin
