@@ -485,6 +485,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .interrupts_enabled(interrupts_enabled),               // I
         .hw_pointer(rx_hw_pointer),                            // I [63:0]
         .resend_interrupt(rx_resend_interrupt),                // O
         .resend_interrupt_ack(rx_resend_interrupt_ack)         // I
@@ -625,6 +626,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .interrupts_enabled(interrupts_enabled),               // I
         .hw_pointer(tx_hw_pointer),                            // I [63:0]
         .resend_interrupt(tx_resend_interrupt),                // O
         .resend_interrupt_ack(tx_resend_interrupt_ack)         // I

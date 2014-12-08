@@ -57,7 +57,8 @@ module hw_sw_synch (
     input                   trn_rsrc_dsc_n,
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
-    
+
+    input                   interrupts_enabled,
     input       [63:0]      hw_pointer,
     output reg              resend_interrupt,
     input                   resend_interrupt_ack
@@ -87,6 +88,7 @@ module hw_sw_synch (
     // Local synch
     //-------------------------------------------------------
     reg     [7:0]      synch_fsm;
+    reg     [63:0]     host_pointer_reg;
 
     ////////////////////////////////////////////////
     // rcv host_pointer
@@ -132,8 +134,6 @@ module hw_sw_synch (
                 end
 
                 s2 : begin
-                    synch_hw_sw <= 1'b1;
-
                     host_pointer[7:0] <= aux_dw[31:24];
                     host_pointer[15:8] <= aux_dw[23:16];
                     host_pointer[23:16] <= aux_dw[15:8];
@@ -144,6 +144,7 @@ module hw_sw_synch (
                     host_pointer[55:48] <= trn_rd[47:40];
                     host_pointer[63:56] <= trn_rd[39:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        synch_hw_sw <= 1'b1;
                         host_last_seen_fsm <= s0;
                     end
                 end
@@ -164,8 +165,6 @@ module hw_sw_synch (
                 end
 
                 s4 : begin
-                    synch_hw_sw <= 1'b1;
-
                     host_pointer[7:0]   <= trn_rd[63:56];
                     host_pointer[15:8]  <= trn_rd[55:48];
                     host_pointer[23:16] <= trn_rd[47:40];
@@ -176,6 +175,7 @@ module hw_sw_synch (
                     host_pointer[55:48] <= trn_rd[15:8];
                     host_pointer[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        synch_hw_sw <= 1'b1;
                         host_last_seen_fsm <= s0;
                     end
                 end
@@ -200,25 +200,33 @@ module hw_sw_synch (
         
         else begin  // not reset
 
+            host_pointer_reg <= host_pointer;
+
             case (synch_fsm)
 
                 s0 : begin
                     if (synch_hw_sw) begin
-                        synch_fsm <= s1;                    // host is going to sleep
+                        synch_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    if (hw_pointer == host_pointer) begin   // hw and sw are synch
-                        synch_fsm <= s0;
-                    end
-                    else begin
-                        resend_interrupt <= 1'b1;
+                    if (interrupts_enabled) begin
                         synch_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    if (hw_pointer == host_pointer_reg) begin
+                        synch_fsm <= s0;
+                    end
+                    else begin
+                        resend_interrupt <= 1'b1;
+                        synch_fsm <= s3;
+                    end
+                end
+
+                s3 : begin
                     if (resend_interrupt_ack) begin
                         resend_interrupt <= 1'b0;
                         synch_fsm <= s0;
