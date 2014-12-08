@@ -39,8 +39,12 @@
 */
 `define INSTRUMENTATION 1
 
-
-
+`define CPL_W_DATA_FMT_TYPE 7'b10_01010
+`define SC                  3'b000
+`define MEM_WR64_FMT_TYPE   7'b11_00000
+`define MEM_WR32_FMT_TYPE   7'b10_00000
+`define MEM_RD64_FMT_TYPE   7'b01_00000
+`define MEM_RD32_FMT_TYPE   7'b00_00000
 
 // Internal buffer address width. s; 
 
@@ -49,4 +53,4 @@
 //`define MAX_DIFF 9'h1E0
 //set to 9 for 10-bit width (8KB)
 `define BF 9 
-`define MAX_DIFF 10'h3E8
+`define MAX_DIFF 10'h3FA

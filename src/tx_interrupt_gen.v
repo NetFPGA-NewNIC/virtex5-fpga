@@ -95,13 +95,13 @@ module tx_interrupt_gen (
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (condition) begin
-                        condition_ack <= 1'b1;
-                        interrupt_gen_fsm <= s1;
-                    end
-                    else if (resend_interrupt) begin
+                    if (resend_interrupt) begin
                         resend_interrupt_ack <= 1'b1;
                         interrupt_gen_fsm <= s3;
+                    end
+                    else if (condition) begin
+                        condition_ack <= 1'b1;
+                        interrupt_gen_fsm <= s1;
                     end
                 end
 

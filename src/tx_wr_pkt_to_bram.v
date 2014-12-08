@@ -48,10 +48,6 @@
 //`default_nettype none
 `include "includes.v"
 
-`define CPL_W_DATA_FMT_TYPE 7'b10_01010
-`define SC 3'b000
-
-
 module tx_wr_pkt_to_bram (
 
     input                   trn_clk,

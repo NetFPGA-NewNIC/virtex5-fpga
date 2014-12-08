@@ -46,11 +46,6 @@
 //`default_nettype none
 `include "includes.v"
 
-`define MEM_WR64_FMT_TYPE 7'b11_00000
-`define MEM_WR32_FMT_TYPE 7'b10_00000
-`define MEM_RD64_FMT_TYPE 7'b01_00000
-`define MEM_RD32_FMT_TYPE 7'b00_00000
-
 module tx_rd_host_mem (
 
     input                  trn_clk,
@@ -236,8 +231,6 @@ module tx_rd_host_mem (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_teof_n <= 1'b1;
-                        trn_trem_n <= 8'hFF;
-                        trn_td <= 64'b0;
                         driving_interface <= 1'b0;
                         rd_host_fsm <= s0;
                     end
@@ -344,7 +337,16 @@ module tx_rd_host_mem (
 
                 s12 : begin
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24], notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
+                        trn_td <= {
+                                notification_message_reg[7:0],
+                                notification_message_reg[15:8],
+                                notification_message_reg[23:16],
+                                notification_message_reg[31:24],
+                                notification_message_reg[39:32],
+                                notification_message_reg[47:40],
+                                notification_message_reg[55:48],
+                                notification_message_reg[63:56]
+                            };
                         trn_teof_n <= 1'b0;
                         rd_host_fsm <= s4;
                     end
@@ -353,14 +355,25 @@ module tx_rd_host_mem (
                 s13 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        trn_td <= {last_completed_buffer_address[31:0], notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24]};
+                        trn_td <= {
+                                last_completed_buffer_address[31:0],
+                                notification_message_reg[7:0],
+                                notification_message_reg[15:8],
+                                notification_message_reg[23:16],
+                                notification_message_reg[31:24]
+                            };
                         rd_host_fsm <= s14;
                     end
                 end
 
                 s14 : begin
                     if (!trn_tdst_rdy_n) begin
-                        trn_td[63:32] <= {notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
+                        trn_td[63:32] <= {
+                                notification_message_reg[39:32],
+                                notification_message_reg[47:40],
+                                notification_message_reg[55:48],
+                                notification_message_reg[63:56]
+                            };
                         trn_teof_n <= 1'b0;
                         rd_host_fsm <= s4;
                     end

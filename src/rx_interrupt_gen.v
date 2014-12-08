@@ -110,7 +110,11 @@ module rx_interrupt_gen (
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (change_huge_page && change_huge_page_ack) begin
+                    if (resend_interrupt) begin
+                        resend_interrupt_ack <= 1'b1;
+                        interrupt_gen_fsm <= s4;
+                    end
+                    else if (change_huge_page && change_huge_page_ack) begin
                         interrupt_gen_fsm <= s1;
                     end
                     else if (send_numb_qws && send_numb_qws_ack) begin
@@ -118,10 +122,6 @@ module rx_interrupt_gen (
                     end
                     else if (rx_activity_reg1) begin
                         interrupt_gen_fsm <= s1;
-                    end
-                    else if (resend_interrupt) begin
-                        resend_interrupt_ack <= 1'b1;
-                        interrupt_gen_fsm <= s4;
                     end
                 end
 

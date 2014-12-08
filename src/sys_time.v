@@ -42,11 +42,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
-
-`define MEM_WR64_FMT_TYPE 7'b11_00000
-`define MEM_WR32_FMT_TYPE 7'b10_00000
-`define MEM_RD64_FMT_TYPE 7'b01_00000
-`define MEM_RD32_FMT_TYPE 7'b00_00000
+`include "includes.v"
 
 module sys_time (
 
