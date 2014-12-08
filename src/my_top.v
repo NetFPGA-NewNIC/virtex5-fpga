@@ -255,6 +255,23 @@ module my_top (
     // Local Wires rx_mac_interface
     //-------------------------------------------------------
     wire   [`BF:0]                                    rx_commited_wr_addr;
+    wire                                              rx_activity;
+    wire   [31:0]                                     sys_nsecs;
+    wire   [31:0]                                     sys_secs;
+    wire                                              rx_timestamp_en;
+    wire   [15:0]                                     rx_dropped_pkts;
+
+    //-------------------------------------------------------
+    // Local Wires ns_synch
+    //-------------------------------------------------------
+    wire   [31:0]                                     sys_nsecs_synch;
+    wire                                              sys_nsecs_update;
+
+    //-------------------------------------------------------
+    // Local Wires s_synch
+    //-------------------------------------------------------
+    wire   [31:0]                                     sys_secs_synch;
+    wire                                              sys_secs_update;
 
     //-------------------------------------------------------
     // Local Wires rx_wr_addr_synch
@@ -266,6 +283,11 @@ module my_top (
     //-------------------------------------------------------
     wire   [`BF:0]                                    rx_commited_rd_addr;
     wire   [`BF:0]                                    rx_commited_rd_addr_synch;
+
+    //-------------------------------------------------------
+    // Local Wires rx_dropped_pkts_synch
+    //-------------------------------------------------------
+    wire   [15:0]                                     rx_dropped_pkts_synch;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC signal declaration
@@ -483,32 +505,77 @@ module my_top (
         .wr_addr(rx_wr_addr),                                  // O [`BF:0]
         .wr_data(rx_wr_data),                                  // O [63:0]
         .wr_en(rx_wr_en),                                      // O
+        .rx_activity(rx_activity),                             // O
         .commited_wr_addr(rx_commited_wr_addr),                // O [`BF:0]
-        .commited_rd_addr(rx_commited_rd_addr_synch)           // I [`BF:0]
+        .commited_rd_addr(rx_commited_rd_addr_synch),          // I [`BF:0]
+        .sys_nsecs(sys_nsecs_synch),                           // I [31:0]
+        .sys_secs(sys_secs_synch),                             // I [31:0]
+        .sys_nsecs_update(sys_nsecs_update),                   // I
+        .sys_secs_update(sys_secs_update),                     // I
+        .timestamp_en(rx_timestamp_en),                        // I
+        .dropped_pkts(rx_dropped_pkts)                         // O [15:0]
+        );
+
+    //-------------------------------------------------------
+    // ns_synch
+    //-------------------------------------------------------
+    synch_type0 #(31,0) ns_synch_mod (
+        .clk_out(clk156_25),                                    // I
+        .reset_clk_out(reset156_25),                            // I
+        .clk_in(trn_clk_c),                                     // I
+        .reset_clk_in(reset250),                                // I
+        .in(sys_nsecs),                                         // I [31:0]
+        .out(sys_nsecs_synch),                                  // O [31:0]
+        .update(sys_nsecs_update)                               // O
+        );
+
+    //-------------------------------------------------------
+    // s_synch
+    //-------------------------------------------------------
+    synch_type0 #(31,0) s_synch_mod (
+        .clk_out(clk156_25),                                    // I
+        .reset_clk_out(reset156_25),                            // I
+        .clk_in(trn_clk_c),                                     // I
+        .reset_clk_in(reset250),                                // I
+        .in(sys_secs),                                          // I [31:0]
+        .out(sys_secs_synch),                                   // O [31:0]
+        .update(sys_secs_update)                                // O
         );
 
     //-------------------------------------------------------
     // rx_rd_addr_synch
     //-------------------------------------------------------
-    rx_rd_addr_synch rx_rd_addr_synch_mod (
+    synch_type0 #(`BF,1) rx_rd_addr_synch_mod (
         .clk_out(clk156_25),                                    // I
         .reset_clk_out(reset156_25),                            // I
         .clk_in(trn_clk_c),                                     // I
         .reset_clk_in(reset250),                                // I
-        .commited_rd_addr_in(rx_commited_rd_addr),              // I [`BF:0]
-        .commited_rd_addr_out(rx_commited_rd_addr_synch)        // O [`BF:0]
+        .in(rx_commited_rd_addr),                               // I [`BF:0]
+        .out(rx_commited_rd_addr_synch)                         // O [`BF:0]
         );
 
     //-------------------------------------------------------
     // rx_wr_addr_synch
     //-------------------------------------------------------
-    rx_wr_addr_synch rx_wr_addr_synch_mod (
-        .clk_out(trn_clk_c),                                   // I
-        .reset_clk_out(reset250),                              // I
-        .clk_in(clk156_25),                                    // I
-        .reset_clk_in(reset156_25),                            // I
-        .commited_wr_addr_in(rx_commited_wr_addr),             // I [`BF:0]
-        .commited_wr_addr_out(rx_commited_wr_addr_synch)       // O [`BF:0]
+    synch_type1 #(`BF,1) rx_wr_addr_synch_mod (
+        .clk_out(trn_clk_c),                                    // I
+        .reset_clk_out(reset250),                               // I
+        .clk_in(clk156_25),                                     // I
+        .reset_clk_in(reset156_25),                             // I
+        .in(rx_commited_wr_addr),                               // I [`BF:0]
+        .out(rx_commited_wr_addr_synch)                         // O [`BF:0]
+        );
+
+    //-------------------------------------------------------
+    // rx_dropped_pkts_synch
+    //-------------------------------------------------------
+    synch_type1 #(15,1) rx_dropped_pkts_synch_mod (
+        .clk_out(trn_clk_c),                                    // I
+        .reset_clk_out(reset250),                               // I
+        .clk_in(clk156_25),                                     // I
+        .reset_clk_in(reset156_25),                             // I
+        .in(rx_dropped_pkts),                                   // I [15:0]
+        .out(rx_dropped_pkts_synch)                             // O [15:0]
         );
     //////////////////////////////////////////////////////////////////////////////////////////
     // Reception side of the NIC (END)
@@ -554,25 +621,25 @@ module my_top (
     //-------------------------------------------------------
     // tx_rd_addr_synch
     //-------------------------------------------------------
-    tx_rd_addr_synch tx_rd_addr_synch_mod (
-        .clk_out(trn_clk_c),                                   // I
-        .reset_clk_out(reset250),                              // I
-        .clk_in(clk156_25),                                    // I
-        .reset_clk_in(reset156_25),                            // I
-        .commited_rd_addr_in(tx_commited_rd_addr),             // I [9:0]
-        .commited_rd_addr_out(tx_commited_rd_addr_synch)       // O [9:0]
+    synch_type1 #(9,1) tx_rd_addr_synch_mod (
+        .clk_out(trn_clk_c),                                    // I
+        .reset_clk_out(reset250),                               // I
+        .clk_in(clk156_25),                                     // I
+        .reset_clk_in(reset156_25),                             // I
+        .in(tx_commited_rd_addr),                               // I [9:0]
+        .out(tx_commited_rd_addr_synch)                         // O [9:0]
         );
 
     //-------------------------------------------------------
     // tx_wr_addr_synch
     //-------------------------------------------------------
-    tx_wr_addr_synch tx_wr_addr_synch_mod (
-        .clk_out(clk156_25),                                   // I
-        .reset_clk_out(reset156_25),                           // I
-        .clk_in(trn_clk_c),                                    // I
-        .reset_clk_in(reset250),                               // I
-        .commited_wr_addr_in(tx_commited_wr_addr),             // I [9:0]
-        .commited_wr_addr_out(tx_commited_wr_addr_synch)       // O [9:0]
+    synch_type0 #(9,1) tx_wr_addr_synch_mod (
+        .clk_out(clk156_25),                                    // I
+        .reset_clk_out(reset156_25),                            // I
+        .clk_in(trn_clk_c),                                     // I
+        .reset_clk_in(reset250),                                // I
+        .in(tx_commited_wr_addr),                               // I [9:0]
+        .out(tx_commited_wr_addr_synch)                         // O [9:0]
         );
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC (END)
@@ -582,7 +649,7 @@ module my_top (
     //-------------------------------------------------------
     // Endpoint Implementation Application
     //-------------------------------------------------------
-    pci_exp_64b_app app (
+    pcie_endpoint_driver pcie_endpoint_driver_mod (
         
         // Transaction ( TRN ) Interface  //
         .trn_clk(trn_clk_c),                                      // I
@@ -601,8 +668,13 @@ module my_top (
         .trn_tbuf_av(trn_tbuf_av_c),                              // I [4/3:0]
 
         // To rx_mac_interface  //
+        .rx_activity(rx_activity),                                // I
         .rx_commited_rd_addr(rx_commited_rd_addr),                // O [`BF:0]
         .rx_commited_wr_addr(rx_commited_wr_addr_synch),          // I [`BF:0]
+        .sys_nsecs(sys_nsecs),                                    // O [31:0]
+        .sys_secs(sys_secs),                                      // O [31:0]
+        .rx_timestamp_en(rx_timestamp_en),                        // O
+        .rx_dropped_pkts(rx_dropped_pkts_synch),                  // I [15:0]
 
         // To mac_host_configuration_interface  //
         .host_clk(clk50),                                         // I 

@@ -64,9 +64,17 @@ module rx_mac_interface (
     output reg                wr_en,
     
     // Internal logic
+    output reg                rx_activity,
     output reg    [`BF:0]     commited_wr_addr,
-    input         [`BF:0]     commited_rd_addr
+    input         [`BF:0]     commited_rd_addr,
 
+    input         [31:0]      sys_nsecs,
+    input         [31:0]      sys_secs,
+    input                     sys_nsecs_update,
+    input                     sys_secs_update,
+    input                     timestamp_en,
+
+    output reg    [15:0]      dropped_pkts
     );
 
     // localparam
@@ -87,15 +95,20 @@ module rx_mac_interface (
     reg     [15:0]    byte_counter;
     reg     [`BF:0]   aux_wr_addr;
     reg     [`BF:0]   diff;
-    /*(* KEEP = "TRUE" *)*/reg     [31:0]   dropped_frames_counter;
+    // /*(* KEEP = "TRUE" *)*/reg     [31:0]   dropped_pkts;
+    reg     [31:0]   pkt_nsec;
+    reg     [31:0]   pkt_sec;
     
     reg     [7:0]    rx_data_valid_reg;
     reg              rx_good_frame_reg;
     reg              rx_bad_frame_reg;
+    reg              timestamp_en_synch0;
+    reg              timestamp_en_synch1;
 
     //-------------------------------------------------------
     // Local ts_sec-and-ts_nsec-generation
     //-------------------------------------------------------
+    reg     [7:0]    time_fsm;
     reg     [31:0]   ts_sec;
     reg     [31:0]   ts_nsec;
     reg     [27:0]   free_running;
@@ -106,19 +119,51 @@ module rx_mac_interface (
     always @(posedge clk) begin
 
         if (reset) begin  // reset
-            ts_sec <= 32'b0;
-            ts_nsec <= 32'b0;
-            free_running <= 28'b0;
+            timestamp_en_synch0 <= 1'b0;
+            timestamp_en_synch1 <= 1'b0;
+            time_fsm <= s0;
         end
         
         else begin  // not reset
-            free_running <= free_running +1;
-            ts_nsec <= ts_nsec + 6;
-            if (free_running == 28'd156250000) begin
-              free_running <= 28'b0;
-              ts_sec <= ts_sec +1;
-              ts_nsec <= 32'b0;
-            end
+
+            timestamp_en_synch0 <= timestamp_en;
+            timestamp_en_synch1 <= timestamp_en_synch0;
+
+            case (time_fsm)
+
+                s0 : begin
+                    free_running <= 'b0;
+                    ts_nsec <= 'b0;
+                    ts_sec <= 'b0;
+                    if (timestamp_en_synch1) begin
+                        time_fsm <= s1;
+                    end
+                end
+
+                s1 : begin
+                    ts_nsec <= ts_nsec + 6;
+                    free_running <= free_running +1;
+                    if (free_running == 28'd156250000) begin
+                        free_running <= 'b0;
+                        ts_sec <= ts_sec +1;
+                        ts_nsec <= 'b0;
+                    end
+                    if (sys_nsecs_update) begin
+                        ts_nsec <= sys_nsecs;
+                    end
+                    if (sys_secs_update) begin
+                        ts_sec <= sys_secs;
+                    end
+                    if (!timestamp_en_synch1) begin
+                        time_fsm <= s0;
+                    end
+                end
+
+                default : begin 
+                    time_fsm <= s0;
+                end
+
+            endcase
 
         end     // not reset
     end  //always
@@ -130,8 +175,9 @@ module rx_mac_interface (
 
         if (reset) begin  // reset
             commited_wr_addr <= 'b0;
-            dropped_frames_counter <= 'b0;
+            dropped_pkts <= 'b0;
             wr_en <= 1'b1;
+            rx_activity <= 1'b0;
             rx_fsm <= s0;
         end
         
@@ -139,12 +185,15 @@ module rx_mac_interface (
             
             diff <= aux_wr_addr + (~commited_rd_addr) +1;
             wr_en <= 1'b1;
-            
+            rx_activity <= 1'b0;
+
             case (rx_fsm)
 
                 s0 : begin                                  // configure mac core to present preamble and save the packet timestamp while its reception
                     byte_counter <= 'b0;
                     aux_wr_addr <= commited_wr_addr +1;
+                    pkt_nsec <= ts_nsec;
+                    pkt_sec <= ts_sec;
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s1;
                     end
@@ -154,6 +203,7 @@ module rx_mac_interface (
                     wr_data <= rx_data;
                     wr_addr <= aux_wr_addr;
                     aux_wr_addr <= aux_wr_addr +1;
+                    rx_activity <= 1'b1;
 
                     rx_data_valid_reg <= rx_data_valid;
                     rx_good_frame_reg <= rx_good_frame;
@@ -202,12 +252,15 @@ module rx_mac_interface (
                 end
 
                 s2 : begin
-                    wr_data <= {byte_counter, 32'b0};
+                    wr_data <= {pkt_sec[0], 15'b0, byte_counter, pkt_nsec};
                     wr_addr <= commited_wr_addr;
+                    rx_activity <= 1'b1;
 
                     commited_wr_addr <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;
-                    byte_counter <= 32'b0;
+                    byte_counter <= 'b0;
+                    pkt_nsec <= ts_nsec;
+                    pkt_sec <= ts_sec;
 
                     if (rx_data_valid) begin        // sof (preamble)
                         rx_fsm <= s1;
@@ -219,7 +272,7 @@ module rx_mac_interface (
                 
                 s3 : begin                                  // drop current frame
                     if (rx_good_frame || rx_good_frame_reg || rx_bad_frame  || rx_bad_frame_reg) begin
-                        dropped_frames_counter <= dropped_frames_counter +1; 
+                        dropped_pkts <= dropped_pkts +1; 
                         rx_fsm <= s0;
                     end
                 end

@@ -46,11 +46,6 @@
 //`default_nettype none
 `include "includes.v"
 
-`define MEM_WR64_FMT_TYPE 7'b11_00000
-`define MEM_WR32_FMT_TYPE 7'b10_00000
-`define MEM_RD64_FMT_TYPE 7'b01_00000
-`define MEM_RD32_FMT_TYPE 7'b00_00000
-
 module rx_wr_pkt_to_hugepages (
 
     input                  trn_clk,
@@ -65,8 +60,6 @@ module rx_wr_pkt_to_hugepages (
     input                  trn_tdst_rdy_n,
     input       [3:0]      trn_tbuf_av,
     input       [15:0]     cfg_completer_id,
-    output reg             cfg_interrupt_n,
-    input                  cfg_interrupt_rdy_n,
 
     // Internal logic  //
     input       [63:0]     huge_page_addr_1,
@@ -75,14 +68,14 @@ module rx_wr_pkt_to_hugepages (
     input                  huge_page_status_2,
     output reg             huge_page_free_1,
     output reg             huge_page_free_2,
-    input                  interrupts_enabled,
 
     input                  trigger_tlp,
     output reg             trigger_tlp_ack,
     input                  change_huge_page,
     output reg             change_huge_page_ack,
-    input                  send_last_tlp,
-    input       [4:0]      qwords_to_send,
+    input                  send_numb_qws,
+    output reg             send_numb_qws_ack,
+    input       [5:0]      qwords_to_send,
 
     output reg  [`BF:0]    commited_rd_addr,
     output reg  [`BF:0]    rd_addr,
@@ -90,7 +83,12 @@ module rx_wr_pkt_to_hugepages (
 
     // Arbitrations handshake  //
     input                  my_turn,
-    output reg             driving_interface
+    output reg             driving_interface,
+
+    input       [15:0]     rx_dropped_pkts,
+
+    // Hw Sw Synch //
+    output      [63:0]     hw_pointer
     );
 
     // localparam
@@ -139,18 +137,22 @@ module rx_wr_pkt_to_hugepages (
     reg     [27:0]      send_fsm;
     reg                 return_huge_page_to_host;
     reg     [8:0]       tlp_qword_counter;
-    reg     [31:0]      tlp_number;
-    reg     [31:0]      look_ahead_tlp_number;
+    reg     [4:0]       tlp_number;
+    reg     [4:0]       look_ahead_tlp_number;
     reg     [8:0]       qwords_in_tlp;
     reg     [63:0]      host_mem_addr;
     reg     [63:0]      look_ahead_host_mem_addr;
+    reg     [63:0]      aux1_host_mem_addr;
     reg     [31:0]      huge_page_qword_counter;
+    reg     [31:0]      aux_qw_count;
+    reg     [31:0]      next_qw_counter;
     reg     [31:0]      look_ahead_huge_page_qword_counter;
-    reg                 remember_to_change_huge_page;
     reg     [`BF:0]     rd_addr_prev1;
     reg     [`BF:0]     rd_addr_prev2;
     reg     [`BF:0]     look_ahead_commited_rd_addr;
     reg     [31:0]      aux_rd_data;
+    reg                 notify_huge_page_change;
+    reg     [15:0]      rx_dropped_pkts_reg;
     
     ////////////////////////////////////////////////
     // current_huge_page_addr
@@ -227,25 +229,24 @@ module rx_wr_pkt_to_hugepages (
         end     // not reset
     end  //always
 
+    assign hw_pointer = host_mem_addr;
+
     ////////////////////////////////////////////////
     // write request TLP generation to huge_page
     ////////////////////////////////////////////////
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            trn_td <= 'b0;
-            trn_trem_n <= 'hFF;
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
-            cfg_interrupt_n <= 1'b1;
 
-            remember_to_change_huge_page <= 1'b0;
             return_huge_page_to_host <= 1'b0;
             driving_interface <= 1'b0;
 
             trigger_tlp_ack <= 1'b0;
             change_huge_page_ack <= 1'b0;
+            send_numb_qws_ack <= 1'b0;
 
             commited_rd_addr <= 'b0;
             rd_addr <= 'b0;
@@ -259,10 +260,13 @@ module rx_wr_pkt_to_hugepages (
 
             trigger_tlp_ack <= 1'b0;
             change_huge_page_ack <= 1'b0;
+            send_numb_qws_ack <= 1'b0;
             return_huge_page_to_host <= 1'b0;
 
             rd_addr_prev1 <= rd_addr;
             rd_addr_prev2 <= rd_addr_prev1;
+
+            rx_dropped_pkts_reg <= rx_dropped_pkts;
 
             case (send_fsm)
 
@@ -284,27 +288,28 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s1 : begin
-                    qwords_in_tlp <= {4'b0, qwords_to_send};
+                    qwords_in_tlp <= {3'b0, qwords_to_send};
 
                     driving_interface <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
-                        if (change_huge_page || remember_to_change_huge_page) begin
-                            remember_to_change_huge_page <= 1'b0;
+                        if (change_huge_page) begin
+                            notify_huge_page_change <= 1'b1;
                             change_huge_page_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s10;
-                        end
-                        else if (send_last_tlp) begin
-                            remember_to_change_huge_page <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s2;
                         end
                         else if (trigger_tlp) begin
                             driving_interface <= 1'b1;
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s2;
+                        end
+                        else if (send_numb_qws) begin
+                            notify_huge_page_change <= 1'b0;
+                            send_numb_qws_ack <= 1'b1;
+                            driving_interface <= 1'b1;
+                            send_fsm <= s10;
                         end
                     end
                 end
@@ -325,7 +330,7 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_number[3:0] },   //Tag
+                                {3'b0, tlp_number },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
@@ -351,7 +356,7 @@ module rx_wr_pkt_to_hugepages (
                         send_fsm <= s6;
                     end
                     else begin
-                        rd_addr <= rd_addr_prev2;
+                        rd_addr <= rd_addr_prev1;
                         send_fsm <= s4;
                     end
                 end
@@ -361,20 +366,24 @@ module rx_wr_pkt_to_hugepages (
                         rd_addr <= rd_addr +1;
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_tsof_n <= 1'b1;
-                        send_fsm <= s5;
+                        send_fsm <= s3;
                     end
                 end
 
-                s5 : begin
-                    trn_tsrc_rdy_n <= 1'b1;
-                    rd_addr <= rd_addr +1;
-                    send_fsm <= s3;
-                end
-
                 s6 : begin
+                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td <= {rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24], rd_data[39:32], rd_data[47:40], rd_data[55:48] ,rd_data[63:56]};
+                        trn_td <= {
+                                rd_data[7:0],
+                                rd_data[15:8],
+                                rd_data[23:16],
+                                rd_data[31:24],
+                                rd_data[39:32],
+                                rd_data[47:40],
+                                rd_data[55:48],
+                                rd_data[63:56]
+                            };
 
                         rd_addr <= rd_addr +1;
 
@@ -407,7 +416,7 @@ module rx_wr_pkt_to_hugepages (
                 s9 : begin
                     commited_rd_addr <= look_ahead_commited_rd_addr;
                     rd_addr <= look_ahead_commited_rd_addr;
-                    host_mem_addr <= look_ahead_host_mem_addr;
+                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;
                     if (!trn_tdst_rdy_n) begin
@@ -439,21 +448,33 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    aux_qw_count <= huge_page_qword_counter;
+                    next_qw_counter <= huge_page_qword_counter + 'hF;
                     send_fsm <= s11;
                 end
 
                 s11 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        return_huge_page_to_host <= 1'b1;
+                        return_huge_page_to_host <= notify_huge_page_change;
                         trn_td <= current_huge_page_addr;
                         send_fsm <= s12;
                     end
                 end
 
                 s12 : begin
+                    huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24], 32'b0};
+                        trn_td <= {
+                                aux_qw_count[7:0],
+                                aux_qw_count[15:8],
+                                aux_qw_count[23:16],
+                                aux_qw_count[31:24],
+                                {7'b0, notify_huge_page_change},
+                                rx_dropped_pkts_reg[7:0],
+                                rx_dropped_pkts_reg[15:8],
+                                8'b0
+                            };
                         trn_teof_n <= 1'b0;
                         send_fsm <= s13;
                     end
@@ -463,38 +484,38 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
-                        if (interrupts_enabled) begin
-                            cfg_interrupt_n <= 1'b0;
-                            send_fsm <= s28;
+                        if (notify_huge_page_change) begin
+                            send_fsm <= s0;
                         end
                         else begin
-                            send_fsm <= s0;
+                            send_fsm <= s1;
                         end
                     end
                 end
 
                 s14 : begin
-                    qwords_in_tlp <= {4'b0, qwords_to_send};
+                    qwords_in_tlp <= {3'b0, qwords_to_send};
 
                     driving_interface <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
                     if ( (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (my_turn || driving_interface) ) begin
-                        if (change_huge_page || remember_to_change_huge_page) begin
-                            remember_to_change_huge_page <= 1'b0;
+                        if (change_huge_page) begin
+                            notify_huge_page_change <= 1'b1;
                             change_huge_page_ack <= 1'b1;
                             driving_interface <= 1'b1;
                             send_fsm <= s24;
-                        end
-                        else if (send_last_tlp) begin
-                            remember_to_change_huge_page <= 1'b1;
-                            driving_interface <= 1'b1;
-                            send_fsm <= s15;
                         end
                         else if (trigger_tlp) begin
                             driving_interface <= 1'b1;
                             trigger_tlp_ack <= 1'b1;
                             send_fsm <= s15;
+                        end
+                        else if (send_numb_qws) begin
+                            notify_huge_page_change <= 1'b0;
+                            send_numb_qws_ack <= 1'b1;
+                            driving_interface <= 1'b1;
+                            send_fsm <= s24;
                         end
                     end
                 end
@@ -520,7 +541,7 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_number[3:0] },   //Tag
+                                {3'b0, tlp_number },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
@@ -542,7 +563,13 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td <= {host_mem_addr[31:0], rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24]};
+                        trn_td <= {
+                                host_mem_addr[31:0],
+                                rd_data[7:0],
+                                rd_data[15:8],
+                                rd_data[23:16],
+                                rd_data[31:24]
+                            };
                         rd_addr <= rd_addr +1;
                         send_fsm <= s20;
                     end
@@ -568,10 +595,20 @@ module rx_wr_pkt_to_hugepages (
                 end
 
                 s20 : begin
+                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         aux_rd_data <= rd_data[63:32];
-                        trn_td <= {aux_rd_data[7:0], aux_rd_data[15:8], aux_rd_data[23:16], aux_rd_data[31:24], rd_data[7:0], rd_data[15:8], rd_data[23:16], rd_data[31:24]};
+                        trn_td <= {
+                                aux_rd_data[7:0],
+                                aux_rd_data[15:8],
+                                aux_rd_data[23:16],
+                                aux_rd_data[31:24],
+                                rd_data[7:0],
+                                rd_data[15:8],
+                                rd_data[23:16],
+                                rd_data[31:24]
+                            };
                         rd_addr <= rd_addr +1;
                         tlp_qword_counter <= tlp_qword_counter +1;
                         if (tlp_qword_counter == qwords_in_tlp) begin
@@ -602,7 +639,7 @@ module rx_wr_pkt_to_hugepages (
                 s23 : begin
                     commited_rd_addr <= look_ahead_commited_rd_addr;
                     rd_addr <= look_ahead_commited_rd_addr;
-                    host_mem_addr <= look_ahead_host_mem_addr;
+                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
                     huge_page_qword_counter <= look_ahead_huge_page_qword_counter;
                     tlp_number <= look_ahead_tlp_number;
                     if (!trn_tdst_rdy_n) begin
@@ -634,21 +671,35 @@ module rx_wr_pkt_to_hugepages (
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    aux_qw_count <= huge_page_qword_counter;
+                    next_qw_counter <= huge_page_qword_counter + 'hF;
                     send_fsm <= s25;
                 end
 
                 s25 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        return_huge_page_to_host <= 1'b1;
-                        trn_td <= {current_huge_page_addr[31:0], huge_page_qword_counter[7:0], huge_page_qword_counter[15:8], huge_page_qword_counter[23:16], huge_page_qword_counter[31:24]};
+                        return_huge_page_to_host <= notify_huge_page_change;
+                        trn_td <= {
+                                current_huge_page_addr[31:0],
+                                aux_qw_count[7:0],
+                                aux_qw_count[15:8],
+                                aux_qw_count[23:16],
+                                aux_qw_count[31:24]
+                            };
                         send_fsm <= s26;
                     end
                 end
 
                 s26 : begin
+                    huge_page_qword_counter <= {next_qw_counter[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td[63:32] <= {32'b0};
+                        trn_td[63:32] <= {
+                                {7'b0, notify_huge_page_change},
+                                rx_dropped_pkts_reg[7:0],
+                                rx_dropped_pkts_reg[15:8],
+                                8'b0
+                            };
                         trn_teof_n <= 1'b0;
                         send_fsm <= s27;
                     end
@@ -658,20 +709,12 @@ module rx_wr_pkt_to_hugepages (
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
-                        if (interrupts_enabled) begin
-                            cfg_interrupt_n <= 1'b0;
-                            send_fsm <= s28;
-                        end
-                        else begin
+                        if (notify_huge_page_change) begin
                             send_fsm <= s0;
                         end
-                    end
-                end
-
-                s28 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        send_fsm <= s0;
+                        else begin
+                            send_fsm <= s14;
+                        end
                     end
                 end
 

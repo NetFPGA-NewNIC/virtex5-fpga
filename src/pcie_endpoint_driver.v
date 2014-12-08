@@ -44,7 +44,7 @@
 //`default_nettype none
 `include "includes.v"
 
-module  pci_exp_64b_app (
+module  pcie_endpoint_driver (
 
     // Transaction ( TRN ) Interface  //
     input                                         trn_clk,
@@ -63,8 +63,13 @@ module  pci_exp_64b_app (
     input      [3:0]                              trn_tbuf_av,
 
     // To rx_mac_interface //
+    input                                         rx_activity,
     output     [`BF:0]                            rx_commited_rd_addr,
     input      [`BF:0]                            rx_commited_wr_addr,
+    output     [31:0]                             sys_nsecs,
+    output     [31:0]                             sys_secs,
+    output                                        rx_timestamp_en,
+    input      [15:0]                             rx_dropped_pkts,
 
     // To mac_host_configuration_interface  //
     input                                         host_clk,
@@ -178,19 +183,34 @@ module  pci_exp_64b_app (
     //-------------------------------------------------------
     // Local Wires rx_tlp_trigger
     //-------------------------------------------------------
-    wire                                              rx_trigger_tlp;
-    wire                                              rx_trigger_tlp_ack;
-    wire                                              rx_change_huge_page;
-    wire                                              rx_change_huge_page_ack;
-    wire                                              rx_send_last_tlp;
-    wire   [4:0]                                      rx_qwords_to_send;
+    wire              rx_trigger_tlp;
+    wire              rx_trigger_tlp_ack;
+    wire              rx_change_huge_page;
+    wire              rx_change_huge_page_ack;
+    wire              rx_send_numb_qws;
+    wire              rx_send_numb_qws_ack;
+    wire   [5:0]      rx_qwords_to_send;
 
+    //-------------------------------------------------------
+    // Local Wires rx_interrupt_gen
+    //-------------------------------------------------------
+    wire              rx_cfg_interrupt_n;
+
+    //-------------------------------------------------------
+    // Local Wires rx_wr_pkt_to_hugepages
+    //-------------------------------------------------------
     wire   [63:0]     rx_trn_td;
     wire   [7:0]      rx_trn_trem_n;
     wire              rx_trn_tsof_n;
     wire              rx_trn_teof_n;
     wire              rx_trn_tsrc_rdy_n;
-    wire              rx_cfg_interrupt_n;
+
+    //-------------------------------------------------------
+    // Local Wires rx_hw_sw_synch
+    //-------------------------------------------------------
+    wire   [63:0]     rx_hw_pointer;
+    wire              rx_resend_interrupt;
+    wire              rx_resend_interrupt_ack;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC signal declaration
@@ -208,6 +228,11 @@ module  pci_exp_64b_app (
     wire              tx_huge_page_free_2;
 
     //-------------------------------------------------------
+    // Local Wires tx_interrupt_gen
+    //-------------------------------------------------------
+    wire              tx_cfg_interrupt_n;
+
+    //-------------------------------------------------------
     // Local tx_rd_host_mem_mod
     //-------------------------------------------------------
     wire   [63:0]     tx_trn_td;
@@ -215,8 +240,7 @@ module  pci_exp_64b_app (
     wire              tx_trn_tsof_n;
     wire              tx_trn_teof_n;
     wire              tx_trn_tsrc_rdy_n;
-    wire              tx_cfg_interrupt_n;
-    wire   [3:0]      tx_tlp_tag;
+    wire   [4:0]      tx_tlp_tag;
 
     //-------------------------------------------------------
     // Local tx_wr_pkt_to_bram_mod
@@ -233,6 +257,13 @@ module  pci_exp_64b_app (
     wire              tx_notify;
     wire   [63:0]     tx_notification_message;
     wire              tx_notify_ack;
+
+    //-------------------------------------------------------
+    // Local Wires tx_hw_sw_synch
+    //-------------------------------------------------------
+    wire   [63:0]     tx_hw_pointer;
+    wire              tx_resend_interrupt;
+    wire              tx_resend_interrupt_ack;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // PCIe Endpoint Arbitrations
@@ -252,7 +283,19 @@ module  pci_exp_64b_app (
     // Local Interrupt control logic
     //-------------------------------------------------------
     wire              interrupts_enabled;
+    wire   [31:0]     interrupt_period;
     wire              mdio_access_cfg_interrupt_n;
+    wire              ctrl_cfg_interrupt_n;
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    // System time
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //-------------------------------------------------------
+    // Local System time
+    //-------------------------------------------------------
+    //wire   [31:0]     sys_nsecs;
+    //wire   [31:0]     sys_secs;
+    //wire              rx_timestamp_en;
 
     //-------------------------------------------------------
     // Core input tie-offs
@@ -357,13 +400,37 @@ module  pci_exp_64b_app (
     rx_tlp_trigger rx_tlp_trigger_mod (
         .clk(trn_clk),                                         // I
         .reset(reset250),                                      // I
+        .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
         .commited_wr_addr(rx_commited_wr_addr),                // I [`BF:0]
+        .rx_activity(rx_activity),                             // I
         .trigger_tlp(rx_trigger_tlp),                          // O
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // I
         .change_huge_page(rx_change_huge_page),                // O
         .change_huge_page_ack(rx_change_huge_page_ack),        // I
-        .send_last_tlp(rx_send_last_tlp),                      // O
-        .qwords_to_send(rx_qwords_to_send)                     // O [4:0]
+        .send_numb_qws(rx_send_numb_qws),                      // O
+        .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
+        .qwords_to_send(rx_qwords_to_send)                     // O [5:0]
+        );
+
+    //-------------------------------------------------------
+    // rx_interrupt_gen
+    //-------------------------------------------------------
+    rx_interrupt_gen rx_interrupt_gen_mod (
+        .clk(trn_clk),                                         // I
+        .reset(reset250),                                      // I
+        .cfg_interrupt_n(rx_cfg_interrupt_n),                  // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
+        .rx_activity(rx_activity),                             // I
+        .change_huge_page(rx_change_huge_page),                // I
+        .change_huge_page_ack(rx_change_huge_page_ack),        // I
+        .send_numb_qws(rx_send_numb_qws),                      // I
+        .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
+        .huge_page_status_1(rx_huge_page_status_1),            // I
+        .huge_page_status_2(rx_huge_page_status_2),            // I
+        .interrupts_enabled(interrupts_enabled),               // I
+        .interrupt_period(interrupt_period),                   // I [31:0]
+        .resend_interrupt(rx_resend_interrupt),                // I
+        .resend_interrupt_ack(rx_resend_interrupt_ack)         // O
         );
 
     //-------------------------------------------------------
@@ -380,26 +447,47 @@ module  pci_exp_64b_app (
         .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
         .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         .cfg_completer_id(cfg_completer_id),                   // I [15:0]
-        .cfg_interrupt_n(rx_cfg_interrupt_n),                  // O
-        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .huge_page_addr_1(rx_huge_page_addr_1),                // I [63:0]
         .huge_page_addr_2(rx_huge_page_addr_2),                // I [63:0]
         .huge_page_status_1(rx_huge_page_status_1),            // I
         .huge_page_status_2(rx_huge_page_status_2),            // I
         .huge_page_free_1(rx_huge_page_free_1),                // O
         .huge_page_free_2(rx_huge_page_free_2),                // O
-        .interrupts_enabled(interrupts_enabled),               // I
         .trigger_tlp(rx_trigger_tlp),                          // I
         .trigger_tlp_ack(rx_trigger_tlp_ack),                  // O
         .change_huge_page(rx_change_huge_page),                // I
         .change_huge_page_ack(rx_change_huge_page_ack),        // O
-        .send_last_tlp(rx_send_last_tlp),                      // I
-        .qwords_to_send(rx_qwords_to_send),                    // I [4:0]
+        .send_numb_qws(rx_send_numb_qws),                      // I
+        .send_numb_qws_ack(rx_send_numb_qws_ack),              // O
+        .qwords_to_send(rx_qwords_to_send),                    // I [5:0]
         .commited_rd_addr(rx_commited_rd_addr),                // O [`BF:0]
         .rd_addr(rx_rd_addr),                                  // O [`BF:0]
         .rd_data(rx_rd_data),                                  // I [63:0]
         .my_turn(rx_turn),                                     // I
-        .driving_interface(rx_driven)                          // O
+        .driving_interface(rx_driven),                         // O
+        .rx_dropped_pkts(rx_dropped_pkts),                     // I [15:0]
+        .hw_pointer(rx_hw_pointer)                             // O [63:0]
+        );
+
+    //-------------------------------------------------------
+    // rx_hw_sw_synch
+    //-------------------------------------------------------
+    hw_sw_synch #(
+        .BARMAPPING(6'b011110)
+    ) rx_hw_sw_synch_mod (
+        .trn_clk(trn_clk),                                     // I
+        .reset(reset250),                                      // I
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .hw_pointer(rx_hw_pointer),                            // I [63:0]
+        .resend_interrupt(rx_resend_interrupt),                // O
+        .resend_interrupt_ack(rx_resend_interrupt_ack)         // I
         );
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -435,6 +523,21 @@ module  pci_exp_64b_app (
         );
 
     //-------------------------------------------------------
+    // tx_interrupt_gen
+    //-------------------------------------------------------
+    tx_interrupt_gen tx_interrupt_gen_mod (
+        .clk(trn_clk),                                         // I
+        .reset(reset250),                                      // I
+        .cfg_interrupt_n(tx_cfg_interrupt_n),                  // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
+        .interrupts_enabled(interrupts_enabled),               // I
+        .condition(tx_send_interrupt),                         // I
+        .condition_ack(tx_send_interrupt_ack),                 // O
+        .resend_interrupt(tx_resend_interrupt),                // I
+        .resend_interrupt_ack(tx_resend_interrupt_ack)         // O
+        );
+
+    //-------------------------------------------------------
     // tx_rd_host_mem
     //-------------------------------------------------------
     tx_rd_host_mem tx_rd_host_mem_mod (
@@ -448,12 +551,10 @@ module  pci_exp_64b_app (
         .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
         .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         .cfg_completer_id(cfg_completer_id),                   // I [15:0]
-        .cfg_interrupt_n(tx_cfg_interrupt_n),                  // O
-        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .completed_buffer_address(tx_completed_buffer_address),// I [63:0]
         .huge_page_addr(tx_huge_page_addr_read_from),          // I [63:0]
         .read_chunk(tx_read_chunk),                            // I
-        .tlp_tag(tx_tlp_tag),                                  // O [3:0]
+        .tlp_tag(tx_tlp_tag),                                  // O [4:0]
         .qwords_to_rd(tx_qwords_to_rd),                        // I [8:0]
         .read_chunk_ack(tx_read_chunk_ack),                    // O
         .send_rd_completed(tx_send_rd_completed),              // I
@@ -461,10 +562,9 @@ module  pci_exp_64b_app (
         .notify(tx_notify),                                    // I
         .notification_message(tx_notification_message),        // I [63:0]
         .notify_ack(tx_notify_ack),                            // O
-        .send_interrupt(tx_send_interrupt),                    // I
-        .send_interrupt_ack(tx_send_interrupt_ack),            // O
         .my_turn(tx_turn),                                     // I
-        .driving_interface(tx_driven)                          // O
+        .driving_interface(tx_driven),                         // O
+        .hw_pointer(tx_hw_pointer)                             // O
         );
 
     //-------------------------------------------------------
@@ -492,7 +592,7 @@ module  pci_exp_64b_app (
         .interrupts_enabled(interrupts_enabled),               // I
         .huge_page_addr_read_from(tx_huge_page_addr_read_from),// O [63:0]
         .read_chunk(tx_read_chunk),                            // O
-        .tlp_tag(tx_tlp_tag),                                  // I [3:0]
+        .tlp_tag(tx_tlp_tag),                                  // I [4:0]
         .qwords_to_rd(tx_qwords_to_rd),                        // O [8:0]
         .read_chunk_ack(tx_read_chunk_ack),                    // I
         .send_rd_completed(tx_send_rd_completed),              // O
@@ -508,6 +608,28 @@ module  pci_exp_64b_app (
         .commited_rd_addr(tx_commited_rd_addr),                // I [9:0]
         .commited_wr_addr(tx_commited_wr_addr)                 // O [9:0]
         );
+
+    //-------------------------------------------------------
+    // tx_hw_sw_synch
+    //-------------------------------------------------------
+    hw_sw_synch #(
+        .BARMAPPING(6'b101110)
+    ) tx_hw_sw_synch_mod (
+        .trn_clk(trn_clk),                                     // I
+        .reset(reset250),                                      // I
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .hw_pointer(tx_hw_pointer),                            // I [63:0]
+        .resend_interrupt(tx_resend_interrupt),                // O
+        .resend_interrupt_ack(tx_resend_interrupt_ack)         // I
+        );
+
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC (END)
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -532,12 +654,12 @@ module  pci_exp_64b_app (
     assign trn_tsof_n = rx_trn_tsof_n & tx_trn_tsof_n;
     assign trn_teof_n = rx_trn_teof_n & tx_trn_teof_n;
     assign trn_tsrc_rdy_n = rx_trn_tsrc_rdy_n & tx_trn_tsrc_rdy_n;
-    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & rx_cfg_interrupt_n & tx_cfg_interrupt_n;               // Active low
+    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & rx_cfg_interrupt_n & tx_cfg_interrupt_n & ctrl_cfg_interrupt_n;               // Active low
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Interrupt control logic
     //////////////////////////////////////////////////////////////////////////////////////////
-    interrupt_en interrupt_en_mod (
+    interrupt_ctrl interrupt_ctrl_mod (
         .trn_clk(trn_clk),                                     // I
         .reset(reset250),                                      // I
         .trn_rd(trn_rd),                                       // I [63:0]
@@ -548,10 +670,32 @@ module  pci_exp_64b_app (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
-        .interrupts_enabled(interrupts_enabled)                // O
+        .cfg_interrupt_n(ctrl_cfg_interrupt_n),                // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
+        .interrupts_enabled(interrupts_enabled),               // O
+        .interrupt_period(interrupt_period)                    // O [31:0]
         );
 
-endmodule // pci_exp_64b_app
+    //////////////////////////////////////////////////////////////////////////////////////////
+    // System time
+    //////////////////////////////////////////////////////////////////////////////////////////
+    sys_time sys_time_mod (
+        .trn_clk(trn_clk),                                     // I
+        .reset(reset250),                                      // I
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .sys_nsecs(sys_nsecs),                                 // O [31:0]
+        .sys_secs(sys_secs),                                   // O [31:0]
+        .rx_timestamp_en(rx_timestamp_en)                      // O
+        );
+
+endmodule // pcie_endpoint_driver
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -46,11 +46,6 @@
 //`default_nettype none
 `include "includes.v"
 
-`define MEM_WR64_FMT_TYPE 7'b11_00000
-`define MEM_WR32_FMT_TYPE 7'b10_00000
-`define MEM_RD64_FMT_TYPE 7'b01_00000
-`define MEM_RD32_FMT_TYPE 7'b00_00000
-
 module tx_rd_host_mem (
 
     input                  trn_clk,
@@ -65,8 +60,6 @@ module tx_rd_host_mem (
     input                  trn_tdst_rdy_n,
     input       [3:0]      trn_tbuf_av,
     input       [15:0]     cfg_completer_id,
-    output reg             cfg_interrupt_n,
-    input                  cfg_interrupt_rdy_n,
 
     // Internal logic
 
@@ -74,7 +67,7 @@ module tx_rd_host_mem (
 
     input       [63:0]     huge_page_addr,
     input                  read_chunk,
-    output reg  [3:0]      tlp_tag,
+    output reg  [4:0]      tlp_tag,
     input       [8:0]      qwords_to_rd,
     output reg             read_chunk_ack,
     input                  send_rd_completed,
@@ -84,13 +77,12 @@ module tx_rd_host_mem (
     input       [63:0]     notification_message,
     output reg             notify_ack,
 
-    input                  send_interrupt,
-    output reg             send_interrupt_ack,
-
     // Arbitrations hanshake
 
     input                  my_turn,
-    output reg             driving_interface
+    output reg             driving_interface,
+
+    output reg  [63:0]     hw_pointer
 
     );
     parameter NUMB_HP = 2;      // = 2^something
@@ -123,7 +115,7 @@ module tx_rd_host_mem (
     reg     [31:0]  huge_page_index;
     reg     [31:0]  next_huge_page_index;
     reg     [63:0]  notification_message_reg;
-    reg     [3:0]   next_tlp_tag;
+    reg     [4:0]   next_tlp_tag;
     reg             aux0_high_mem;
     reg             aux1_high_mem;
 
@@ -133,17 +125,13 @@ module tx_rd_host_mem (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            trn_td <= 64'b0;
-            trn_trem_n <= 8'hFF;
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
-            cfg_interrupt_n <= 1'b1;
 
             read_chunk_ack <= 1'b0;
             send_rd_completed_ack <= 1'b0;
             huge_page_index <= 'b0;
-            send_interrupt_ack <= 1'b0;
             notify_ack <= 1'b0;
             tlp_tag <= 'b0;
 
@@ -155,13 +143,14 @@ module tx_rd_host_mem (
 
             read_chunk_ack <= 1'b0;
             send_rd_completed_ack <= 1'b0;
-            send_interrupt_ack <= 1'b0;
             notify_ack <= 1'b0;
             next_huge_page_index <= (huge_page_index + 1) & (~NUMB_HP);
 
             case (rd_host_fsm)
 
                 s0 : begin
+                    trn_td <= 64'b0;
+                    trn_trem_n <= 8'hFF;
                     next_completed_buffer_address <= completed_buffer_address + {huge_page_index, 2'b00};
                     last_completed_buffer_address <= completed_buffer_address + 4'b1000;
                     driving_interface <= 1'b0;
@@ -179,12 +168,6 @@ module tx_rd_host_mem (
                         driving_interface <= 1'b1;
                         send_rd_completed_ack <= 1'b1;
                         rd_host_fsm <= s5;
-                    end
-                    else if ((my_turn) && (trn_tbuf_av[1]) && (!trn_tdst_rdy_n) && (send_interrupt)) begin
-                        cfg_interrupt_n <= 1'b0;
-                        driving_interface <= 1'b1;
-                        send_interrupt_ack <= 1'b1;
-                        rd_host_fsm <= s9;
                     end
                     else if ((my_turn) && (trn_tbuf_av[0]) && (!trn_tdst_rdy_n) && (read_chunk)) begin
                         driving_interface <= 1'b1;
@@ -209,7 +192,7 @@ module tx_rd_host_mem (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id,   //Requester ID
-                                {4'b0, tlp_tag },   //Tag
+                                {3'b0, tlp_tag },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
@@ -248,8 +231,6 @@ module tx_rd_host_mem (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_teof_n <= 1'b1;
-                        trn_trem_n <= 8'hFF;
-                        trn_td <= 64'b0;
                         driving_interface <= 1'b0;
                         rd_host_fsm <= s0;
                     end
@@ -313,15 +294,8 @@ module tx_rd_host_mem (
                     end
                 end
 
-                s9 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        driving_interface <= 1'b0;
-                        rd_host_fsm <= s0;
-                    end
-                end
-
                 s10 : begin
+                    hw_pointer <= notification_message_reg;
                     trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
@@ -363,7 +337,16 @@ module tx_rd_host_mem (
 
                 s12 : begin
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24], notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
+                        trn_td <= {
+                                notification_message_reg[7:0],
+                                notification_message_reg[15:8],
+                                notification_message_reg[23:16],
+                                notification_message_reg[31:24],
+                                notification_message_reg[39:32],
+                                notification_message_reg[47:40],
+                                notification_message_reg[55:48],
+                                notification_message_reg[63:56]
+                            };
                         trn_teof_n <= 1'b0;
                         rd_host_fsm <= s4;
                     end
@@ -372,14 +355,25 @@ module tx_rd_host_mem (
                 s13 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        trn_td <= {last_completed_buffer_address[31:0], notification_message_reg[7:0], notification_message_reg[15:8], notification_message_reg[23:16], notification_message_reg[31:24]};
+                        trn_td <= {
+                                last_completed_buffer_address[31:0],
+                                notification_message_reg[7:0],
+                                notification_message_reg[15:8],
+                                notification_message_reg[23:16],
+                                notification_message_reg[31:24]
+                            };
                         rd_host_fsm <= s14;
                     end
                 end
 
                 s14 : begin
                     if (!trn_tdst_rdy_n) begin
-                        trn_td[63:32] <= {notification_message_reg[39:32], notification_message_reg[47:40], notification_message_reg[55:48], notification_message_reg[63:56]};
+                        trn_td[63:32] <= {
+                                notification_message_reg[39:32],
+                                notification_message_reg[47:40],
+                                notification_message_reg[55:48],
+                                notification_message_reg[63:56]
+                            };
                         trn_teof_n <= 1'b0;
                         rd_host_fsm <= s4;
                     end
