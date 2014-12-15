@@ -79,7 +79,6 @@ module hw_sw_synch (
     reg     [7:0]      host_last_seen_fsm;
     reg     [31:0]     aux_dw;
     reg     [63:0]     host_pointer;
-    reg                synch_hw_sw;
 
     ////////////////////////////////////////////////
     // rcv host_pointer
@@ -87,13 +86,11 @@ module hw_sw_synch (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            synch_hw_sw <= 1'b0;
             host_last_seen_fsm <= s0;
         end
         
         else begin  // not reset
 
-            synch_hw_sw <= 1'b0;
             sw_pointer <= host_pointer;
 
             case (host_last_seen_fsm)
@@ -136,7 +133,6 @@ module hw_sw_synch (
                     host_pointer[55:48] <= trn_rd[47:40];
                     host_pointer[63:56] <= trn_rd[39:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        synch_hw_sw <= 1'b1;
                         host_last_seen_fsm <= s0;
                     end
                 end
@@ -167,7 +163,6 @@ module hw_sw_synch (
                     host_pointer[55:48] <= trn_rd[15:8];
                     host_pointer[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        synch_hw_sw <= 1'b1;
                         host_last_seen_fsm <= s0;
                     end
                 end

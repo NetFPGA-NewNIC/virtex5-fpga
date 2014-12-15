@@ -84,12 +84,16 @@ module tx_huge_pages_addr (
     localparam s9  = 10'b0100000000;
     localparam s10 = 10'b1000000000;
 
-    // Local wires and reg
-
-    reg     [9:0]   state;
+    //-------------------------------------------------------
+    // Local TLP reception
+    //-------------------------------------------------------
+    reg     [9:0]   tlp_rx_fsm;
     reg             huge_page_unlock_1;
     reg             huge_page_unlock_2;
     reg     [31:0]  aux_dw;
+    reg     [63:0]  huge_page_addr_1_i;
+    reg     [63:0]  huge_page_addr_2_i;
+    reg     [63:0]  completed_buffer_address_i;
 
     ////////////////////////////////////////////////
     // huge_page_status
@@ -135,7 +139,7 @@ module tx_huge_pages_addr (
         if (reset) begin  // reset
             huge_page_unlock_1 <= 1'b0;
             huge_page_unlock_2 <= 1'b0;
-            state <= s0;
+            tlp_rx_fsm <= s0;
         end
         
         else begin  // not reset
@@ -143,15 +147,19 @@ module tx_huge_pages_addr (
             huge_page_unlock_1 <= 1'b0;
             huge_page_unlock_2 <= 1'b0;
 
-            case (state)
+            huge_page_addr_1 <= huge_page_addr_1_i;
+            huge_page_addr_2 <= huge_page_addr_2_i;
+            completed_buffer_address <= completed_buffer_address_i;
+
+            case (tlp_rx_fsm)
 
                 s0 : begin
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[2])) begin
                         if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
-                            state <= s1;
+                            tlp_rx_fsm <= s1;
                         end
                         else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
-                            state <= s5;
+                            tlp_rx_fsm <= s5;
                         end
                     end
                 end
@@ -162,29 +170,29 @@ module tx_huge_pages_addr (
                         case (trn_rd[39:34])
 
                             6'b100000 : begin     // huge page address
-                                state <= s2;
+                                tlp_rx_fsm <= s2;
                             end
 
                             6'b100010 : begin     // huge page address
-                                state <= s3;
+                                tlp_rx_fsm <= s3;
                             end
 
                             6'b101000 : begin     // huge page un-lock
                                 huge_page_unlock_1 <= 1'b1;
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                             6'b101001 : begin     // huge page un-lock
                                 huge_page_unlock_2 <= 1'b1;
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                             6'b101100 : begin     // completion buffer address
-                                state <= s4;
+                                tlp_rx_fsm <= s4;
                             end
 
                             default : begin //other addresses
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                         endcase
@@ -192,47 +200,47 @@ module tx_huge_pages_addr (
                 end
 
                 s2 : begin
-                    huge_page_addr_1[7:0] <= aux_dw[31:24];
-                    huge_page_addr_1[15:8] <= aux_dw[23:16];
-                    huge_page_addr_1[23:16] <= aux_dw[15:8];
-                    huge_page_addr_1[31:24] <= aux_dw[7:0];
+                    huge_page_addr_1_i[7:0] <= aux_dw[31:24];
+                    huge_page_addr_1_i[15:8] <= aux_dw[23:16];
+                    huge_page_addr_1_i[23:16] <= aux_dw[15:8];
+                    huge_page_addr_1_i[31:24] <= aux_dw[7:0];
 
-                    huge_page_addr_1[39:32] <= trn_rd[63:56];
-                    huge_page_addr_1[47:40] <= trn_rd[55:48];
-                    huge_page_addr_1[55:48] <= trn_rd[47:40];
-                    huge_page_addr_1[63:56] <= trn_rd[39:32];
+                    huge_page_addr_1_i[39:32] <= trn_rd[63:56];
+                    huge_page_addr_1_i[47:40] <= trn_rd[55:48];
+                    huge_page_addr_1_i[55:48] <= trn_rd[47:40];
+                    huge_page_addr_1_i[63:56] <= trn_rd[39:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s3 : begin
-                    huge_page_addr_2[7:0] <= aux_dw[31:24];
-                    huge_page_addr_2[15:8] <= aux_dw[23:16];
-                    huge_page_addr_2[23:16] <= aux_dw[15:8];
-                    huge_page_addr_2[31:24] <= aux_dw[7:0];
+                    huge_page_addr_2_i[7:0] <= aux_dw[31:24];
+                    huge_page_addr_2_i[15:8] <= aux_dw[23:16];
+                    huge_page_addr_2_i[23:16] <= aux_dw[15:8];
+                    huge_page_addr_2_i[31:24] <= aux_dw[7:0];
 
-                    huge_page_addr_2[39:32] <= trn_rd[63:56];
-                    huge_page_addr_2[47:40] <= trn_rd[55:48];
-                    huge_page_addr_2[55:48] <= trn_rd[47:40];
-                    huge_page_addr_2[63:56] <= trn_rd[39:32];
+                    huge_page_addr_2_i[39:32] <= trn_rd[63:56];
+                    huge_page_addr_2_i[47:40] <= trn_rd[55:48];
+                    huge_page_addr_2_i[55:48] <= trn_rd[47:40];
+                    huge_page_addr_2_i[63:56] <= trn_rd[39:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s4 : begin
-                    completed_buffer_address[7:0] <= aux_dw[31:24];
-                    completed_buffer_address[15:8] <= aux_dw[23:16];
-                    completed_buffer_address[23:16] <= aux_dw[15:8];
-                    completed_buffer_address[31:24] <= aux_dw[7:0];
+                    completed_buffer_address_i[7:0] <= aux_dw[31:24];
+                    completed_buffer_address_i[15:8] <= aux_dw[23:16];
+                    completed_buffer_address_i[23:16] <= aux_dw[15:8];
+                    completed_buffer_address_i[31:24] <= aux_dw[7:0];
                     
-                    completed_buffer_address[39:32] <= trn_rd[63:56];
-                    completed_buffer_address[47:40] <= trn_rd[55:48];
-                    completed_buffer_address[55:48] <= trn_rd[47:40];
-                    completed_buffer_address[63:56] <= trn_rd[39:32];
+                    completed_buffer_address_i[39:32] <= trn_rd[63:56];
+                    completed_buffer_address_i[47:40] <= trn_rd[55:48];
+                    completed_buffer_address_i[55:48] <= trn_rd[47:40];
+                    completed_buffer_address_i[63:56] <= trn_rd[39:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
@@ -241,27 +249,27 @@ module tx_huge_pages_addr (
                         case (trn_rd[7:2])
 
                             6'b100000 : begin     // huge page address
-                                state <= s6;
+                                tlp_rx_fsm <= s6;
                             end
 
                             6'b100010 : begin     // huge page address
-                                state <= s7;
+                                tlp_rx_fsm <= s7;
                             end
 
                             6'b101000 : begin     // huge page un-lock
-                                state <= s8;
+                                tlp_rx_fsm <= s8;
                             end
 
                             6'b101001 : begin     // huge page un-lock
-                                state <= s9;
+                                tlp_rx_fsm <= s9;
                             end
 
                             6'b101100 : begin     // completion buffer address
-                                state <= s10;
+                                tlp_rx_fsm <= s10;
                             end
 
                             default : begin //other addresses
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                         endcase
@@ -269,68 +277,68 @@ module tx_huge_pages_addr (
                 end
 
                 s6 : begin
-                    huge_page_addr_1[7:0]   <= trn_rd[63:56];
-                    huge_page_addr_1[15:8]  <= trn_rd[55:48];
-                    huge_page_addr_1[23:16] <= trn_rd[47:40];
-                    huge_page_addr_1[31:24] <= trn_rd[39:32];
+                    huge_page_addr_1_i[7:0]   <= trn_rd[63:56];
+                    huge_page_addr_1_i[15:8]  <= trn_rd[55:48];
+                    huge_page_addr_1_i[23:16] <= trn_rd[47:40];
+                    huge_page_addr_1_i[31:24] <= trn_rd[39:32];
 
-                    huge_page_addr_1[39:32] <= trn_rd[31:24];
-                    huge_page_addr_1[47:40] <= trn_rd[23:16];
-                    huge_page_addr_1[55:48] <= trn_rd[15:8];
-                    huge_page_addr_1[63:56] <= trn_rd[7:0];
+                    huge_page_addr_1_i[39:32] <= trn_rd[31:24];
+                    huge_page_addr_1_i[47:40] <= trn_rd[23:16];
+                    huge_page_addr_1_i[55:48] <= trn_rd[15:8];
+                    huge_page_addr_1_i[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s7 : begin
-                    huge_page_addr_2[7:0]   <= trn_rd[63:56];
-                    huge_page_addr_2[15:8]  <= trn_rd[55:48];
-                    huge_page_addr_2[23:16] <= trn_rd[47:40];
-                    huge_page_addr_2[31:24] <= trn_rd[39:32];
+                    huge_page_addr_2_i[7:0]   <= trn_rd[63:56];
+                    huge_page_addr_2_i[15:8]  <= trn_rd[55:48];
+                    huge_page_addr_2_i[23:16] <= trn_rd[47:40];
+                    huge_page_addr_2_i[31:24] <= trn_rd[39:32];
 
-                    huge_page_addr_2[39:32] <= trn_rd[31:24];
-                    huge_page_addr_2[47:40] <= trn_rd[23:16];
-                    huge_page_addr_2[55:48] <= trn_rd[15:8];
-                    huge_page_addr_2[63:56] <= trn_rd[7:0];
+                    huge_page_addr_2_i[39:32] <= trn_rd[31:24];
+                    huge_page_addr_2_i[47:40] <= trn_rd[23:16];
+                    huge_page_addr_2_i[55:48] <= trn_rd[15:8];
+                    huge_page_addr_2_i[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s8 : begin
-                    huge_page_unlock_1 <= 1'b1;
                     aux_dw <= trn_rd[63:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        huge_page_unlock_1 <= 1'b1;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s9 : begin
-                    huge_page_unlock_2 <= 1'b1;
                     aux_dw <= trn_rd[63:32];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        huge_page_unlock_2 <= 1'b1;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 s10 : begin
-                    completed_buffer_address[7:0]   <= trn_rd[63:56];
-                    completed_buffer_address[15:8]  <= trn_rd[55:48];
-                    completed_buffer_address[23:16] <= trn_rd[47:40];
-                    completed_buffer_address[31:24] <= trn_rd[39:32];
+                    completed_buffer_address_i[7:0]   <= trn_rd[63:56];
+                    completed_buffer_address_i[15:8]  <= trn_rd[55:48];
+                    completed_buffer_address_i[23:16] <= trn_rd[47:40];
+                    completed_buffer_address_i[31:24] <= trn_rd[39:32];
 
-                    completed_buffer_address[39:32] <= trn_rd[31:24];
-                    completed_buffer_address[47:40] <= trn_rd[23:16];
-                    completed_buffer_address[55:48] <= trn_rd[15:8];
-                    completed_buffer_address[63:56] <= trn_rd[7:0];
+                    completed_buffer_address_i[39:32] <= trn_rd[31:24];
+                    completed_buffer_address_i[47:40] <= trn_rd[23:16];
+                    completed_buffer_address_i[55:48] <= trn_rd[15:8];
+                    completed_buffer_address_i[63:56] <= trn_rd[7:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 
                 default : begin //other TLPs
-                    state <= s0;
+                    tlp_rx_fsm <= s0;
                 end
 
             endcase
