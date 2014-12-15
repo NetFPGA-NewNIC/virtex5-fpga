@@ -16,10 +16,7 @@ NIC prototype for virtex5 netfpga-10g
 
 | BAR NUMBER | Offset in bytes | Used for | Access type | Access width |
 |:----------:|:---------------:|:--------:|:-----------:|:------------:|
-| BAR2 | 32 | Rx interrupt eneable | WRO | DW |
-| BAR2 | 36 | Rx interrupt disable | WRO | DW |
-| BAR2 | 40 | Rx interrupt min period | WRO | DW |
-| BAR2 | 44 | RTT test | WRO | DW |
+| BAR2 | 32 | Host going to sleep | WRO | DW |
 | BAR2 | 64 | Rx huge page addr 1 | WRO | QW |
 | BAR2 | 72 | Rx huge page addr 2 | WRO | QW |
 | BAR2 | 96 | Rx huge page ready 1 | WRO | DW |

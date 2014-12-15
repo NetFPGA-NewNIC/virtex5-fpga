@@ -54,7 +54,11 @@ module enpoint_arbitration (
 
     // Tx
     output reg             tx_turn,
-    input                  tx_driven
+    input                  tx_driven,
+
+    output reg             intctrl_turn,
+    input                  intctrl_driven,
+    input                  intctrl_req_ep
 
     );
 
@@ -63,6 +67,11 @@ module enpoint_arbitration (
     localparam s1 = 8'b00000001;
     localparam s2 = 8'b00000010;
     localparam s3 = 8'b00000100;
+    localparam s4 = 8'b00001000;
+    localparam s5 = 8'b00010000;
+    localparam s6 = 8'b00100000;
+    localparam s7 = 8'b01000000;
+    localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
     // Local send_tlps_machine
@@ -78,6 +87,7 @@ module enpoint_arbitration (
         if (reset) begin  // reset
             rx_turn <= 1'b0;
             tx_turn <= 1'b0;
+            intctrl_turn <= 1'b0;
             turn_bit <= 1'b0;
             fsm <= s0;
         end
@@ -87,7 +97,7 @@ module enpoint_arbitration (
             case (fsm)
 
                 s0 : begin
-                    if ( (!rx_driven) && (!tx_driven) ) begin
+                    if ( (!rx_driven) && (!tx_driven) && (!intctrl_driven) ) begin
                         turn_bit <= ~turn_bit;
                         if (!turn_bit) begin
                             rx_turn <= 1'b1;
@@ -102,6 +112,23 @@ module enpoint_arbitration (
                 s1 : begin
                     rx_turn <= 1'b0;
                     tx_turn <= 1'b0;
+                    if (intctrl_req_ep) begin
+                        fsm <= s2;
+                    end
+                    else begin
+                        fsm <= s0;
+                    end
+                end
+
+                s2 : begin
+                    if ( (!rx_driven) && (!tx_driven) ) begin
+                        intctrl_turn <= 1'b1;
+                        fsm <= s3;
+                    end
+                end
+
+                s3 : begin
+                    intctrl_turn <= 1'b0;
                     fsm <= s0;
                 end
 

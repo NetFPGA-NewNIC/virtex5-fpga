@@ -48,15 +48,11 @@ module tx_interrupt_gen (
     input                   clk,
     input                   reset,
 
-    output reg              cfg_interrupt_n,
-    input                   cfg_interrupt_rdy_n,
-    input                   interrupts_enabled,
+    input       [63:0]      hw_pointer,
+    input       [63:0]      sw_pointer,
+    input                   notify_ack,
 
-    input                   condition,
-    output reg              condition_ack,
-    
-    input                   resend_interrupt,
-    output reg              resend_interrupt_ack
+    output reg              send_interrupt
     );
 
     // localparam
@@ -83,49 +79,27 @@ module tx_interrupt_gen (
     always @(posedge clk) begin
 
         if (reset) begin  // reset
-            cfg_interrupt_n <= 1'b1;
+            send_interrupt <= 1'b0;
             interrupt_gen_fsm <= s0;
         end
         
         else begin  // not reset
 
-            condition_ack <= 1'b0;
-            resend_interrupt_ack <= 1'b0;
-
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (resend_interrupt) begin
-                        resend_interrupt_ack <= 1'b1;
-                        interrupt_gen_fsm <= s3;
-                    end
-                    else if (condition) begin
-                        condition_ack <= 1'b1;
+                    if (notify_ack) begin
+                        send_interrupt <= 1'b1;
                         interrupt_gen_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    if (interrupts_enabled) begin
-                        cfg_interrupt_n <= 1'b0;
-                        interrupt_gen_fsm <= s2;
+                    if (hw_pointer == sw_pointer) begin
+                        send_interrupt <= 1'b0;
                     end
                     else begin
-                        interrupt_gen_fsm <= s0;
-                    end
-                end
-
-                s2 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        interrupt_gen_fsm <= s0;
-                    end
-                end
-
-                s3 : begin
-                    if (interrupts_enabled) begin
-                        cfg_interrupt_n <= 1'b0;
-                        interrupt_gen_fsm <= s2;
+                        send_interrupt <= 1'b1;
                     end
                 end
 

@@ -57,10 +57,16 @@ module interrupt_ctrl (
     input                   trn_rsrc_dsc_n,
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
+
     output reg              cfg_interrupt_n,
     input                   cfg_interrupt_rdy_n,
-    output reg              interrupts_enabled,
-    output reg  [31:0]      interrupt_period
+
+    // Arbitrations handshake  //
+    input                   my_turn,
+    output reg              driving_interface,
+    output reg              req_ep,
+
+    input                   send_interrupt
     );
 
     // localparam
@@ -74,70 +80,68 @@ module interrupt_ctrl (
     localparam s7 = 8'b01000000;
     localparam s8 = 8'b10000000;
 
-    // Local wires and reg
+    //-------------------------------------------------------
+    // Local TLP reception
+    //-------------------------------------------------------
+    reg     [7:0]   tlp_rx_fsm;
+    reg             interrupts_reenabled;
 
-    reg     [7:0]   state;
-    reg     [7:0]   period_fsm;
-    reg     [7:0]   rtt_test_fsm;
-    reg             interrupts_enabled_i;
-    reg             interrupts_not_enabled_i;
-    reg             period_received;
-    reg             rtt_test;
-    reg     [31:0]  aux_dw;
-    reg     [31:0]  aux_period;
+    //-------------------------------------------------------
+    // Local send_interrupt_fsm
+    //-------------------------------------------------------
+    reg     [7:0]   send_interrupt_fsm;
 
     ////////////////////////////////////////////////
-    // output
+    // send_interrupt_fsm
     ////////////////////////////////////////////////
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            interrupts_enabled <= 1'b1;
-            interrupt_period <= 'h3D090;
+            req_ep <= 1'b0;
+            driving_interface <= 1'b0;
             cfg_interrupt_n <= 1'b1;
-            rtt_test_fsm <= s0;
-            period_fsm <= s0;
+            send_interrupt_fsm <= s0;
         end
         
         else begin  // not reset
-            if (interrupts_enabled_i) begin
-                interrupts_enabled <= 1'b1;
-            end
-            else if (interrupts_not_enabled_i) begin
-                interrupts_enabled <= 1'b0;
-            end
 
-            case (period_fsm)
+            case (send_interrupt_fsm)
+
                 s0 : begin
-                    aux_period[7:0]   <= aux_dw[31:24];
-                    aux_period[15:8]  <= aux_dw[23:16];
-                    aux_period[23:16] <= aux_dw[15:8];
-                    aux_period[31:24] <= aux_dw[7:0];
-                    if (period_received) begin
-                        period_fsm <= s1;
+                    if (send_interrupt) begin
+                        req_ep <= 1'b1;
+                        send_interrupt_fsm <= s1;
                     end
                 end
-                s1 : begin
-                    interrupt_period[29:0] <= aux_period[31:2];
-                    period_fsm <= s0;
-                end
-            endcase
 
-            case (rtt_test_fsm)
-                s0 : begin
-                    if (rtt_test) begin
+                s1 : begin
+                    if (my_turn) begin
+                        req_ep <= 1'b0;
+                        driving_interface <= 1'b1;
                         cfg_interrupt_n <= 1'b0;
-                        rtt_test_fsm <= s1;
+                        send_interrupt_fsm <= s2;
                     end
                 end
-                s1 : begin
+
+                s2 : begin
                     if (!cfg_interrupt_rdy_n) begin
                         cfg_interrupt_n <= 1'b1;
-                        rtt_test_fsm <= s0;
+                        driving_interface <= 1'b0;
+                        send_interrupt_fsm <= s3;
                     end
                 end
-            endcase
 
+                s3 : begin
+                    if (interrupts_reenabled) begin
+                        send_interrupt_fsm <= s0;
+                    end
+                end
+
+                default : begin
+                    send_interrupt_fsm <= s0;
+                end
+
+            endcase
         end     // not reset
     end  //always
 
@@ -147,29 +151,23 @@ module interrupt_ctrl (
     always @(posedge trn_clk) begin
 
         if (reset) begin  // reset
-            interrupts_enabled_i <= 1'b0;
-            interrupts_not_enabled_i <= 1'b0;
-            period_received <= 1'b0;
-            rtt_test <= 1'b0;
-            state <= s0;
+            interrupts_reenabled <= 1'b0;
+            tlp_rx_fsm <= s0;
         end
         
         else begin  // not reset
 
-            interrupts_enabled_i <= 1'b0;
-            interrupts_not_enabled_i <= 1'b0;
-            period_received <= 1'b0;
-            rtt_test <= 1'b0;
+            interrupts_reenabled <= 1'b0;
 
-            case (state)
+            case (tlp_rx_fsm)
 
                 s0 : begin
                     if ( (!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rdst_rdy_n) && (!trn_rbar_hit_n[2])) begin
                         if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
-                            state <= s1;
+                            tlp_rx_fsm <= s1;
                         end
                         else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
-                            state <= s2;
+                            tlp_rx_fsm <= s2;
                         end
                     end
                 end
@@ -179,28 +177,13 @@ module interrupt_ctrl (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[39:34])
 
-                            6'b001000 : begin     // interrupts eneable
-                                interrupts_enabled_i <= 1'b1;
-                                state <= s0;
-                            end
-
-                            6'b001001 : begin     // interrupts disable
-                                interrupts_not_enabled_i <= 1'b1;
-                                state <= s0;
-                            end
-
-                            6'b001010 : begin     // interrupts period
-                                period_received <= 1'b1;
-                                state <= s0;
-                            end
-
-                            6'b001011 : begin     // rtt
-                                rtt_test <= 1'b1;
-                                state <= s0;
+                            6'b001000 : begin     // host going to sleep
+                                interrupts_reenabled <= 1'b1;
+                                tlp_rx_fsm <= s0;
                             end
 
                             default : begin //other addresses
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                         endcase
@@ -212,42 +195,20 @@ module interrupt_ctrl (
                         case (trn_rd[7:2])
 
                             6'b001000 : begin     // interrupts eneable
-                                interrupts_enabled_i <= 1'b1;
-                                state <= s0;
-                            end
-
-                            6'b001001 : begin     // interrupts disable
-                                interrupts_not_enabled_i <= 1'b1;
-                                state <= s0;
-                            end
-
-                            6'b001010 : begin     // interrupts period
-                                state <= s3;
-                            end
-
-                            6'b001011 : begin     // rtt
-                                rtt_test <= 1'b1;
-                                state <= s0;
+                                interrupts_reenabled <= 1'b1;
+                                tlp_rx_fsm <= s0;
                             end
 
                             default : begin //other addresses
-                                state <= s0;
+                                tlp_rx_fsm <= s0;
                             end
 
                         endcase
                     end
                 end
 
-                s3 : begin
-                    aux_dw <= trn_rd[63:32];
-                    period_received <= 1'b1;
-                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
-                        state <= s0;
-                    end
-                end
-
                 default : begin //other TLPs
-                    state <= s0;
+                    tlp_rx_fsm <= s0;
                 end
 
             endcase

@@ -58,10 +58,7 @@ module hw_sw_synch (
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
 
-    input                   interrupts_enabled,
-    input       [63:0]      hw_pointer,
-    output reg              resend_interrupt,
-    input                   resend_interrupt_ack
+    output reg  [63:0]      sw_pointer
     );
     parameter BARMAPPING = 0;
 
@@ -84,12 +81,6 @@ module hw_sw_synch (
     reg     [63:0]     host_pointer;
     reg                synch_hw_sw;
 
-    //-------------------------------------------------------
-    // Local synch
-    //-------------------------------------------------------
-    reg     [7:0]      synch_fsm;
-    reg     [63:0]     host_pointer_reg;
-
     ////////////////////////////////////////////////
     // rcv host_pointer
     ////////////////////////////////////////////////
@@ -103,6 +94,7 @@ module hw_sw_synch (
         else begin  // not reset
 
             synch_hw_sw <= 1'b0;
+            sw_pointer <= host_pointer;
 
             case (host_last_seen_fsm)
 
@@ -187,60 +179,6 @@ module hw_sw_synch (
             endcase
         end     // not reset
     end  //always
-
-    ////////////////////////////////////////////////
-    // synch
-    ////////////////////////////////////////////////
-    always @(posedge trn_clk) begin
-
-        if (reset) begin  // reset
-            resend_interrupt <= 1'b0;
-            synch_fsm <= s0;
-        end
-        
-        else begin  // not reset
-
-            host_pointer_reg <= host_pointer;
-
-            case (synch_fsm)
-
-                s0 : begin
-                    if (synch_hw_sw) begin
-                        synch_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    if (interrupts_enabled) begin
-                        synch_fsm <= s2;
-                    end
-                end
-
-                s2 : begin
-                    if (hw_pointer == host_pointer_reg) begin
-                        synch_fsm <= s0;
-                    end
-                    else begin
-                        resend_interrupt <= 1'b1;
-                        synch_fsm <= s3;
-                    end
-                end
-
-                s3 : begin
-                    if (resend_interrupt_ack) begin
-                        resend_interrupt <= 1'b0;
-                        synch_fsm <= s0;
-                    end
-                end
-
-                default : begin //other TLPs
-                    synch_fsm <= s0;
-                end
-
-            endcase
-        end     // not reset
-    end  //always
-   
 
 endmodule // hw_sw_synch
 

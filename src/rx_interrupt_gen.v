@@ -48,20 +48,13 @@ module rx_interrupt_gen (
     input                   clk,
     input                   reset,
 
-    output reg              cfg_interrupt_n,
-    input                   cfg_interrupt_rdy_n,
-
     input                   rx_activity,
-    input                   change_huge_page,
-    input                   change_huge_page_ack,
-    input                   send_numb_qws,
-    input                   send_numb_qws_ack,
+    input       [63:0]      hw_pointer,
+    input       [63:0]      sw_pointer,
     input                   huge_page_status_1,
     input                   huge_page_status_2,
-    input                   interrupts_enabled,
-    input       [31:0]      interrupt_period,
-    input                   resend_interrupt,
-    output reg              resend_interrupt_ack
+
+    output reg              send_interrupt
     );
 
     // localparam
@@ -81,8 +74,6 @@ module rx_interrupt_gen (
     // Local interrupts_gen
     //-------------------------------------------------------  
     reg     [7:0]   interrupt_gen_fsm;
-    reg     [31:0]  counter;
-    reg     [31:0]  max_count;
     reg             rx_activity_reg0;
     reg             rx_activity_reg1;
 
@@ -92,69 +83,38 @@ module rx_interrupt_gen (
     always @(posedge clk) begin
 
         if (reset) begin  // reset
-            cfg_interrupt_n <= 1'b1;
             rx_activity_reg0 <= 1'b0;
             rx_activity_reg1 <= 1'b0;
+            send_interrupt <= 1'b0;
             interrupt_gen_fsm <= s0;
         end
         
         else begin  // not reset
 
-            resend_interrupt_ack <= 1'b0;
-
             rx_activity_reg0 <= rx_activity;
             rx_activity_reg1 <= rx_activity_reg0;
-
-            max_count <= interrupt_period;
 
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (resend_interrupt) begin
-                        resend_interrupt_ack <= 1'b1;
-                        interrupt_gen_fsm <= s4;
-                    end
-                    else if (change_huge_page && change_huge_page_ack) begin
-                        interrupt_gen_fsm <= s1;
-                    end
-                    else if (send_numb_qws && send_numb_qws_ack) begin
-                        interrupt_gen_fsm <= s1;
-                    end
-                    else if (rx_activity_reg1) begin
+                    if (huge_page_status_1 || huge_page_status_2) begin
                         interrupt_gen_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    counter <= 'b0;
-                    if (interrupts_enabled && (huge_page_status_1 || huge_page_status_2)) begin
-                        cfg_interrupt_n <= 1'b0;
+                    if (rx_activity_reg1) begin
+                        send_interrupt <= 1'b1;
                         interrupt_gen_fsm <= s2;
-                    end
-                    else begin
-                        interrupt_gen_fsm <= s0;
                     end
                 end
 
                 s2 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        interrupt_gen_fsm <= s3;
+                    if (rx_activity_reg1 || (hw_pointer != sw_pointer)) begin
+                        send_interrupt <= 1'b1;
                     end
-                end
-
-                s3 : begin
-                    counter <= counter + 1;
-                    if (counter == max_count) begin
-                        interrupt_gen_fsm <= s0;
-                    end
-                end
-
-                s4 : begin
-                    counter <= 'b0;
-                    if (interrupts_enabled) begin
-                        cfg_interrupt_n <= 1'b0;
-                        interrupt_gen_fsm <= s2;
+                    else begin
+                        send_interrupt <= 1'b0;
                     end
                 end
 

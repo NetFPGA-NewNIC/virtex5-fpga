@@ -194,7 +194,7 @@ module  pcie_endpoint_driver (
     //-------------------------------------------------------
     // Local Wires rx_interrupt_gen
     //-------------------------------------------------------
-    wire              rx_cfg_interrupt_n;
+    wire              rx_send_interrupt;
 
     //-------------------------------------------------------
     // Local Wires rx_wr_pkt_to_hugepages
@@ -209,8 +209,7 @@ module  pcie_endpoint_driver (
     // Local Wires rx_hw_sw_synch
     //-------------------------------------------------------
     wire   [63:0]     rx_hw_pointer;
-    wire              rx_resend_interrupt;
-    wire              rx_resend_interrupt_ack;
+    wire   [63:0]     rx_sw_pointer;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Transmition side of the NIC signal declaration
@@ -230,7 +229,7 @@ module  pcie_endpoint_driver (
     //-------------------------------------------------------
     // Local Wires tx_interrupt_gen
     //-------------------------------------------------------
-    wire              tx_cfg_interrupt_n;
+    wire              tx_send_interrupt;
 
     //-------------------------------------------------------
     // Local tx_rd_host_mem_mod
@@ -252,8 +251,6 @@ module  pcie_endpoint_driver (
     wire              tx_read_chunk_ack;
     wire              tx_send_rd_completed;
     wire              tx_send_rd_completed_ack;
-    wire              tx_send_interrupt;
-    wire              tx_send_interrupt_ack;
     wire              tx_notify;
     wire   [63:0]     tx_notification_message;
     wire              tx_notify_ack;
@@ -262,8 +259,7 @@ module  pcie_endpoint_driver (
     // Local Wires tx_hw_sw_synch
     //-------------------------------------------------------
     wire   [63:0]     tx_hw_pointer;
-    wire              tx_resend_interrupt;
-    wire              tx_resend_interrupt_ack;
+    wire   [63:0]     tx_sw_pointer;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // PCIe Endpoint Arbitrations
@@ -275,6 +271,9 @@ module  pcie_endpoint_driver (
     wire              rx_driven;
     wire              tx_turn;
     wire              tx_driven;
+    wire              intctrl_turn;
+    wire              intctrl_driven;
+    wire              intctrl_req_ep;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Interrupt control logic
@@ -282,8 +281,7 @@ module  pcie_endpoint_driver (
     //-------------------------------------------------------
     // Local Interrupt control logic
     //-------------------------------------------------------
-    wire              interrupts_enabled;
-    wire   [31:0]     interrupt_period;
+    wire              send_interrupt;
     wire              mdio_access_cfg_interrupt_n;
     wire              ctrl_cfg_interrupt_n;
 
@@ -418,19 +416,12 @@ module  pcie_endpoint_driver (
     rx_interrupt_gen rx_interrupt_gen_mod (
         .clk(trn_clk),                                         // I
         .reset(reset250),                                      // I
-        .cfg_interrupt_n(rx_cfg_interrupt_n),                  // O
-        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .rx_activity(rx_activity),                             // I
-        .change_huge_page(rx_change_huge_page),                // I
-        .change_huge_page_ack(rx_change_huge_page_ack),        // I
-        .send_numb_qws(rx_send_numb_qws),                      // I
-        .send_numb_qws_ack(rx_send_numb_qws_ack),              // I
+        .hw_pointer(rx_hw_pointer),                            // I [63:0]
+        .sw_pointer(rx_sw_pointer),                            // I [63:0]
         .huge_page_status_1(rx_huge_page_status_1),            // I
         .huge_page_status_2(rx_huge_page_status_2),            // I
-        .interrupts_enabled(interrupts_enabled),               // I
-        .interrupt_period(interrupt_period),                   // I [31:0]
-        .resend_interrupt(rx_resend_interrupt),                // I
-        .resend_interrupt_ack(rx_resend_interrupt_ack)         // O
+        .send_interrupt(rx_send_interrupt)                     // O
         );
 
     //-------------------------------------------------------
@@ -485,10 +476,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
-        .interrupts_enabled(interrupts_enabled),               // I
-        .hw_pointer(rx_hw_pointer),                            // I [63:0]
-        .resend_interrupt(rx_resend_interrupt),                // O
-        .resend_interrupt_ack(rx_resend_interrupt_ack)         // I
+        .sw_pointer(rx_sw_pointer)                             // O [63:0]
         );
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -529,13 +517,10 @@ module  pcie_endpoint_driver (
     tx_interrupt_gen tx_interrupt_gen_mod (
         .clk(trn_clk),                                         // I
         .reset(reset250),                                      // I
-        .cfg_interrupt_n(tx_cfg_interrupt_n),                  // O
-        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
-        .interrupts_enabled(interrupts_enabled),               // I
-        .condition(tx_send_interrupt),                         // I
-        .condition_ack(tx_send_interrupt_ack),                 // O
-        .resend_interrupt(tx_resend_interrupt),                // I
-        .resend_interrupt_ack(tx_resend_interrupt_ack)         // O
+        .hw_pointer(tx_hw_pointer),                            // I [63:0]
+        .sw_pointer(tx_sw_pointer),                            // I [63:0]
+        .notify_ack(tx_notify_ack),                            // I
+        .send_interrupt(tx_send_interrupt)                     // O
         );
 
     //-------------------------------------------------------
@@ -601,8 +586,6 @@ module  pcie_endpoint_driver (
         .notify(tx_notify),                                    // O
         .notification_message(tx_notification_message),        // O [63:0]
         .notify_ack(tx_notify_ack),                            // I
-        .send_interrupt(tx_send_interrupt),                    // O 
-        .send_interrupt_ack(tx_send_interrupt_ack),            // I
         .wr_addr(tx_wr_addr),                                  // O [8:0]
         .wr_data(tx_wr_data),                                  // O [63:0]
         .wr_en(tx_wr_en),                                      // O
@@ -626,10 +609,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
-        .interrupts_enabled(interrupts_enabled),               // I
-        .hw_pointer(tx_hw_pointer),                            // I [63:0]
-        .resend_interrupt(tx_resend_interrupt),                // O
-        .resend_interrupt_ack(tx_resend_interrupt_ack)         // I
+        .sw_pointer(tx_sw_pointer)                             // O [63:0]
         );
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -645,18 +625,20 @@ module  pcie_endpoint_driver (
         .rx_turn(rx_turn),                                     // O
         .rx_driven(rx_driven),                                 // I
         .tx_turn(tx_turn),                                     // O
-        .tx_driven(tx_driven)                                  // I 
+        .tx_driven(tx_driven),                                 // I
+        .intctrl_turn(intctrl_turn),                           // O
+        .intctrl_driven(intctrl_driven),                       // I
+        .intctrl_req_ep(intctrl_req_ep)                        // I
         );
-    // debug
-    //assign rx_turn = 1'b0;
-    //assign tx_turn = 1'b1;
 
     assign trn_td = rx_trn_td | tx_trn_td;
     assign trn_trem_n = rx_trn_trem_n & tx_trn_trem_n;
     assign trn_tsof_n = rx_trn_tsof_n & tx_trn_tsof_n;
     assign trn_teof_n = rx_trn_teof_n & tx_trn_teof_n;
     assign trn_tsrc_rdy_n = rx_trn_tsrc_rdy_n & tx_trn_tsrc_rdy_n;
-    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & rx_cfg_interrupt_n & tx_cfg_interrupt_n & ctrl_cfg_interrupt_n;               // Active low
+    assign cfg_interrupt_n = mdio_access_cfg_interrupt_n & ctrl_cfg_interrupt_n;               // Active low
+
+    assign send_interrupt  = rx_send_interrupt | tx_send_interrupt;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Interrupt control logic
@@ -674,8 +656,10 @@ module  pcie_endpoint_driver (
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
         .cfg_interrupt_n(ctrl_cfg_interrupt_n),                // O
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
-        .interrupts_enabled(interrupts_enabled),               // O
-        .interrupt_period(interrupt_period)                    // O [31:0]
+        .my_turn(intctrl_turn),                                // I
+        .driving_interface(intctrl_driven),                    // O
+        .req_ep(intctrl_req_ep),                               // O
+        .send_interrupt(send_interrupt)                        // I
         );
 
     //////////////////////////////////////////////////////////////////////////////////////////

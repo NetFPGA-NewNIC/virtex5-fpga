@@ -84,9 +84,6 @@ module tx_wr_pkt_to_bram (
     output reg   [63:0]     notification_message,
     input                   notify_ack,
 
-    output reg              send_interrupt,
-    input                   send_interrupt_ack,
-
     // Internal memory driver
     output reg  [8:0]       wr_addr,
     output reg  [63:0]      wr_data,
@@ -163,11 +160,6 @@ module tx_wr_pkt_to_bram (
     reg     [2:0]   look_ahead_sent_requests;
     reg     [2:0]   outstanding_requests;
     
-    //-------------------------------------------------------
-    // Local trigger_interrupts
-    //-------------------------------------------------------
-    reg     [14:0]  trigger_interrupts_fsm;
-
     //-------------------------------------------------------
     // Local huge_page_1_notifications
     //-------------------------------------------------------
@@ -569,59 +561,6 @@ module tx_wr_pkt_to_bram (
 
                 default : begin
                     trigger_rd_tlp_fsm <= s0;
-                end
-
-            endcase
-        end     // not reset
-    end  //always
-
-    ////////////////////////////////////////////////
-    // trigger_interrupts
-    ////////////////////////////////////////////////
-    always @(posedge trn_clk) begin
-
-        if (reset) begin  // reset
-            send_interrupt <= 1'b0;
-            trigger_interrupts_fsm <= s0;
-        end
-        
-        else begin  // not reset
-
-            case (trigger_interrupts_fsm)
-
-                s0 : begin
-                    if ( waiting_data_huge_page_1 || waiting_data_huge_page_2 ) begin
-                        trigger_interrupts_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    if (!waiting_data_huge_page_1 && !waiting_data_huge_page_2) begin
-                        trigger_interrupts_fsm <= s2;
-                    end
-                end
-
-                s2 : begin                                     // added delay to send the interrupt after the notification
-                    trigger_interrupts_fsm <= s3;
-                    if (!interrupts_enabled) begin
-                        trigger_interrupts_fsm <= s0;
-                    end
-                end
-
-                s3 : begin
-                    send_interrupt <= 1'b1;
-                    trigger_interrupts_fsm <= s4;
-                end
-
-                s4 : begin
-                    if (send_interrupt_ack) begin
-                        send_interrupt <= 1'b0;
-                        trigger_interrupts_fsm <= s0;
-                    end
-                end
-
-                default : begin
-                    trigger_interrupts_fsm <= s0;
                 end
 
             endcase
