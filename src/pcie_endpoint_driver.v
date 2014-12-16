@@ -254,6 +254,7 @@ module  pcie_endpoint_driver (
     wire              tx_notify;
     wire   [63:0]     tx_notification_message;
     wire              tx_notify_ack;
+    wire              tx_interrupt_trigger;
 
     //-------------------------------------------------------
     // Local Wires tx_hw_sw_synch
@@ -519,7 +520,7 @@ module  pcie_endpoint_driver (
         .reset(reset250),                                      // I
         .hw_pointer(tx_hw_pointer),                            // I [63:0]
         .sw_pointer(tx_sw_pointer),                            // I [63:0]
-        .notify_ack(tx_notify_ack),                            // I
+        .data_ready(tx_interrupt_trigger),                     // I
         .send_interrupt(tx_send_interrupt)                     // O
         );
 
@@ -586,6 +587,7 @@ module  pcie_endpoint_driver (
         .notify(tx_notify),                                    // O
         .notification_message(tx_notification_message),        // O [63:0]
         .notify_ack(tx_notify_ack),                            // I
+        .send_interrupt(tx_interrupt_trigger),                 // O
         .wr_addr(tx_wr_addr),                                  // O [8:0]
         .wr_data(tx_wr_data),                                  // O [63:0]
         .wr_en(tx_wr_en),                                      // O

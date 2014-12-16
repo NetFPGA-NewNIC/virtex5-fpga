@@ -80,6 +80,8 @@ module tx_wr_pkt_to_bram (
     output reg              send_rd_completed,
     input                   send_rd_completed_ack,
 
+    output reg              send_interrupt,
+
     output reg              notify,
     output reg   [63:0]     notification_message,
     input                   notify_ack,
@@ -159,6 +161,11 @@ module tx_wr_pkt_to_bram (
     reg     [2:0]   sent_requests;
     reg     [2:0]   look_ahead_sent_requests;
     reg     [2:0]   outstanding_requests;
+
+    //-------------------------------------------------------
+    // Local trigger_interrupts
+    //-------------------------------------------------------
+    reg     [14:0]  trigger_interrupts_fsm;
     
     //-------------------------------------------------------
     // Local huge_page_1_notifications
@@ -223,7 +230,7 @@ module tx_wr_pkt_to_bram (
     //-------------------------------------------------------
     reg     [14:0]  health_mon_fsm;
     reg     [9:0]   diff_mon_reg;
-    /*(* KEEP = "TRUE" *)*/reg     [31:0]   counter_mon;
+    (* KEEP = "TRUE" *)reg     [31:0]   counter_mon;
 
     ////////////////////////////////////////////////
     // health_mon
@@ -561,6 +568,43 @@ module tx_wr_pkt_to_bram (
 
                 default : begin
                     trigger_rd_tlp_fsm <= s0;
+                end
+
+            endcase
+        end     // not reset
+    end  //always
+
+    ////////////////////////////////////////////////
+    // trigger_interrupts
+    ////////////////////////////////////////////////
+    always @(posedge trn_clk) begin
+
+        if (reset) begin  // reset
+            send_interrupt <= 1'b0;
+            trigger_interrupts_fsm <= s0;
+        end
+        
+        else begin  // not reset
+
+            send_interrupt <= 1'b0;
+
+            case (trigger_interrupts_fsm)
+
+                s0 : begin
+                    if ( waiting_data_huge_page_1 || waiting_data_huge_page_2 ) begin
+                        trigger_interrupts_fsm <= s1;
+                    end
+                end
+
+                s1 : begin
+                    if (!waiting_data_huge_page_1 && !waiting_data_huge_page_2) begin
+                        send_interrupt <= 1'b1;
+                        trigger_interrupts_fsm <= s0;
+                    end
+                end
+
+                default : begin
+                    trigger_interrupts_fsm <= s0;
                 end
 
             endcase

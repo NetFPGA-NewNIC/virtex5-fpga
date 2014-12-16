@@ -50,7 +50,7 @@ module tx_interrupt_gen (
 
     input       [63:0]      hw_pointer,
     input       [63:0]      sw_pointer,
-    input                   notify_ack,
+    input                   data_ready,
 
     output reg              send_interrupt
     );
@@ -72,6 +72,7 @@ module tx_interrupt_gen (
     // Local interrupts_gen
     //-------------------------------------------------------  
     reg     [7:0]   interrupt_gen_fsm;
+    reg             data_ready_reg;
 
     ////////////////////////////////////////////////
     // interrupts_gen
@@ -85,10 +86,12 @@ module tx_interrupt_gen (
         
         else begin  // not reset
 
+            data_ready_reg <= data_ready;
+
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (notify_ack) begin
+                    if (data_ready || data_ready_reg) begin
                         send_interrupt <= 1'b1;
                         interrupt_gen_fsm <= s1;
                     end
@@ -97,9 +100,7 @@ module tx_interrupt_gen (
                 s1 : begin
                     if (hw_pointer == sw_pointer) begin
                         send_interrupt <= 1'b0;
-                    end
-                    else begin
-                        send_interrupt <= 1'b1;
+                        interrupt_gen_fsm <= s0;
                     end
                 end
 
