@@ -85,6 +85,7 @@ module interrupt_ctrl (
     //-------------------------------------------------------
     reg     [7:0]   tlp_rx_fsm;
     reg             interrupts_reenabled;
+    reg             interrupts_disable;
 
     //-------------------------------------------------------
     // Local send_interrupt_fsm
@@ -108,7 +109,7 @@ module interrupt_ctrl (
             case (send_interrupt_fsm)
 
                 s0 : begin
-                    if (send_interrupt) begin
+                    if (send_interrupt && !interrupts_disable) begin
                         req_ep <= 1'b1;
                         send_interrupt_fsm <= s1;
                     end
@@ -152,6 +153,7 @@ module interrupt_ctrl (
 
         if (reset) begin  // reset
             interrupts_reenabled <= 1'b0;
+            interrupts_disable <= 1'b0;
             tlp_rx_fsm <= s0;
         end
         
@@ -173,12 +175,17 @@ module interrupt_ctrl (
                 end
 
                 s1 : begin
-                    aux_dw <= trn_rd[31:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[39:34])
 
                             6'b001000 : begin     // host going to sleep
                                 interrupts_reenabled <= 1'b1;
+                                interrupts_disable <= 1'b0;
+                                tlp_rx_fsm <= s0;
+                            end
+
+                            6'b001001 : begin     // interrupts disable
+                                interrupts_disable <= 1'b1;
                                 tlp_rx_fsm <= s0;
                             end
 
@@ -194,8 +201,14 @@ module interrupt_ctrl (
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[7:2])
 
-                            6'b001000 : begin     // interrupts eneable
+                            6'b001000 : begin     // host going to sleep
                                 interrupts_reenabled <= 1'b1;
+                                interrupts_disable <= 1'b0;
+                                tlp_rx_fsm <= s0;
+                            end
+
+                            6'b001001 : begin     // interrupts disable
+                                interrupts_disable <= 1'b1;
                                 tlp_rx_fsm <= s0;
                             end
 
