@@ -401,7 +401,7 @@ module tx_wr_pkt_to_bram (
                 end
 
                 s3 : begin
-                    qwords_to_rd_i <= 'h010;
+                    qwords_to_rd_i <= 'h020;
                     if (!aux_diff_256[9]) begin
                         read_chunk <= 1'b1;
                         trigger_rd_tlp_fsm <= s5;
