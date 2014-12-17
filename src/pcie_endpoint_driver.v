@@ -656,6 +656,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         .cfg_interrupt_n(ctrl_cfg_interrupt_n),                // O
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
         .my_turn(intctrl_turn),                                // I

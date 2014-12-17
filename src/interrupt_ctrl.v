@@ -58,6 +58,7 @@ module interrupt_ctrl (
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
 
+    input       [3:0]       trn_tbuf_av,
     output reg              cfg_interrupt_n,
     input                   cfg_interrupt_rdy_n,
 
@@ -119,22 +120,39 @@ module interrupt_ctrl (
                     if (my_turn) begin
                         req_ep <= 1'b0;
                         driving_interface <= 1'b1;
-                        cfg_interrupt_n <= 1'b0;
                         send_interrupt_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        driving_interface <= 1'b0;
+                    if (trn_tbuf_av[1]) begin
+                        cfg_interrupt_n <= 1'b0;
                         send_interrupt_fsm <= s3;
+                    end
+                    else begin
+                        driving_interface <= 1'b0;
+                        send_interrupt_fsm <= s5;
                     end
                 end
 
                 s3 : begin
+                    if (!cfg_interrupt_rdy_n) begin
+                        cfg_interrupt_n <= 1'b1;
+                        driving_interface <= 1'b0;
+                        send_interrupt_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
                     if (interrupts_reenabled) begin
                         send_interrupt_fsm <= s0;
+                    end
+                end
+
+                s5 : begin
+                    if (trn_tbuf_av[1]) begin
+                        req_ep <= 1'b1;
+                        send_interrupt_fsm <= s1;
                     end
                 end
 
