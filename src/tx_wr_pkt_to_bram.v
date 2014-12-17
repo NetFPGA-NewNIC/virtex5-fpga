@@ -146,7 +146,7 @@ module tx_wr_pkt_to_bram (
     reg     [9:0]   page_qwords_counter;
     reg     [9:0]   look_ahead_page_qwords_counter;
     reg     [9:0]   aux_diff0;
-    reg     [9:0]   aux_diff_128;
+    reg     [9:0]   aux_diff_256;
     reg     [9:0]   qwords_to_rd_i;
     reg     [9:0]   request_addr_bram;
     reg     [9:0]   request_size[0:3];
@@ -371,7 +371,7 @@ module tx_wr_pkt_to_bram (
             outstanding_requests <= sent_requests + (~completed_requests) + 1;
 
             aux_diff0 <= diff + remaining_qwords;   // desired
-            aux_diff_128 <= diff + 'h010;
+            aux_diff_256 <= diff + 'h020;
 
             case (trigger_rd_tlp_fsm)
 
@@ -392,7 +392,7 @@ module tx_wr_pkt_to_bram (
 
                 s2 : begin
                     look_ahead_sent_requests <= sent_requests + 1;
-                    if (remaining_qwords > 'h10) begin
+                    if (remaining_qwords > 'h20) begin
                         trigger_rd_tlp_fsm <= s3;
                     end
                     else begin
@@ -402,7 +402,7 @@ module tx_wr_pkt_to_bram (
 
                 s3 : begin
                     qwords_to_rd_i <= 'h010;
-                    if (!aux_diff_128[9]) begin
+                    if (!aux_diff_256[9]) begin
                         read_chunk <= 1'b1;
                         trigger_rd_tlp_fsm <= s5;
                     end
