@@ -1,7 +1,7 @@
 ##############################################################
 #
 # Xilinx Core Generator version 14.6
-# Date: Thu Sep  4 13:29:36 2014
+# Date: Wed Dec 17 16:44:31 2014
 #
 ##############################################################
 #
@@ -115,7 +115,7 @@ CSET d3_power_dissipated=0
 CSET d3_power_dissipated_factor=0
 CSET d3cold_pme_support=false
 CSET d3hot_pme_support=false
-CSET device_capabilities_register=00000FC2
+CSET device_capabilities_register=00000FC1
 CSET device_id=4245
 CSET device_port_type=PCI_Express_Endpoint_device
 CSET device_specific_initialization=false
@@ -130,7 +130,7 @@ CSET gt_debug_ports=false
 CSET interface_freq=250_default
 CSET lane_width=X8
 CSET link_capabilities_register=0003F481
-CSET max_payload_size=512_bytes
+CSET max_payload_size=256_bytes
 CSET maximum_link_speed=1
 CSET maximum_link_width=8
 CSET msi=1_vector
@@ -149,4 +149,4 @@ CSET vendor_id=10EE
 MISC pkg_timestamp=2013-06-08T22:43:50Z
 # END Extra information
 GENERATE
-# CRC: 22bbf4cd
+# CRC: fca8e64b

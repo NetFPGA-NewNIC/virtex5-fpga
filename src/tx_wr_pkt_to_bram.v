@@ -137,24 +137,16 @@ module tx_wr_pkt_to_bram (
     reg     [9:0]   next_wr_addr;
     reg     [9:0]   look_ahead_next_wr_addr;
     reg     [31:0]  huge_page_qwords_counter;
+    reg     [31:0]  remaining_qwords;
     reg     [31:0]  look_ahead_huge_page_qwords_counter;
     reg     [63:0]  look_ahead_huge_page_addr_read_from;
-    reg     [31:0]  huge_page_remaining_qwords;
     reg     [1:0]   tag_to_hp[0:3];
     reg     [4:0]   tlp_tag_sent;
-    reg     [9:0]   aux_diff_horror;
     reg     [9:0]   current_page_qwords;
     reg     [9:0]   page_qwords_counter;
     reg     [9:0]   look_ahead_page_qwords_counter;
-    reg     [9:0]   page_remaining_qwords;
-    reg     [9:0]   aux_value;
-    reg     [9:0]   init_aux;
-    reg     [9:0]   next_aux_value;
-    reg     [9:0]   aux_diff;
-    reg     [22:0]  current_numb_of_pages;
-    reg     [22:0]  consumed_pages;
-    reg     [22:0]  page_count;
-    reg             remainder_page;
+    reg     [9:0]   aux_diff0;
+    reg     [9:0]   aux_diff_128;
     reg     [9:0]   qwords_to_rd_i;
     reg     [9:0]   request_addr_bram;
     reg     [9:0]   request_size[0:3];
@@ -375,139 +367,75 @@ module tx_wr_pkt_to_bram (
 
             return_huge_page_to_host <= 1'b0;
             diff <= next_wr_addr + (~commited_rd_addr) + 1;
-            huge_page_remaining_qwords <= current_huge_page_qwords + (~huge_page_qwords_counter) + 1;
+            remaining_qwords <= current_huge_page_qwords + (~huge_page_qwords_counter) + 1;
             outstanding_requests <= sent_requests + (~completed_requests) + 1;
 
-            aux_diff_horror <= diff + current_huge_page_qwords[9:0];
-
-            page_count <= current_numb_of_pages + (~consumed_pages) + 1;
-
-            page_remaining_qwords <= current_page_qwords + (~page_qwords_counter) + 1;
-
-            aux_diff <= diff + aux_value;
-            next_aux_value <= aux_value + (~('h10)) + 1;
+            aux_diff0 <= diff + remaining_qwords;   // desired
+            aux_diff_128 <= diff + 'h010;
 
             case (trigger_rd_tlp_fsm)
 
                 s0 : begin
-                    current_numb_of_pages <= current_huge_page_qwords[31:9];
-                    remainder_page <= | (current_huge_page_qwords[8:0]);
-                    consumed_pages <= 'b0;
-                    page_qwords_counter <= 'b0;
-
                     huge_page_addr_read_from <= current_huge_page_addr;
                     huge_page_qwords_counter <= 'b0;
                     if (huge_page_available) begin
-                        if (current_huge_page_qwords > 'h200) begin
-                            trigger_rd_tlp_fsm <= s1;
-                        end
-                        else begin
-                            trigger_rd_tlp_fsm <= s2;
-                        end
+                        trigger_rd_tlp_fsm <= s1;
                     end
                 end
 
-                s1 : begin  // Horror vacui
-                    current_page_qwords <= 'h200;
-                    qwords_to_rd_i <= 'h200;
+                s1 : begin
+                    // dealy for remaining_qwords calculation
+                    if (outstanding_requests < 'h4) begin
+                        trigger_rd_tlp_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
                     look_ahead_sent_requests <= sent_requests + 1;
-                    if (!diff) begin
-                        read_chunk <= 1'b1;
-                        trigger_rd_tlp_fsm <= s9;
+                    if (remaining_qwords > 'h10) begin
+                        trigger_rd_tlp_fsm <= s3;
                     end
-                    else begin      // take it easy, buffer not empty
-                        trigger_rd_tlp_fsm <= s3;     
-                    end
-                end
-
-                s2 : begin  // Horror vacui
-                    current_page_qwords <= current_huge_page_qwords[9:0];
-                    qwords_to_rd_i <= current_huge_page_qwords[9:0];
-                    look_ahead_sent_requests <= sent_requests + 1;
-                    if (aux_diff_horror <= 'h200) begin
-                        read_chunk <= 1'b1;
-                        trigger_rd_tlp_fsm <= s9;
-                    end
-                    else begin      // take it easy, buffer not empty
-                        trigger_rd_tlp_fsm <= s3;     
-                    end
-                end
-
-                s3 : begin
-                    page_qwords_counter <= 'b0;
-                    aux_value <= 'h1F0;
-                    init_aux <= 'h1F0;
-                    if (page_count) begin
-                        current_page_qwords <= 'h200;
-                        trigger_rd_tlp_fsm <= s7;
-                    end
-                    else if (remainder_page) begin
-                        current_page_qwords <= current_huge_page_qwords[8:0];
+                    else begin
                         trigger_rd_tlp_fsm <= s4;
                     end
                 end
 
+                s3 : begin
+                    qwords_to_rd_i <= 'h010;
+                    if (!aux_diff_128[9]) begin
+                        read_chunk <= 1'b1;
+                        trigger_rd_tlp_fsm <= s5;
+                    end
+                end
+
                 s4 : begin
-                    // delay: page_remaining_qwords
-                    trigger_rd_tlp_fsm <= s5;
+                    qwords_to_rd_i <= remaining_qwords;
+                    if (!aux_diff0[9]) begin
+                        read_chunk <= 1'b1;
+                        trigger_rd_tlp_fsm <= s5;
+                    end
                 end
 
                 s5 : begin
-                    aux_value <= page_remaining_qwords;
-                    init_aux <= page_remaining_qwords;
-                    trigger_rd_tlp_fsm <= s7;
-                end
-
-                //s6 : begin
-                    // delay: aux_diff
-                    //trigger_rd_tlp_fsm <= s7;
-                //end
-
-                s7 : begin
-                    // delay: aux_diff
-                    if ((aux_value[8:0]) && (!aux_value[9])) begin
-                        trigger_rd_tlp_fsm <= s8;
-                    end
-                    else begin
-                        aux_value <= init_aux;
-                    end
-                end
-
-                s8 : begin
-                    look_ahead_sent_requests <= sent_requests + 1;
-                    aux_value <= next_aux_value;
-                    if (!aux_diff[9]) begin
-                        qwords_to_rd_i <= aux_value;
-                        read_chunk <= 1'b1;
-                        trigger_rd_tlp_fsm <= s9;
-                    end
-                    else begin
-                        trigger_rd_tlp_fsm <= s7;
-                    end
-                end
-
-                s9 : begin
                     look_ahead_next_wr_addr <= next_wr_addr + qwords_to_rd_i;
                     look_ahead_huge_page_addr_read_from <= huge_page_addr_read_from + {qwords_to_rd_i, 3'b0};
                     look_ahead_huge_page_qwords_counter <= huge_page_qwords_counter + qwords_to_rd_i;
-                    look_ahead_page_qwords_counter <= page_qwords_counter + qwords_to_rd_i;
-                    sent_requests <= look_ahead_sent_requests;
 
                     request_addr_bram <= next_wr_addr;
                     request_size[tlp_tag] <= qwords_to_rd_i;
-                    tlp_tag_sent <= tlp_tag;
+                    sent_requests <= look_ahead_sent_requests;
 
+                    tlp_tag_sent <= tlp_tag;
                     if (read_chunk_ack) begin
                         read_chunk <= 1'b0;
-                        trigger_rd_tlp_fsm <= s10;
+                        trigger_rd_tlp_fsm <= s6;
                     end
                 end
 
-                s10 : begin
+                s6 : begin
                     next_wr_addr <= look_ahead_next_wr_addr;
                     huge_page_addr_read_from <= look_ahead_huge_page_addr_read_from;
                     huge_page_qwords_counter <= look_ahead_huge_page_qwords_counter;
-                    page_qwords_counter <= look_ahead_page_qwords_counter;
 
                     if (reading_huge_page_1) begin
                         tag_to_hp[tlp_tag_sent] <= hp1;
@@ -515,53 +443,28 @@ module tx_wr_pkt_to_bram (
                     else begin
                         tag_to_hp[tlp_tag_sent] <= hp2;
                     end
-                    trigger_rd_tlp_fsm <= s11;
+                    trigger_rd_tlp_fsm <= s7;
                 end
 
-                s11 : begin
-                    // delay: huge_page_remaining_qwords
-                    if (outstanding_requests < 'h4) begin
-                        trigger_rd_tlp_fsm <= s12;
-                    end
+                s7 : begin
+                    // dealy for remaining_qwords calculation
+                    trigger_rd_tlp_fsm <= s8;
                 end
 
-                s12 : begin
-                    if (huge_page_remaining_qwords) begin
-                        trigger_rd_tlp_fsm <= s13;
+                s8 : begin
+                    if (remaining_qwords) begin
+                        trigger_rd_tlp_fsm <= s1;
                     end
                     else begin
                         return_huge_page_to_host <= 1'b1;
                         send_rd_completed <= 1'b1;
-                        trigger_rd_tlp_fsm <= s15;
+                        trigger_rd_tlp_fsm <= s9;
                     end
                 end
 
-                s13 : begin
-                    aux_value <= page_remaining_qwords;
-                    init_aux <= page_remaining_qwords;
-                    if (page_remaining_qwords) begin
-                        trigger_rd_tlp_fsm <= s7;
-                    end
-                    else begin
-                        consumed_pages <= consumed_pages + 1;
-                        trigger_rd_tlp_fsm <= s14;
-                    end
-                end
-
-                s14 : begin
-                    // delay: page_count
-                    trigger_rd_tlp_fsm <= s3;
-                end
-
-                s15 : begin
+                s9 : begin
                     if (send_rd_completed_ack) begin
                         send_rd_completed <= 1'b0;
-                        trigger_rd_tlp_fsm <= s16;
-                    end
-                end
-
-                s16 : begin
-                    if (outstanding_requests < 'h4) begin
                         trigger_rd_tlp_fsm <= s0;
                     end
                 end

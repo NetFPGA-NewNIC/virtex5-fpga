@@ -1,5 +1,5 @@
 #ChipScope Core Inserter Project File Version 3.0
-#Wed Dec 17 11:17:17 GMT 2014
+#Wed Dec 17 17:17:30 GMT 2014
 Project.device.designInputFile=/local/scratch/mf537/NetFPGA-NewNIC/forconesi/virtex5-fpga/ise/my_top_cs.ngc
 Project.device.designOutputFile=/local/scratch/mf537/NetFPGA-NewNIC/forconesi/virtex5-fpga/ise/my_top_cs.ngc
 Project.device.deviceFamily=14
@@ -218,7 +218,6 @@ Project.unit<0>.timestampWidth=0
 Project.unit<0>.triggerChannel<0><0>=trn_rsof_n_c
 Project.unit<0>.triggerChannel<0><10>=pcie_endpoint_driver_mod/interrupt_ctrl_mod/interrupts_disable
 Project.unit<0>.triggerChannel<0><11>=cfg_interrupt_n_c
-Project.unit<0>.triggerChannel<0><12>=
 Project.unit<0>.triggerChannel<0><1>=pcie_endpoint_driver_mod/rx_tlp_trigger_mod/trigger_tlp
 Project.unit<0>.triggerChannel<0><2>=pcie_endpoint_driver_mod/rx_tlp_trigger_mod/change_huge_page
 Project.unit<0>.triggerChannel<0><3>=pcie_endpoint_driver_mod/rx_tlp_trigger_mod/send_numb_qws

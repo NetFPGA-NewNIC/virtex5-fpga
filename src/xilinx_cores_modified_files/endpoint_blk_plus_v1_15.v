@@ -107,7 +107,7 @@ module endpoint_blk_plus_v1_15 # (
   parameter        EP_L0s_ACCPT_LAT = 3'b111,
   parameter        EXT_TAG_FLD_SUP = 1,
   parameter        PHANTM_FUNC_SUP = 2'b01,
-  parameter        MPS = 3'b010,
+  parameter        MPS = 3'b001,
   
   parameter        L1_EXIT_LAT = 3'b111,
   parameter        L0s_EXIT_LAT = 3'b111,
