@@ -230,7 +230,7 @@ module tx_wr_pkt_to_bram (
     //-------------------------------------------------------
     reg     [14:0]  health_mon_fsm;
     reg     [9:0]   diff_mon_reg;
-    (* KEEP = "TRUE" *)reg     [31:0]   counter_mon;
+    /*(* KEEP = "TRUE" *)*/reg     [31:0]   counter_mon;
 
     ////////////////////////////////////////////////
     // health_mon
