@@ -118,6 +118,7 @@ module rx_tlp_trigger (
     reg                  double_inc;
     reg                  max_tlp_size256;
     reg                  aux_max_tlp_size256;
+    reg     [2:0]        cfg_max_payload_size_reg;
 
     ////////////////////////////////////////////////
     // timeout logic
@@ -169,7 +170,8 @@ module rx_tlp_trigger (
             diff <= commited_wr_addr + (~commited_rd_addr) +1;
             diff_tlp <= number_of_tlp_to_send + (~number_of_tlp_sent) +1;
 
-            aux_max_tlp_size256 <= | cfg_max_payload_size;
+            cfg_max_payload_size_reg <= cfg_max_payload_size;
+            aux_max_tlp_size256 <= | cfg_max_payload_size_reg;
             max_tlp_size256 <= aux_max_tlp_size256;
             
             case (trigger_fsm)

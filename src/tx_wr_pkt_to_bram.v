@@ -61,6 +61,7 @@ module tx_wr_pkt_to_bram (
     input                   trn_rsrc_dsc_n,
     input       [6:0]       trn_rbar_hit_n,
     input                   trn_rdst_rdy_n,
+    input       [2:0]       cfg_max_rd_req_size,
 
     input       [63:0]      huge_page_addr_1,
     input       [63:0]      huge_page_addr_2,
@@ -146,13 +147,19 @@ module tx_wr_pkt_to_bram (
     reg     [9:0]   page_qwords_counter;
     reg     [9:0]   look_ahead_page_qwords_counter;
     reg     [9:0]   aux_diff0;
-    reg     [9:0]   aux_diff_512;
+    reg     [9:0]   aux_diff1;
+    reg     [9:0]   max_qw_numb;
+    reg     [9:0]   aux_max_qw_numb;
     reg     [9:0]   qwords_to_rd_i;
     reg     [9:0]   request_addr_bram;
     reg     [9:0]   request_size[0:3];
     reg     [2:0]   sent_requests;
     reg     [2:0]   look_ahead_sent_requests;
     reg     [2:0]   outstanding_requests;
+    reg     [2:0]   max_rd_req_reg0;
+    reg     [2:0]   max_rd_req_reg1;
+    reg             max_rd_req256;
+    reg             max_rd_req512;
 
     //-------------------------------------------------------
     // Local trigger_interrupts
@@ -371,7 +378,24 @@ module tx_wr_pkt_to_bram (
             outstanding_requests <= sent_requests + (~completed_requests) + 1;
 
             aux_diff0 <= diff + remaining_qwords;   // desired
-            aux_diff_512 <= diff + 'h040;
+            aux_diff1 <= diff + max_qw_numb;
+
+            max_rd_req_reg0 <= cfg_max_rd_req_size;
+            max_rd_req_reg1 <= max_rd_req_reg0;
+            max_rd_req256 <= max_rd_req_reg1[0];
+            max_rd_req512 <= | max_rd_req_reg1[2:1];
+
+            max_qw_numb <= aux_max_qw_numb;
+
+            if (max_rd_req512) begin
+                aux_max_qw_numb <= 'h40;
+            end
+            else if (max_rd_req256) begin
+                aux_max_qw_numb <= 'h20;
+            end
+            else begin
+                aux_max_qw_numb <= 'h10;
+            end
 
             case (trigger_rd_tlp_fsm)
 
@@ -392,7 +416,7 @@ module tx_wr_pkt_to_bram (
 
                 s2 : begin
                     look_ahead_sent_requests <= sent_requests + 1;
-                    if (remaining_qwords > 'h40) begin
+                    if (remaining_qwords > max_qw_numb) begin
                         trigger_rd_tlp_fsm <= s3;
                     end
                     else begin
@@ -401,8 +425,8 @@ module tx_wr_pkt_to_bram (
                 end
 
                 s3 : begin
-                    qwords_to_rd_i <= 'h040;
-                    if (!aux_diff_512[9]) begin
+                    qwords_to_rd_i <= max_qw_numb;
+                    if (!aux_diff1[9]) begin
                         read_chunk <= 1'b1;
                         trigger_rd_tlp_fsm <= s5;
                     end

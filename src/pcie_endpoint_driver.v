@@ -568,6 +568,7 @@ module  pcie_endpoint_driver (
         .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
+        .cfg_max_rd_req_size(cfg_max_rd_req_size),             // I [2:0]
         .huge_page_addr_1(tx_huge_page_addr_1),                // I [63:0]
         .huge_page_addr_2(tx_huge_page_addr_2),                // I [63:0]
         .huge_page_qwords_1(tx_huge_page_qwords_1),            // I [31:0]
