@@ -87,11 +87,22 @@ module interrupt_ctrl (
     reg     [7:0]   tlp_rx_fsm;
     reg             interrupts_reenabled;
     reg             interrupts_disable;
+    reg             period_received;
+    reg     [31:0]  aux_dw;
+    
 
     //-------------------------------------------------------
     // Local send_interrupt_fsm
     //-------------------------------------------------------
     reg     [7:0]   send_interrupt_fsm;
+    reg     [29:0]  counter;
+
+    //-------------------------------------------------------
+    // Local interrupt_period_fsm
+    //-------------------------------------------------------
+    reg     [7:0]   interrupt_period_fsm;
+    reg     [31:0]  aux_period;
+    reg     [29:0]  interrupt_period;
 
     ////////////////////////////////////////////////
     // send_interrupt_fsm
@@ -144,8 +155,9 @@ module interrupt_ctrl (
                 end
 
                 s4 : begin
+                    counter <= 'b0;
                     if (interrupts_reenabled) begin
-                        send_interrupt_fsm <= s0;
+                        send_interrupt_fsm <= s6;
                     end
                 end
 
@@ -156,8 +168,56 @@ module interrupt_ctrl (
                     end
                 end
 
+                s6 : begin
+                    counter <= counter + 1;
+                    if (interrupt_period == counter) begin
+                        send_interrupt_fsm <= s0;
+                    end
+                end
+
                 default : begin
                     send_interrupt_fsm <= s0;
+                end
+
+            endcase
+        end     // not reset
+    end  //always
+
+    ////////////////////////////////////////////////
+    // interrupt_period_fsm
+    ////////////////////////////////////////////////
+    always @(posedge trn_clk) begin
+
+        if (reset) begin  // reset
+            interrupt_period_fsm <= s0;
+        end
+        
+        else begin  // not reset
+
+            case (interrupt_period_fsm)
+
+                s0 : begin
+                    interrupt_period <= 'b0;
+                    interrupt_period_fsm <= s1;
+                end
+
+                s1 : begin
+                    aux_period[7:0]   <= aux_dw[31:24];
+                    aux_period[15:8]  <= aux_dw[23:16];
+                    aux_period[23:16] <= aux_dw[15:8];
+                    aux_period[31:24] <= aux_dw[7:0];
+                    if (period_received) begin
+                        interrupt_period_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    interrupt_period <= aux_period[31:2];
+                    interrupt_period_fsm <= s1;
+                end
+
+                default : begin
+                    interrupt_period_fsm <= s0;
                 end
 
             endcase
@@ -172,12 +232,14 @@ module interrupt_ctrl (
         if (reset) begin  // reset
             interrupts_reenabled <= 1'b0;
             interrupts_disable <= 1'b0;
+            period_received <= 1'b0;
             tlp_rx_fsm <= s0;
         end
         
         else begin  // not reset
 
             interrupts_reenabled <= 1'b0;
+            period_received <= 1'b0;
 
             case (tlp_rx_fsm)
 
@@ -193,6 +255,7 @@ module interrupt_ctrl (
                 end
 
                 s1 : begin
+                    aux_dw <= trn_rd[31:0];
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         case (trn_rd[39:34])
 
@@ -204,6 +267,11 @@ module interrupt_ctrl (
 
                             6'b001001 : begin     // interrupts disable
                                 interrupts_disable <= 1'b1;
+                                tlp_rx_fsm <= s0;
+                            end
+
+                            6'b001010 : begin     // interrupts period
+                                period_received <= 1'b1;
                                 tlp_rx_fsm <= s0;
                             end
 
@@ -230,11 +298,23 @@ module interrupt_ctrl (
                                 tlp_rx_fsm <= s0;
                             end
 
+                            6'b001010 : begin     // interrupts period
+                                tlp_rx_fsm <= s3;
+                            end
+
                             default : begin //other addresses
                                 tlp_rx_fsm <= s0;
                             end
 
                         endcase
+                    end
+                end
+
+                s3 : begin
+                    aux_dw <= trn_rd[63:32];
+                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                        period_received <= 1'b1;
+                        tlp_rx_fsm <= s0;
                     end
                 end
 

@@ -160,6 +160,7 @@ module tx_wr_pkt_to_bram (
     reg     [2:0]   max_rd_req_reg1;
     reg             max_rd_req256;
     reg             max_rd_req512;
+    reg             max_rd_req1k;
 
     //-------------------------------------------------------
     // Local trigger_interrupts
@@ -383,11 +384,15 @@ module tx_wr_pkt_to_bram (
             max_rd_req_reg0 <= cfg_max_rd_req_size;
             max_rd_req_reg1 <= max_rd_req_reg0;
             max_rd_req256 <= max_rd_req_reg1[0];
-            max_rd_req512 <= | max_rd_req_reg1[2:1];
+            max_rd_req512 <= max_rd_req_reg1[1];
+            max_rd_req1k <= max_rd_req_reg1[2] | (& max_rd_req_reg1[1:0]);
 
             max_qw_numb <= aux_max_qw_numb;
 
-            if (max_rd_req512) begin
+            if (max_rd_req1k) begin
+                aux_max_qw_numb <= 'h80;
+            end
+            else if (max_rd_req512) begin
                 aux_max_qw_numb <= 'h40;
             end
             else if (max_rd_req256) begin
