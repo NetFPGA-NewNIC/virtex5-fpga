@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        my_buffer.v
+*        internal_buffer.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 //`default_nettype none
 `include "includes.v"
 
-module my_buffer # (
+module internal_buffer # (
     parameter  AW = 10,
     parameter  DW = 64) ( 
 
@@ -60,7 +60,8 @@ module my_buffer # (
     //-------------------------------------------------------
     reg     [AW-1:0]     a_reg;
     reg     [DW-1:0]     d_reg;
-    reg     [DW-1:0]     dpram[(2**AW)-1:0];
+    reg     [DW-1:0]     dpram_0[(2**(AW-1))-1:0];
+    reg     [DW-1:0]     dpram_1[(2**(AW-1))-1:0];
 
     //-------------------------------------------------------
     // Local port b
@@ -73,7 +74,12 @@ module my_buffer # (
     always @(posedge clk) begin
         a_reg <= a;
         d_reg <= d;
-        dpram[a_reg] <= d_reg;
+        if (!a_reg[AW-1]) begin
+            dpram_0[a_reg[AW-2:0]] <= d_reg;
+        end
+        else begin
+            dpram_1[a_reg[AW-2:0]] <= d_reg;
+        end
     end  //always
 
     ////////////////////////////////////////////////
@@ -81,10 +87,15 @@ module my_buffer # (
     ////////////////////////////////////////////////
     always @(posedge qdpo_clk) begin
         dpra_reg <= dpra;
-        qdpo <= dpram[dpra_reg];
+        if (!dpra_reg[AW-1]) begin
+            qdpo <= dpram_0[dpra_reg[AW-2:0]];
+        end
+        else begin
+            qdpo <= dpram_1[dpra_reg[AW-2:0]];
+        end
     end  //always
 
-endmodule // my_buffer
+endmodule // internal_buffer
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
