@@ -61,7 +61,6 @@ module rx_mac_interface (
     // Internal memory driver
     output reg    [`BF:0]     wr_addr,
     output reg    [63:0]      wr_data,
-    output reg                wr_en,
     
     // Internal logic
     output reg                rx_activity,
@@ -176,7 +175,6 @@ module rx_mac_interface (
         if (reset) begin  // reset
             commited_wr_addr <= 'b0;
             dropped_pkts <= 'b0;
-            wr_en <= 1'b1;
             rx_activity <= 1'b0;
             rx_fsm <= s0;
         end
@@ -184,7 +182,6 @@ module rx_mac_interface (
         else begin  // not reset
             
             diff <= aux_wr_addr + (~commited_rd_addr) +1;
-            wr_en <= 1'b1;
             rx_activity <= 1'b0;
 
             case (rx_fsm)

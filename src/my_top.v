@@ -247,9 +247,7 @@ module my_top (
     wire   [`BF:0]                                    rx_rd_addr;
     wire   [63:0]                                     rx_rd_data;
     wire                                              rx_wr_clk;
-    wire                                              rx_wr_en;
     wire                                              rx_rd_clk;
-    wire   [63:0]                                     rx_qspo;
 
     //-------------------------------------------------------
     // Local Wires rx_mac_interface
@@ -478,14 +476,12 @@ module my_top (
     //-------------------------------------------------------
     // internal_true_dual_port_ram rx
     //-------------------------------------------------------
-    rx_buffer rx_buffer_mod (
+    rx_buffer (.AW=10, .DW=64) my_buffer (
         .a(rx_wr_addr),                                        // I [`BF:0]
         .d(rx_wr_data),                                        // I [63:0]
         .dpra(rx_rd_addr),                                     // I [`BF:0]
         .clk(rx_wr_clk),                                       // I 
-        .we(rx_wr_en),                                         // I
         .qdpo_clk(rx_rd_clk),                                  // I
-        .qspo(rx_qspo),                                        // O [63:0]
         .qdpo(rx_rd_data)                                      // O [63:0]
         );  //see pg063
 
@@ -504,7 +500,6 @@ module my_top (
         .rx_bad_frame(mac_rx_bad_frame),                       // I
         .wr_addr(rx_wr_addr),                                  // O [`BF:0]
         .wr_data(rx_wr_data),                                  // O [63:0]
-        .wr_en(rx_wr_en),                                      // O
         .rx_activity(rx_activity),                             // O
         .commited_wr_addr(rx_commited_wr_addr),                // O [`BF:0]
         .commited_rd_addr(rx_commited_rd_addr_synch),          // I [`BF:0]
