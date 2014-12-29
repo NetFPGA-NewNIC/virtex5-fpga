@@ -90,7 +90,6 @@ module tx_wr_pkt_to_bram (
     // Internal memory driver
     output reg  [8:0]       wr_addr,
     output reg  [63:0]      wr_data,
-    output reg              wr_en,
 
     input       [9:0]       commited_rd_addr,
     output reg  [9:0]       commited_wr_addr
@@ -777,7 +776,6 @@ module tx_wr_pkt_to_bram (
         if (reset) begin  // reset
             wr_addr <= 'b0;
             look_ahead_wr_addr <= 'b0;
-            wr_en <= 1'b1;
             completion_received <= 1'b0;
             commited_wr_addr <= 'b0;
             this_tlp_tag <= 'b0;
@@ -790,7 +788,6 @@ module tx_wr_pkt_to_bram (
         
         else begin  // not reset
 
-            wr_en <= 1'b1;
             completion_received <= 1'b0;
 
             if (read_chunk && read_chunk_ack) begin

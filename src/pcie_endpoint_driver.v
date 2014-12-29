@@ -90,7 +90,6 @@ module  pcie_endpoint_driver (
     // To internal_true_dual_port_ram TX  //
     output     [8:0]                              tx_wr_addr,
     output     [63:0]                             tx_wr_data,
-    output                                        tx_wr_en,
 
     // To tx_mac_interface  //
     input      [9:0]                              tx_commited_rd_addr,
@@ -591,7 +590,6 @@ module  pcie_endpoint_driver (
         .send_interrupt(tx_interrupt_trigger),                 // O
         .wr_addr(tx_wr_addr),                                  // O [8:0]
         .wr_data(tx_wr_data),                                  // O [63:0]
-        .wr_en(tx_wr_en),                                      // O
         .commited_rd_addr(tx_commited_rd_addr),                // I [9:0]
         .commited_wr_addr(tx_commited_wr_addr)                 // O [9:0]
         );

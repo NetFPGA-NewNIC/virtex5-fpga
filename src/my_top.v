@@ -298,9 +298,7 @@ module my_top (
     wire   [8:0]                                      tx_rd_addr;
     wire   [63:0]                                     tx_rd_data;
     wire                                              tx_wr_clk;
-    wire                                              tx_wr_en;
     wire                                              tx_rd_clk;
-    wire   [63:0]                                     tx_qspo;
 
     //-------------------------------------------------------
     // Local Wires tx_mac_interface
@@ -476,7 +474,7 @@ module my_top (
     //-------------------------------------------------------
     // internal_true_dual_port_ram rx
     //-------------------------------------------------------
-    internal_buffer #(.AW(10), .DW(64)) rx_buffer_mod (
+    rx_buff #(.AW(10), .DW(64)) rx_buffer_mod (
         .a(rx_wr_addr),                                        // I [`BF:0]
         .d(rx_wr_data),                                        // I [63:0]
         .dpra(rx_rd_addr),                                     // I [`BF:0]
@@ -582,15 +580,13 @@ module my_top (
     //-------------------------------------------------------
     // internal_true_dual_port_ram tx
     //-------------------------------------------------------
-    tx_buffer tx_buffer_mod (
+    tx_buff #(.AW(9), .DW(64)) tx_buffer_mod (
         .a(tx_wr_addr),                                        // I [8:0]
         .d(tx_wr_data),                                        // I [63:0]
         .dpra(tx_rd_addr),                                     // I [8:0]
         .clk(tx_wr_clk),                                       // I 
-        .we(tx_wr_en),                                         // I
         .qdpo_clk(tx_rd_clk),                                  // I
-        .spo(tx_qspo),                                         // O [63:0]
-        .dpo(tx_rd_data)                                       // O [63:0]
+        .qdpo(tx_rd_data)                                      // O [63:0]
         );  //see pg063
 
     assign tx_rd_clk = clk156_25;                              // 156.25 MHz
@@ -690,7 +686,6 @@ module my_top (
         // To internal_true_dual_port_ram TX  //
         .tx_wr_addr(tx_wr_addr),                                  // O [8:0]
         .tx_wr_data(tx_wr_data),                                  // O [63:0]
-        .tx_wr_en(tx_wr_en),                                      // O
 
         // To tx_mac_interface
         .tx_commited_rd_addr(tx_commited_rd_addr_synch),          // I [9:0]
