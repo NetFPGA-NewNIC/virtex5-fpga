@@ -59,8 +59,8 @@ module top (
     input                    refclk_D_n,
     output       [3:0]       xaui_d_txp,
     output       [3:0]       xaui_d_txn,
-    input        [7:0]       xaui_d_rxp,
-    input        [7:0]       xaui_d_rxn,
+    input        [3:0]       xaui_d_rxp,
+    input        [3:0]       xaui_d_rxn,
 
     input                    usr_100MHz,
 

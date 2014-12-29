@@ -50,8 +50,8 @@ module xge_intf (
     input                    refclk_n,
     output       [3:0]       xaui_txp,
     output       [3:0]       xaui_txn,
-    input        [7:0]       xaui_rxp,
-    input        [7:0]       xaui_rxn,
+    input        [3:0]       xaui_rxp,
+    input        [3:0]       xaui_rxn,
 
     input                    clk100,
     input                    dcm_rst_in,
@@ -108,22 +108,22 @@ module xge_intf (
     wire                     xaui_mgt_tx_ready;
     wire         [6:0]       xaui_configuration_vector;
     wire         [7:0]       xaui_status_vector;
-    wire                     xaui_tx_l0_p = xaui_txp[0];
-    wire                     xaui_tx_l0_n = xaui_txn[0];
-    wire                     xaui_tx_l1_p = xaui_txp[1];
-    wire                     xaui_tx_l1_n = xaui_txn[1];
-    wire                     xaui_tx_l2_p = xaui_txp[2];
-    wire                     xaui_tx_l2_n = xaui_txn[2];
-    wire                     xaui_tx_l3_p = xaui_txp[3];
-    wire                     xaui_tx_l3_n = xaui_txn[3];
-    wire                     xaui_rx_l0_p = xaui_rxp[0];
-    wire                     xaui_rx_l0_n = xaui_rxn[0];
-    wire                     xaui_rx_l1_p = xaui_rxp[1];
-    wire                     xaui_rx_l1_n = xaui_rxn[1];
-    wire                     xaui_rx_l2_p = xaui_rxp[2];
-    wire                     xaui_rx_l2_n = xaui_rxn[2];
-    wire                     xaui_rx_l3_p = xaui_rxp[3];
-    wire                     xaui_rx_l3_n = xaui_rxn[3];
+    wire                     xaui_tx_l0_p;
+    wire                     xaui_tx_l0_n;
+    wire                     xaui_tx_l1_p;
+    wire                     xaui_tx_l1_n;
+    wire                     xaui_tx_l2_p;
+    wire                     xaui_tx_l2_n;
+    wire                     xaui_tx_l3_p;
+    wire                     xaui_tx_l3_n;
+    wire                     xaui_rx_l0_p;
+    wire                     xaui_rx_l0_n;
+    wire                     xaui_rx_l1_p;
+    wire                     xaui_rx_l1_n;
+    wire                     xaui_rx_l2_p;
+    wire                     xaui_rx_l2_n;
+    wire                     xaui_rx_l3_p;
+    wire                     xaui_rx_l3_n;
     
     //-------------------------------------------------------
     // Local MAC
@@ -194,6 +194,14 @@ module xge_intf (
         .configuration_vector(xaui_configuration_vector),      // I [6:0]
         .status_vector(xaui_status_vector)                     // O [7:0]
         );
+
+    assign xaui_txp = {xaui_tx_l3_p, xaui_tx_l2_p, xaui_tx_l1_p, xaui_tx_l0_p};
+    assign xaui_txn = {xaui_tx_l3_n, xaui_tx_l2_n, xaui_tx_l1_n, xaui_tx_l0_n};
+
+    assign {xaui_rx_l3_p, xaui_rx_l2_p, xaui_rx_l1_p, xaui_rx_l0_p} = xaui_rxp;
+    assign {xaui_rx_l3_n, xaui_rx_l2_n, xaui_rx_l1_n, xaui_rx_l0_n} = xaui_rxn;
+
+    assign host_reset = xaui_reset;
 
     // XAUI Loopback
     //always @(posedge clk156_25) begin
