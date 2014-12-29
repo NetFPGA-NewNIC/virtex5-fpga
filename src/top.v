@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        my_top.v
+*        top.v
 *
 *  Project:
 *
@@ -44,56 +44,56 @@
 //`default_nettype none
 `include "includes.v"
 
-module my_top ( 
-    // PCI Express Fabric Interface
-    // Tx
-    output    [7:0]           pci_exp_txp,
-    output    [7:0]           pci_exp_txn,
-    // Rx
-    input     [7:0]           pci_exp_rxp,
-    input     [7:0]           pci_exp_rxn,
-
-    // System (SYS) Interface
-    input                     sys_clk_p,
-    input                     sys_clk_n,
-    //input                   sys_reset_n,    // MF: no reset available
-
-    //output                    LED01,
-    //output                    LED02,
-    //output                    LED03,
+module top ( 
+    // PCIe //
+    input                    sys_clk_p,
+    input                    sys_clk_n,
+    //input                    sys_reset_n,    // MF: no reset available
+    output       [7:0]       pci_exp_txp,
+    output       [7:0]       pci_exp_txn,
+    input        [7:0]       pci_exp_rxp,
+    input        [7:0]       pci_exp_rxn,
 
     // XAUI D
-    input refclk_D_p,
-    input refclk_D_n,
-    output  xaui_tx_l0_p,
-    output  xaui_tx_l0_n,
-    output  xaui_tx_l1_p,
-    output  xaui_tx_l1_n,
-    output  xaui_tx_l2_p,
-    output  xaui_tx_l2_n,
-    output  xaui_tx_l3_p,
-    output  xaui_tx_l3_n,
-    input   xaui_rx_l0_p,
-    input   xaui_rx_l0_n,
-    input   xaui_rx_l1_p,
-    input   xaui_rx_l1_n,
-    input   xaui_rx_l2_p,
-    input   xaui_rx_l2_n,
-    input   xaui_rx_l3_p,
-    input   xaui_rx_l3_n,
+    input                    refclk_D_p,
+    input                    refclk_D_n,
+    output       [3:0]       xaui_d_txp,
+    output       [3:0]       xaui_d_txn,
+    input        [7:0]       xaui_d_rxp,
+    input        [7:0]       xaui_d_rxn,
 
-    input   usr_100MHz,
+    input                    usr_100MHz,
 
-    output  ael2005_mdc,
-    inout   ael2005_mdio
+    output                   ael2005_mdc,
+    inout                    ael2005_mdio
+    );
 
-    );//synthesis syn_noclockbuf=1
-
-
-    //assign LED01 = 1'b1;
-    //assign LED02 = 1'b1;
-    //assign LED03 = 1'b1;
-
+    //-------------------------------------------------------
+    // Local xge_intf D
+    //-------------------------------------------------------
+    wire                     clk156_25;
+    wire                     reset156_25;
+    // MAC tx
+    wire                     mac_tx_underrun;
+    wire         [63:0]      mac_tx_data;
+    wire         [7:0]       mac_tx_data_valid;
+    wire                     mac_tx_start;
+    wire                     mac_tx_ack;
+    // MAC rx
+    wire         [63:0]      mac_rx_data;
+    wire         [7:0]       mac_rx_data_valid;
+    wire                     mac_rx_good_frame;
+    wire                     mac_rx_bad_frame;
+    // Host conf intf
+    wire                     mac_host_clk;
+    wire                     mac_host_reset;
+    wire         [1:0]       mac_host_opcode;
+    wire         [9:0]       mac_host_addr;
+    wire         [31:0]      mac_host_wr_data;
+    wire         [31:0]      mac_host_rd_data;
+    wire                     mac_host_miim_sel;
+    wire                     mac_host_req;
+    wire                     mac_host_miim_rdy;
 
     //-------------------------------------------------------
     // Local Wires  PCIe
@@ -180,62 +180,7 @@ module my_top (
     // Local Wires 
     //-------------------------------------------------------
     wire                                              reset250;
-    wire                                              reset156_25;
     
-    //-------------------------------------------------------
-    // Local Wires  DCM for XAUI
-    //-------------------------------------------------------
-    wire                                              clk50;
-    wire                                              dcm_for_xaui_locked;
-
-    //-------------------------------------------------------
-    // Local Wires  XAUI
-    //-------------------------------------------------------
-    wire                                              xaui_reset;
-    wire                                              clk156_25;
-    wire   [63:0]                                     xgmii_txd;
-    wire   [7:0]                                      xgmii_txc;
-    wire   [63:0]                                     xgmii_rxd;
-    wire   [7:0]                                      xgmii_rxc;
-    wire   [3:0]                                      xaui_signal_detect;
-    wire                                              xaui_align_status;
-    wire   [3:0]                                      xaui_sync_status;
-    wire                                              xaui_mgt_tx_ready;
-    wire   [6:0]                                      xaui_configuration_vector;
-    wire   [7:0]                                      xaui_status_vector;
-    
-    //-------------------------------------------------------
-    // Local Wires  MAC
-    //-------------------------------------------------------
-    wire                                              mac_tx_underrun;
-    wire   [63:0]                                     mac_tx_data;
-    wire   [7:0]                                      mac_tx_data_valid;
-    wire                                              mac_tx_start;
-    wire                                              mac_tx_ack;
-    wire   [7:0]                                      mac_tx_ifg_delay;
-    wire   [24:0]                                     mac_tx_statistics_vector;
-    wire                                              mac_tx_statistics_valid;
-    wire   [15:0]                                     mac_pause_val;
-    wire                                              mac_pause_req;
-    wire   [63:0]                                     mac_rx_data;
-    wire   [7:0]                                      mac_rx_data_valid;
-    wire                                              mac_rx_good_frame;
-    wire                                              mac_rx_bad_frame;
-    wire   [28:0]                                     mac_rx_statistics_vector;
-    wire                                              mac_rx_statistics_valid;
-    //wire   [68:0]                                     mac_configuration_vector;
-    //wire   [1:0]                                      mac_status_vector;
-    wire   [1:0]                                      mac_host_opcode;
-    wire   [9:0]                                      mac_host_addr;
-    wire   [31:0]                                     mac_host_wr_data;
-    wire   [31:0]                                     mac_host_rd_data;
-    wire                                              mac_host_miim_sel;
-    wire                                              mac_host_req;
-    wire                                              mac_host_miim_rdy;
-    wire                                              mac_mdio_in;
-    wire                                              mac_mdio_out;
-    wire                                              mac_mdio_tri;
-
     //////////////////////////////////////////////////////////////////////////////////////////
     // Reception side of the NIC signal declaration
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -322,151 +267,44 @@ module my_top (
     IBUFDS refclk_ibuf (.O(sys_clk_c), .I(sys_clk_p), .IB(sys_clk_n));  // 100 MHz
 
     //-------------------------------------------------------
-    // Virtex5-FX DCM for XAUI
+    // xge_intf D
     //-------------------------------------------------------
-    xaui_dcm dcm_for_xaui (
-        .CLKIN_IN(usr_100MHz),                                 // I
-        .RST_IN(reset250),                                     // I
-        .CLKIN_IBUFG_OUT(),                                    // O (it's also possible to use 1 source clk for the all design)
-        .CLK0_OUT(clk50),                                      // O
-        .LOCKED_OUT(dcm_for_xaui_locked)                       // O
-        );
-
-    //-------------------------------------------------------
-    // XAUI D
-    //-------------------------------------------------------
-
-    assign xaui_reset = ~dcm_for_xaui_locked;
-
-    xaui_v10_4_example_design xaui_d (
-        .dclk(clk50),                                          // I
-        .reset(xaui_reset),                                    // I
-        .clk156_out(clk156_25),                                // O
-        .xgmii_txd(xgmii_txd),                                 // I [63:0]
-        .xgmii_txc(xgmii_txc),                                 // I [7:0]
-        .xgmii_rxd(xgmii_rxd),                                 // O [63:0]
-        .xgmii_rxc(xgmii_rxc),                                 // O [7:0]
+    xge_intf xge_intf_d (
         .refclk_p(refclk_D_p),                                 // I
         .refclk_n(refclk_D_n),                                 // I
-        .xaui_tx_l0_p(xaui_tx_l0_p),                           // O
-        .xaui_tx_l0_n(xaui_tx_l0_n),                           // O
-        .xaui_tx_l1_p(xaui_tx_l1_p),                           // O
-        .xaui_tx_l1_n(xaui_tx_l1_n),                           // O
-        .xaui_tx_l2_p(xaui_tx_l2_p),                           // O
-        .xaui_tx_l2_n(xaui_tx_l2_n),                           // O
-        .xaui_tx_l3_p(xaui_tx_l3_p),                           // O
-        .xaui_tx_l3_n(xaui_tx_l3_n),                           // O
-        .xaui_rx_l0_p(xaui_rx_l0_p),                           // I
-        .xaui_rx_l0_n(xaui_rx_l0_n),                           // I
-        .xaui_rx_l1_p(xaui_rx_l1_p),                           // I
-        .xaui_rx_l1_n(xaui_rx_l1_n),                           // I
-        .xaui_rx_l2_p(xaui_rx_l2_p),                           // I
-        .xaui_rx_l2_n(xaui_rx_l2_n),                           // I
-        .xaui_rx_l3_p(xaui_rx_l3_p),                           // I
-        .xaui_rx_l3_n(xaui_rx_l3_n),                           // I
-        .signal_detect(xaui_signal_detect),                    // I [3:0]
-        .align_status(xaui_align_status),                      // O
-        .sync_status(xaui_sync_status),                        // O [3:0]
-        .mgt_tx_ready(xaui_mgt_tx_ready),                      // O
-        .configuration_vector(xaui_configuration_vector),      // I [6:0]
-        .status_vector(xaui_status_vector)                     // O [7:0]
+        .xaui_txp(xaui_d_txp),                                 // O [3:0]
+        .xaui_txn(xaui_d_txn),                                 // O [3:0]
+        .xaui_rxp(xaui_d_rxp),                                 // I [3:0]
+        .xaui_rxn(xaui_d_rxn),                                 // I [3:0]
+        .clk100(usr_100MHz),                                   // I
+        .dcm_rst_in(reset250),                                 // I
+        .clk156_25(clk156_25),                                 // O
+        .reset156_25(reset156_25),                             // O
+        // MAC tx
+        .mac_tx_underrun(mac_tx_underrun),                     // I
+        .mac_tx_data(mac_tx_data),                             // I [63:0]
+        .mac_tx_data_valid(mac_tx_data_valid),                 // I [7:0]
+        .mac_tx_start(mac_tx_start),                           // I
+        .mac_tx_ack(mac_tx_ack),                               // O
+        // MAC rx
+        .mac_rx_data(mac_rx_data),                             // O [63:0]
+        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
+        .mac_rx_good_frame(mac_rx_good_frame),                 // O
+        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // MDIO
+        .phy_mdc(ael2005_mdc),                                 // O
+        .phy_mdio(ael2005_mdio),                               // IO
+        // Host conf intf
+        .host_clk(mac_host_clk),                               // O
+        .host_reset(mac_host_reset),                           // O
+        .host_opcode(mac_host_opcode),                         // I [1:0]
+        .host_addr(mac_host_addr),                             // I [9:0]
+        .host_wr_data(mac_host_wr_data),                       // I [31:0]
+        .host_rd_data(mac_host_rd_data),                       // O [31:0]
+        .host_miim_sel(mac_host_miim_sel),                     // I
+        .host_req(mac_host_req),                               // I
+        .host_miim_rdy(mac_host_miim_rdy)                      // O
         );
-
-    // XAUI Loopback
-    //always @(posedge clk156_25) begin
-        //xgmii_txd <= xgmii_rxd;
-        //xgmii_txc <= xgmii_rxc;
-    //end
-
-    // XAUI Configuration
-    assign  xaui_signal_detect = 4'b1111;      //according to pg053
-    assign  xaui_configuration_vector = 7'b0;  //see pg053
-
-    //-------------------------------------------------------
-    // MAC
-    //-------------------------------------------------------
-    ten_gig_eth_mac_v10_3 mac_d (
-        .reset(reset156_25),                                   // I
-        
-        .tx_underrun(mac_tx_underrun),                         // I 
-        .tx_data(mac_tx_data),                                 // I [63:0] 
-        .tx_data_valid(mac_tx_data_valid),                     // I [7:0] 
-        .tx_start(mac_tx_start),                               // I 
-        .tx_ack(mac_tx_ack),                                   // O 
-        .tx_ifg_delay(mac_tx_ifg_delay),                       // I [7:0] 
-        .tx_statistics_vector(mac_tx_statistics_vector),       // O [24:0] 
-        .tx_statistics_valid(mac_tx_statistics_valid),         // O 
-        .pause_val(mac_pause_val),                             // I [15:0] 
-        .pause_req(mac_pause_req),                             // I
-
-        .rx_data(mac_rx_data),                                 // O [63:0]
-        .rx_data_valid(mac_rx_data_valid),                     // O [7:0]
-        .rx_good_frame(mac_rx_good_frame),                     // O
-        .rx_bad_frame(mac_rx_bad_frame),                       // O
-        .rx_statistics_vector(mac_rx_statistics_vector),       // O [28:0]
-        .rx_statistics_valid(mac_rx_statistics_valid),         // O 
-
-        .host_clk(clk50),                                      // I 
-        .host_opcode(mac_host_opcode),                         // I [1:0] 
-        .host_addr(mac_host_addr),                             // I [9:0] 
-        .host_wr_data(mac_host_wr_data),                       // I [31:0] 
-        .host_rd_data(mac_host_rd_data),                       // O [31:0] 
-        .host_miim_sel(mac_host_miim_sel),                     // I 
-        .host_req(mac_host_req),                               // I 
-        .host_miim_rdy(mac_host_miim_rdy),                     // O 
-
-        .tx_clk0(clk156_25),                                   // I 
-        .tx_dcm_lock(xaui_mgt_tx_ready),                       // I 
-        .xgmii_txd(xgmii_txd),                                 // O [63:0]
-        .xgmii_txc(xgmii_txc),                                 // O [7:0]
-
-        .rx_clk0(clk156_25),                                   // I 
-        .rx_dcm_lock(xaui_align_status),                       // I pg053: '1' when the XAUI receiver is aligned across all four lanes, '0' otherwise.
-        .xgmii_rxd(xgmii_rxd),                                 // I [63:0]
-        .xgmii_rxc(xgmii_rxc),                                 // I [7:0]
-        
-        .mdc(ael2005_mdc),                                     // O 
-        .mdio_in(mac_mdio_in),                                 // I
-        .mdio_out(mac_mdio_out),                               // O 
-        .mdio_tri(mac_mdio_tri)                                // O
-        );
-
-    // MAC Configuration
-    // Tx interface disabled
-    //assign mac_tx_underrun = 1'b0;
-    //assign mac_tx_data = 64'b0;
-    //assign mac_tx_data_valid = 8'b0;
-    //assign mac_tx_start = 1'b0;
-    assign mac_tx_ifg_delay = 8'b0;
-
-    assign mac_pause_val = 16'b0;
-    assign mac_pause_req = 1'b0;
-    
-    // When using The Management Interface the configuration vector interface doesn't exists
-    // -------------------------------------------------------------------------------------
-    // Rx
-    //assign mac_configuration_vector[47:0] = 48'b0;  //Pause frame MAC Source Address
-    //assign mac_configuration_vector[48] = 1'b1;     //Receive VLAN Enable
-    //assign mac_configuration_vector[49] = 1'b1;     //Receive Enable
-    //assign mac_configuration_vector[50] = 1'b1;     //Receive In-Band FCS
-    //assign mac_configuration_vector[51] = 1'b1;     //Receive Jumbo Frame Enable
-    //assign mac_configuration_vector[52] = 1'b0;     //Receiver Reset
-    //assign mac_configuration_vector[66] = 1'b1;     //Receiver Preserve Preamble Enable
-    // Tx
-    //assign mac_configuration_vector[65:53] = 12'b0;
-    //assign mac_configuration_vector[68:67] = 2'b0;
-
-        //.configuration_vector(mac_configuration_vector),  // I [68:0]
-        //.status_vector(mac_status_vector),  // O [1:0]
-    // -------------------------------------------------------------------------------------
-    // When using The Management Interface the configuration vector interface doesn't exists
-
-    //-------------------------------------------------------
-    // MDIO interface
-    //-------------------------------------------------------
-
-    assign ael2005_mdio = mac_mdio_tri ? 1'bZ : mac_mdio_out;
-    assign mac_mdio_in = mac_mdio_out;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     // Reception side of the NIC (START)
@@ -668,8 +506,8 @@ module my_top (
         .rx_dropped_pkts(rx_dropped_pkts_synch),                  // I [15:0]
 
         // To mac_host_configuration_interface  //
-        .host_clk(clk50),                                         // I 
-        .host_reset(xaui_reset),                                  // I
+        .host_clk(mac_host_clk),                                  // I 
+        .host_reset(mac_host_reset),                              // I
         .reset156_25(reset156_25),                                // I
         .host_opcode(mac_host_opcode),                            // O [1:0] 
         .host_addr(mac_host_addr),                                // O [9:0] 
@@ -758,15 +596,6 @@ module my_top (
         .trn_reset_n(trn_reset_n_c),                           // I
         .trn_lnk_up_n(trn_lnk_up_n_c),                         // I
         .reset250(reset250)                                    // O
-        );
-
-    //-------------------------------------------------------
-    // mac_reset
-    //-------------------------------------------------------
-    mac_reset mac_reset_mod (
-        .clk156_25(clk156_25),                                 // I
-        .xaui_reset(xaui_reset),                               // I
-        .reset156_25(reset156_25)                              // O
         );
 
     //-------------------------------------------------------
@@ -886,7 +715,7 @@ module my_top (
         );
 
 
-endmodule // my_top
+endmodule // top
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
