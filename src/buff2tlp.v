@@ -64,13 +64,10 @@ module buff2tlp (
     input        [15:0]      cfg_completer_id,
 
     // lbuf_mgmt
-    input        [63:0]      lbuf1_addr,
-    input                    lbuf1_en,
-    output reg               lbuf1_dn,
-
-    input        [63:0]      lbuf2_addr,
-    input                    lbuf2_en,
-    output reg               lbuf2_dn,
+    input        [63:0]      lbuf_addr,
+    input                    lbuf_en,
+    input                    lbuf64b,
+    output reg               lbuf_dn,
 
     // eth2tlp_ctrl
     input                    trig_tlp,
@@ -131,19 +128,10 @@ module buff2tlp (
     localparam s28 = 28'b1000000000000000000000000000;
 
     //-------------------------------------------------------
-    // Local crnt_lbuf
-    //-------------------------------------------------------
-    reg          [63:0]      crnt_lbuf;
-    reg          [27:0]      giv_lbuf_fsm;
-    reg          [27:0]      rtv_lbuf_fsm;
-    reg                      lbuf_av;
-    reg                      aux_high_mem;
-
-    //-------------------------------------------------------
     // Local send_tlps_machine
     //-------------------------------------------------------   
     reg          [27:0]      send_fsm;
-    reg                      rtrn_lbuf;
+    reg                      lbuf_dn;
     reg          [8:0]       tlp_qw_cnt;
     reg          [4:0]       tlp_nmb;
     reg          [4:0]       look_ahead_tlp_nmb;
@@ -162,81 +150,6 @@ module buff2tlp (
     reg                      close_lbuf;
     reg          [15:0]      dropped_pkts_reg;
     
-    ////////////////////////////////////////////////
-    // crnt_lbuf
-    ////////////////////////////////////////////////
-    always @(posedge clk) begin
-
-        if (rst) begin  // rst
-            lbuf1_dn <= 1'b0;
-            lbuf2_dn <= 1'b0;
-            lbuf_av <= 1'b0;
-            giv_lbuf_fsm <= s0;
-            rtv_lbuf_fsm <= s0;
-        end
-
-        else begin  // not rst
-
-            case (rtv_lbuf_fsm)
-                s0 : begin
-                    if (rtrn_lbuf) begin
-                        lbuf1_dn <= 1'b1;
-                        rtv_lbuf_fsm <= s1;
-                    end
-                end
-                s1 : begin
-                    lbuf1_dn <= 1'b0;
-                    rtv_lbuf_fsm <= s2;
-                end
-                s2 : begin
-                    if (rtrn_lbuf) begin
-                        lbuf2_dn <= 1'b1;
-                        rtv_lbuf_fsm <= s3;
-                    end
-                end
-                s3 : begin
-                    lbuf2_dn <= 1'b0;
-                    rtv_lbuf_fsm <= s0;
-                end
-            endcase
-
-            case (giv_lbuf_fsm)
-                s0 : begin
-                    if (lbuf1_en) begin
-                        lbuf_av <= 1'b1;
-                        crnt_lbuf <= lbuf1_addr;
-                        aux_high_mem <= | lbuf1_addr[63:32];
-                        giv_lbuf_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    if (rtrn_lbuf) begin
-                        lbuf_av <= 1'b0;
-                        giv_lbuf_fsm <= s2;
-                    end
-                end
-
-                s2 : begin
-                    if (lbuf2_en) begin
-                        lbuf_av <= 1'b1;
-                        crnt_lbuf <= lbuf2_addr;
-                        aux_high_mem <= | lbuf2_addr[63:32];
-                        giv_lbuf_fsm <= s3;
-                    end
-                end
-
-                s3 : begin
-                    if (rtrn_lbuf) begin
-                        lbuf_av <= 1'b0;
-                        giv_lbuf_fsm <= s0;
-                    end
-                end
-            endcase
-
-        end     // not rst
-    end  //always
-
     assign hw_ptr = host_mem_addr;
 
     ////////////////////////////////////////////////
@@ -249,7 +162,7 @@ module buff2tlp (
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
 
-            rtrn_lbuf <= 1'b0;
+            lbuf_dn <= 1'b0;
             drv_ep <= 1'b0;
 
             trig_tlp_ack <= 1'b0;
@@ -269,7 +182,7 @@ module buff2tlp (
             trig_tlp_ack <= 1'b0;
             chng_lbuf_ack <= 1'b0;
             send_qws_ack <= 1'b0;
-            rtrn_lbuf <= 1'b0;
+            lbuf_dn <= 1'b0;
 
             rd_addr_prev1 <= rd_addr;
             rd_addr_prev2 <= rd_addr_prev1;
@@ -283,10 +196,10 @@ module buff2tlp (
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
 
-                    host_mem_addr <= crnt_lbuf + 'h80;
+                    host_mem_addr <= lbuf_addr + 'h80;
                     lbuf_qw_cnt <= 'b0;
-                    if (lbuf_av) begin
-                        if (aux_high_mem) begin
+                    if (lbuf_en) begin
+                        if (lbuf64b) begin
                             send_fsm <= s1;
                         end
                         else begin
@@ -464,8 +377,8 @@ module buff2tlp (
                 s11 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        rtrn_lbuf <= close_lbuf;
-                        trn_td <= crnt_lbuf;
+                        lbuf_dn <= close_lbuf;
+                        trn_td <= lbuf_addr;
                         send_fsm <= s12;
                     end
                 end
@@ -687,9 +600,9 @@ module buff2tlp (
                 s25 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
-                        rtrn_lbuf <= close_lbuf;
+                        lbuf_dn <= close_lbuf;
                         trn_td <= {
-                                crnt_lbuf[31:0],
+                                lbuf_addr[31:0],
                                 aux_qw_cnt[7:0],
                                 aux_qw_cnt[15:8],
                                 aux_qw_cnt[23:16],

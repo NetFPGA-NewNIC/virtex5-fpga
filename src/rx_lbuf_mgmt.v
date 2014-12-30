@@ -63,218 +63,68 @@ module rx_lbuf_mgmt # (
     input        [6:0]       trn_rbar_hit_n,
 
     // lbuf_mgmt
-    output reg   [63:0]      lbuf1_addr,
-    output reg               lbuf1_en,
-    input                    lbuf1_dn,
-
-    output reg   [63:0]      lbuf2_addr,
-    output reg               lbuf2_en,
-    input                    lbuf2_dn
+    output       [63:0]      lbuf_addr,
+    output                   lbuf_en,
+    output                   lbuf64b,
+    input                    lbuf_dn
     );
 
-    // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
-    localparam s4 = 8'b00001000;
-    localparam s5 = 8'b00010000;
-    localparam s6 = 8'b00100000;
-    localparam s7 = 8'b01000000;
-    localparam s8 = 8'b10000000;
+    //-------------------------------------------------------
+    // Local hst_ctrl
+    //-------------------------------------------------------
+    wire         [63:0]      lbuf1_addr;
+    wire                     lbuf1_en;
+    wire                     lbuf1_dn;
+    wire         [63:0]      lbuf2_addr;
+    wire                     lbuf2_en;
+    wire                     lbuf2_dn;
 
     //-------------------------------------------------------
-    // Local TLP reception
+    // gv_lbuf
     //-------------------------------------------------------
-    reg          [7:0]       tlp_rx_fsm;
-    reg                      lbuf1_en_i;
-    reg                      lbuf2_en_i;
-    reg          [31:0]      aux_dw;
-    reg          [63:0]      lbuf1_addr_i;
-    reg          [63:0]      lbuf2_addr_i;
+    rx_gv_lbuf gv_lbuf_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        // hst_ctrl
+        .lbuf1_addr(lbuf1_addr),                               // O [63:0]
+        .lbuf1_en(lbuf1_en),                                   // O
+        .lbuf1_dn(lbuf1_dn),                                   // I
+        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
+        .lbuf2_en(lbuf2_en),                                   // O
+        .lbuf2_dn(lbuf2_dn),                                   // I
+        // gv_lbuf
+        .lbuf_addr(lbuf2_addr),                               // O [63:0]
+        .lbuf_en(lbuf2_en),                                   // O
+        .lbuf64b(lbuf64b),                                    // O
+        .lbuf_dn(lbuf2_dn)                                    // I
+        );
 
-    ////////////////////////////////////////////////
-    // huge_page_status
-    ////////////////////////////////////////////////
-    always @(posedge clk) begin
-
-        if (rst) begin  // rst
-            lbuf1_en <= 1'b0;
-            lbuf2_en <= 1'b0;
-        end
-        
-        else begin  // not rst
-            if (lbuf1_en_i) 
-                lbuf1_en <= 1'b1;
-            else if (lbuf1_dn) 
-                lbuf1_en <= 1'b0;
-
-            if (lbuf2_en_i) 
-                lbuf2_en <= 1'b1;
-            else if (lbuf2_dn) 
-                lbuf2_en <= 1'b0;
-
-        end     // not rst
-    end  //always
-
-    ////////////////////////////////////////////////
-    // huge_page_address and unlock TLP reception
-    ////////////////////////////////////////////////
-    always @(posedge clk) begin
-
-        if (rst) begin  // rst
-            lbuf1_en_i <= 1'b0;
-            lbuf2_en_i <= 1'b0;
-            tlp_rx_fsm <= s0;
-        end
-        
-        else begin  // not rst
-
-            lbuf1_en_i <= 1'b0;
-            lbuf2_en_i <= 1'b0;
-
-            lbuf1_addr <= lbuf1_addr_i;
-            lbuf2_addr <= lbuf2_addr_i;
-
-            case (tlp_rx_fsm)
-
-                s0 : begin
-                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rbar_hit_n[2])) begin
-                        if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
-                            tlp_rx_fsm <= s1;
-                        end
-                        else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
-                            tlp_rx_fsm <= s4;
-                        end
-                    end
-                end
-
-                s1 : begin
-                    aux_dw <= trn_rd[31:0];
-                    if (!trn_rsrc_rdy_n) begin
-                        case (trn_rd[39:34])
-
-                            BARMP_LBUF1_ADDR : begin
-                                tlp_rx_fsm <= s2;
-                            end
-
-                            BARMP_LBUF2_ADDR : begin
-                                tlp_rx_fsm <= s3;
-                            end
-
-                            BARMP_LBUF1_EN : begin
-                                lbuf1_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            BARMP_LBUF2_EN : begin
-                                lbuf2_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            default : begin //other addresses
-                                tlp_rx_fsm <= s0;
-                            end
-                        endcase
-                    end
-                end
-
-                s2 : begin
-                    lbuf1_addr_i[7:0] <= aux_dw[31:24];
-                    lbuf1_addr_i[15:8] <= aux_dw[23:16];
-                    lbuf1_addr_i[23:16] <= aux_dw[15:8];
-                    lbuf1_addr_i[31:24] <= aux_dw[7:0];
-
-                    lbuf1_addr_i[39:32] <= trn_rd[63:56];
-                    lbuf1_addr_i[47:40] <= trn_rd[55:48];
-                    lbuf1_addr_i[55:48] <= trn_rd[47:40];
-                    lbuf1_addr_i[63:56] <= trn_rd[39:32];
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                s3 : begin
-                    lbuf2_addr_i[7:0] <= aux_dw[31:24];
-                    lbuf2_addr_i[15:8] <= aux_dw[23:16];
-                    lbuf2_addr_i[23:16] <= aux_dw[15:8];
-                    lbuf2_addr_i[31:24] <= aux_dw[7:0];
-
-                    lbuf2_addr_i[39:32] <= trn_rd[63:56];
-                    lbuf2_addr_i[47:40] <= trn_rd[55:48];
-                    lbuf2_addr_i[55:48] <= trn_rd[47:40];
-                    lbuf2_addr_i[63:56] <= trn_rd[39:32];
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                s4 : begin
-                    if (!trn_rsrc_rdy_n) begin
-                        case (trn_rd[7:2])
-
-                            BARMP_LBUF1_ADDR : begin
-                                tlp_rx_fsm <= s5;
-                            end
-
-                            BARMP_LBUF2_ADDR : begin
-                                tlp_rx_fsm <= s6;
-                            end
-
-                            BARMP_LBUF1_EN : begin
-                                lbuf1_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            BARMP_LBUF2_EN : begin
-                                lbuf2_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            default : begin //other addresses
-                                tlp_rx_fsm <= s0;
-                            end
-                        endcase
-                    end
-                end
-
-                s5 : begin
-                    lbuf1_addr_i[7:0]   <= trn_rd[63:56];
-                    lbuf1_addr_i[15:8]  <= trn_rd[55:48];
-                    lbuf1_addr_i[23:16] <= trn_rd[47:40];
-                    lbuf1_addr_i[31:24] <= trn_rd[39:32];
-
-                    lbuf1_addr_i[39:32] <= trn_rd[31:24];
-                    lbuf1_addr_i[47:40] <= trn_rd[23:16];
-                    lbuf1_addr_i[55:48] <= trn_rd[15:8];
-                    lbuf1_addr_i[63:56] <= trn_rd[7:0];
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                s6 : begin
-                    lbuf2_addr_i[7:0]   <= trn_rd[63:56];
-                    lbuf2_addr_i[15:8]  <= trn_rd[55:48];
-                    lbuf2_addr_i[23:16] <= trn_rd[47:40];
-                    lbuf2_addr_i[31:24] <= trn_rd[39:32];
-
-                    lbuf2_addr_i[39:32] <= trn_rd[31:24];
-                    lbuf2_addr_i[47:40] <= trn_rd[23:16];
-                    lbuf2_addr_i[55:48] <= trn_rd[15:8];
-                    lbuf2_addr_i[63:56] <= trn_rd[7:0];
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                default : begin //other TLPs
-                    tlp_rx_fsm <= s0;
-                end
-
-            endcase
-        end     // not rst
-    end  //always
+    //-------------------------------------------------------
+    // hst_ctrl
+    //-------------------------------------------------------
+    rx_hst_ctrl # (
+        .BARMP_LBUF1_ADDR(BARMP_LBUF1_ADDR),
+        .BARMP_LBUF1_EN(BARMP_LBUF1_EN),
+        .BARMP_LBUF2_ADDR(BARMP_LBUF2_ADDR),
+        .BARMP_LBUF2_EN(BARMP_LBUF2_EN)
+    ) hst_ctrl_mod (
+        .clk(pcie_clk),                                        // I
+        .rst(pcie_rst),                                        // I
+        // TRN rx
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        // lbuf_mgmt
+        .lbuf1_addr(lbuf1_addr),                               // O [63:0]
+        .lbuf1_en(lbuf1_en),                                   // O
+        .lbuf1_dn(lbuf1_dn),                                   // I
+        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
+        .lbuf2_en(lbuf2_en),                                   // O
+        .lbuf2_dn(lbuf2_dn)                                    // I
+        );
 
 endmodule // rx_lbuf_mgmt
 

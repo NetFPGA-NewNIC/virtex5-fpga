@@ -140,12 +140,10 @@ module rx # (
     //-------------------------------------------------------
     // Local lbuf_mgmt
     //-------------------------------------------------------
-    wire         [63:0]      lbuf1_addr;
-    wire                     lbuf1_en;
-    wire                     lbuf1_dn;
-    wire         [63:0]      lbuf2_addr;
-    wire                     lbuf2_en;
-    wire                     lbuf2_dn;
+    wire         [63:0]      lbuf_addr;
+    wire                     lbuf_en;
+    wire                     lbuf64b;
+    wire                     lbuf_dn;
     
     //-------------------------------------------------------
     // Local irq_gen
@@ -261,12 +259,10 @@ module rx # (
         // CFG
         .cfg_completer_id(cfg_completer_id),                   // I [15:0]
         // lbuf_mgmt
-        .lbuf1_addr(lbuf1_addr),                               // I [63:0]
-        .lbuf1_en(lbuf1_en),                                   // I
-        .lbuf1_dn(lbuf1_dn),                                   // O
-        .lbuf2_addr(lbuf2_addr),                               // I [63:0]
-        .lbuf2_en(lbuf2_en),                                   // I
-        .lbuf2_dn(lbuf2_dn),                                   // O
+        .lbuf_addr(lbuf_addr),                                 // I [63:0]
+        .lbuf_en(lbuf_en),                                     // I
+        .lbuf64b(lbuf64b),                                     // I
+        .lbuf_dn(lbuf_dn),                                     // O
         // eth2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // I
         .trig_tlp_ack(trig_tlp_ack),                           // O
@@ -308,12 +304,10 @@ module rx # (
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // lbuf_mgmt
-        .lbuf1_addr(lbuf1_addr),                               // O [63:0]
-        .lbuf1_en(lbuf1_en),                                   // O
-        .lbuf1_dn(lbuf1_dn),                                   // I
-        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
-        .lbuf2_en(lbuf2_en),                                   // O
-        .lbuf2_dn(lbuf2_dn)                                    // I
+        .lbuf_addr(lbuf_addr),                                 // O [63:0]
+        .lbuf_en(lbuf_en),                                     // O
+        .lbuf64b(lbuf64b),                                     // O
+        .lbuf_dn(lbuf_dn)                                      // I
         );
 
     //-------------------------------------------------------
