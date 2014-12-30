@@ -43,7 +43,13 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx ( 
+module rx # (
+    parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
+    parameter BARMP_LBUF1_EN = 6'bxxxxxx,
+    parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
+    parameter BARMP_LBUF2_EN = 6'bxxxxxx,
+    parameter BARMP_WRBCK = 6'bxxxxxx
+    ) (
 
     input                    mac_clk,
     input                    mac_rst,
@@ -77,9 +83,8 @@ module rx (
 
     // CFG
     input        [15:0]      cfg_completer_id,
-    input        [2:0]       cfg_max_rd_req_size,
     input        [2:0]       cfg_max_payload_size,
-    output                   send_interrupt,
+    output                   send_irq,
 
     // EP arb
     input                    my_trn,
@@ -89,8 +94,8 @@ module rx (
     //-------------------------------------------------------
     // Local mac2buff
     //-------------------------------------------------------
-    wire         [`BF:0]     committed_prod;
     wire                     mac_activity;
+    wire         [`BF:0]     committed_prod;
     wire         [15:0]      dropped_pkts_cnt;
 
     //-------------------------------------------------------
@@ -102,14 +107,51 @@ module rx (
     wire         [63:0]      rd_data;
 
     //-------------------------------------------------------
+    // Local prod_sync
+    //-------------------------------------------------------
+    wire         [`BF:0]     committed_prod_sync;
+
+    //-------------------------------------------------------
+    // Local cons_sync
+    //-------------------------------------------------------
+    wire         [`BF:0]     committed_cons_sync;
+
+    //-------------------------------------------------------
+    // Local dropped_pkts_cnt_sync
+    //-------------------------------------------------------
+    wire         [15:0]      dropped_pkts_cnt_sync;
+
+    //-------------------------------------------------------
+    // Local eth2tlp_ctrl
+    //-------------------------------------------------------
+    wire                     trig_tlp;
+    wire                     trig_tlp_ack;
+    wire                     chng_lbuf;
+    wire                     chng_lbuf_ack;
+    wire                     send_qws;
+    wire                     send_qws_ack;
+    wire         [5:0]       qw_cnt;
+
+    //-------------------------------------------------------
     // Local buff2tlp
     //-------------------------------------------------------
+    wire         [`BF:0]     committed_cons;
+
+    //-------------------------------------------------------
+    // Local lbuf_mgmt
+    //-------------------------------------------------------
+    wire         [63:0]      lbuf1_addr;
+    wire                     lbuf1_en;
+    wire                     lbuf1_dn;
+    wire         [63:0]      lbuf2_addr;
+    wire                     lbuf2_en;
+    wire                     lbuf2_dn;
     
     //-------------------------------------------------------
     // Local irq_gen
     //-------------------------------------------------------
-    wire         [63:0]      hw_pointer;
-    wire         [63:0]      sw_pointer;
+    wire         [63:0]      hw_ptr;
+    wire         [63:0]      sw_ptr;
     wire                     hst_rdy;
 
     //-------------------------------------------------------
@@ -118,15 +160,18 @@ module rx (
     mac2buff mac2buff_mod (
         .clk(mac_clk),                                         // I
         .rst(mac_rst),                                         // I
+        // MAC rx
         .rx_data(mac_rx_data),                                 // I [63:0]
         .rx_data_valid(mac_rx_data_valid),                     // I [7:0]
         .rx_good_frame(mac_rx_good_frame),                     // I
         .rx_bad_frame(mac_rx_bad_frame),                       // I
+        // buff
         .wr_addr(wr_addr),                                     // O [`BF:0]
         .wr_data(wr_data),                                     // O [63:0]
+        // fwd logic
         .activity(mac_activity),                               // O
         .committed_prod(committed_prod),                       // O [`BF:0]
-        .committed_cons(committed_cons),                       // I [`BF:0]
+        .committed_cons(committed_cons_sync),                  // I [`BF:0]
         .dropped_pkts(dropped_pkts_cnt)                        // O [15:0]
         );
 
@@ -157,9 +202,9 @@ module rx (
     //-------------------------------------------------------
     // cons_sync
     //-------------------------------------------------------
-    synch_type0 #(.W(`BF+1)) cons_sync_mod (
+    sync_type0 #(.W(`BF+1)) cons_sync_mod (
         .clk_out(mac_clk),                                     // I
-        .rst_out(reset156_25),                                 // I
+        .rst_out(mac_rst),                                     // I
         .clk_in(pcie_clk),                                     // I
         .rst_in(pcie_rst),                                     // I
         .in(committed_cons),                                   // I [`BF:0]
@@ -169,7 +214,7 @@ module rx (
     //-------------------------------------------------------
     // dropped_pkts_cnt_sync
     //-------------------------------------------------------
-    synch_type1 #(15,1) dropped_pkts_cnt_sync_mod (
+    sync_type1 #(.W(16)) dropped_pkts_cnt_sync_mod (
         .clk_out(pcie_clk),                                    // I
         .rst_out(pcie_rst),                                    // I
         .clk_in(mac_clk),                                      // I
@@ -184,9 +229,12 @@ module rx (
     eth2tlp_ctrl eth2tlp_ctrl_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
+        // CFG
         .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
+        // mac2buff
         .committed_prod(committed_prod_sync),                  // I [`BF:0]
         .mac_activity(mac_activity),                           // I
+        // eth2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // O
         .trig_tlp_ack(trig_tlp_ack),                           // I
         .chng_lbuf(chng_lbuf),                                 // O
@@ -210,14 +258,15 @@ module rx (
         .trn_tsrc_rdy_n(rx_trn_tsrc_rdy_n),                    // O
         .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
         .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
+        // CFG
         .cfg_completer_id(cfg_completer_id),                   // I [15:0]
         // lbuf_mgmt
         .lbuf1_addr(lbuf1_addr),                               // I [63:0]
-        .lbuf1_av(lbuf1_av),                                   // I
+        .lbuf1_en(lbuf1_en),                                   // I
         .lbuf1_dn(lbuf1_dn),                                   // O
-        .lbuf2_addr(lbuf1_addr),                               // I [63:0]
-        .lbuf2_av(lbuf1_av),                                   // I
-        .lbuf2_dn(lbuf1_dn),                                   // O
+        .lbuf2_addr(lbuf2_addr),                               // I [63:0]
+        .lbuf2_en(lbuf2_en),                                   // I
+        .lbuf2_dn(lbuf2_dn),                                   // O
         // eth2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // I
         .trig_tlp_ack(trig_tlp_ack),                           // O
@@ -232,18 +281,22 @@ module rx (
         .rd_addr(rd_addr),                                     // O [`BF:0]
         .rd_data(rd_data),                                     // I [63:0]
         // irq_gen
-        .hw_pointer(hw_pointer),                               // O [63:0]
+        .hw_ptr(hw_ptr),                                       // O [63:0]
+        // ep arb
         .my_trn(my_trn),                                       // I
         .drv_ep(drv_ep),                                       // O
+        // stats
         .dropped_pkts(dropped_pkts_cnt_sync)                   // I [15:0]
         );
 
     //-------------------------------------------------------
     // lbuf_mgmt
     //-------------------------------------------------------
-    lbuf_mgmt # (
-        .BARMP_lbuf1(6'bxxxxxx),
-        .BARMP_lbuf2(6'bxxxxxx)
+    rx_lbuf_mgmt # (
+        .BARMP_LBUF1_ADDR(BARMP_LBUF1_ADDR),
+        .BARMP_LBUF1_EN(BARMP_LBUF1_EN),
+        .BARMP_LBUF2_ADDR(BARMP_LBUF2_ADDR),
+        .BARMP_LBUF2_EN(BARMP_LBUF2_EN)
     ) lbuf_mgmt_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
@@ -256,19 +309,19 @@ module rx (
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // lbuf_mgmt
         .lbuf1_addr(lbuf1_addr),                               // O [63:0]
-        .lbuf1_av(lbuf1_av),                                   // O
+        .lbuf1_en(lbuf1_en),                                   // O
         .lbuf1_dn(lbuf1_dn),                                   // I
-        .lbuf2_addr(lbuf1_addr),                               // O [63:0]
-        .lbuf2_av(lbuf1_av),                                   // O
-        .lbuf2_dn(lbuf1_dn)                                    // I
+        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
+        .lbuf2_en(lbuf2_en),                                   // O
+        .lbuf2_dn(lbuf2_dn)                                    // I
         );
 
     //-------------------------------------------------------
-    // sw_wr_back
+    // sw_wrbck
     //-------------------------------------------------------
-    sw_wr_back #(
-        .BARMP(6'b011110)
-    ) sw_wr_back_mod (
+    sw_wrbck #(
+        .BARMP(BARMP_WRBCK)
+    ) sw_wrbck_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN rx
@@ -278,22 +331,22 @@ module rx (
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
-        .sw_pointer(sw_pointer)                                // O [63:0]
+        .sw_ptr(sw_ptr)                                        // O [63:0]
         );
 
     //-------------------------------------------------------
     // irq_gen
     //-------------------------------------------------------
-    assign hst_rdy = lbuf1_av | lbuf2_av;
+    assign hst_rdy = lbuf1_en | lbuf2_en;
 
-    irq_gen irq_gen_mod (
+    rx_irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         .mac_activity(mac_activity),                           // I
-        .hw_pointer(hw_pointer),                               // I [63:0]
-        .sw_pointer(sw_pointer),                               // I [63:0]
         .hst_rdy(hst_rdy),                                     // I
-        .send_interrupt(send_interrupt)                        // O
+        .hw_ptr(hw_ptr),                                       // I [63:0]
+        .sw_ptr(sw_ptr),                                       // I [63:0]
+        .send_irq(send_irq)                                    // O
         );
 
 endmodule // rx

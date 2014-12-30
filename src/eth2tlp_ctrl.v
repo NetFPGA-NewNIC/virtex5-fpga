@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_tlp_trigger.v
+*        eth2tlp_ctrl.v
 *
 *  Project:
 *
@@ -15,8 +15,6 @@
 *        When enough (good) data is in the internal buffer, a TLP is sent.
 *        Ethernet frame boundaries are not taken in consideration.
 *
-*        TODO: 
-*        Fast timeout has to be implemented when sw is ready for it.
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
 *
@@ -47,23 +45,26 @@
 //`default_nettype none
 `include "includes.v"
 
-module rx_tlp_trigger (
+module eth2tlp_ctrl (
 
-    input    clk,
-    input    reset,
+    input                    clk,
+    input                    rst,
 
-    input      [2:0]        cfg_max_payload_size,
+    // CFG
+    input        [2:0]       cfg_max_payload_size,
 
-    // Internal logic
-    input      [`BF:0]      commited_wr_addr,
-    input                   rx_activity,
-    output reg              trigger_tlp,
-    input                   trigger_tlp_ack,
-    output reg              change_huge_page,
-    input                   change_huge_page_ack,
-    output reg              send_numb_qws,
-    input                   send_numb_qws_ack,
-    output reg [5:0]        qwords_to_send
+    // mac2buff
+    input        [`BF:0]     committed_prod,
+    input                    mac_activity,
+
+    // eth2tlp_ctrl
+    output reg               trig_tlp,
+    input                    trig_tlp_ack,
+    output reg               chng_lbuf,
+    input                    chng_lbuf_ack,
+    output reg               send_qws,
+    input                    send_qws_ack,
+    output reg   [5:0]       qw_cnt
     );
 
     // localparam
@@ -90,63 +91,63 @@ module rx_tlp_trigger (
     //-------------------------------------------------------
     // Local timeout-generation
     //-------------------------------------------------------
-    reg     [5:0]        free_running;
-    reg                  timeout;
-    reg                  rx_activity_reg0;
-    reg                  rx_activity_reg1;
+    reg          [5:0]       free_running;
+    reg                      timeout;
+    reg                      mac_activity_reg0;
+    reg                      mac_activity_reg1;
 
     //-------------------------------------------------------
     // Local trigger-logic
     //-------------------------------------------------------
-    reg     [17:0]       trigger_fsm;
-    reg     [`BF:0]      diff;
-    reg     [`BF:0]      diff_reg;
-    reg     [`BF:0]      commited_rd_addr;
-    reg     [`BF:0]      aux_commited_rd_addr;
-    reg                  huge_page_dirty;
-    reg     [18:0]       huge_page_qw_offset;
-    reg     [18:0]       aux0_huge_page_qw_offset;
-    reg     [18:0]       aux1_huge_page_qw_offset;
-    reg     [18:0]       aux_ethframe_endaddr;
-    reg     [3:0]        qwords_remaining;
-    reg     [`BF-4:0]    number_of_tlp_sent;
-    reg     [`BF-4:0]    aux0_number_of_tlp_sent;
-    reg     [`BF-4:0]    aux1_number_of_tlp_sent;
-    reg     [`BF-4:0]    number_of_tlp_to_send;
-    reg     [`BF-3:0]    diff_tlp;
-    reg                  rx_idle;
-    reg                  double_inc;
-    reg                  max_tlp_size256;
-    reg                  aux_max_tlp_size256;
-    reg     [2:0]        cfg_max_payload_size_reg;
+    reg          [17:0]      trigger_fsm;
+    reg          [`BF:0]     diff;
+    reg          [`BF:0]     diff_reg;
+    reg          [`BF:0]     commited_rd_addr;
+    reg          [`BF:0]     aux_commited_rd_addr;
+    reg                      huge_page_dirty;
+    reg          [18:0]      huge_page_qw_offset;
+    reg          [18:0]      aux0_huge_page_qw_offset;
+    reg          [18:0]      aux1_huge_page_qw_offset;
+    reg          [18:0]      aux_ethframe_endaddr;
+    reg          [3:0]       qwords_remaining;
+    reg          [`BF-4:0]   number_of_tlp_sent;
+    reg          [`BF-4:0]   aux0_number_of_tlp_sent;
+    reg          [`BF-4:0]   aux1_number_of_tlp_sent;
+    reg          [`BF-4:0]   number_of_tlp_to_send;
+    reg          [`BF-3:0]   diff_tlp;
+    reg                      rx_idle;
+    reg                      double_inc;
+    reg                      max_tlp_size256;
+    reg                      aux_max_tlp_size256;
+    reg          [2:0]       cfg_max_payload_size_reg;
 
     ////////////////////////////////////////////////
     // timeout logic
     ////////////////////////////////////////////////
     always @(posedge clk) begin
-        if (reset) begin  // reset
+        if (rst) begin  // rst
             timeout <= 1'b0;
-            rx_activity_reg0 <= 1'b0;
-            rx_activity_reg1 <= 1'b0;
+            mac_activity_reg0 <= 1'b0;
+            mac_activity_reg1 <= 1'b0;
             free_running <= 'b0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
 
             timeout <= 1'b0;
             free_running <= 'b0;
 
-            rx_activity_reg0 <= rx_activity;
-            rx_activity_reg1 <= rx_activity_reg0;
+            mac_activity_reg0 <= mac_activity;
+            mac_activity_reg1 <= mac_activity_reg0;
 
-            if (rx_idle && !rx_activity_reg1) begin
+            if (rx_idle && !mac_activity_reg1) begin
                 free_running <= free_running +1;
                 if (free_running == 'h3F) begin
                     timeout <= 1'b1;
                 end
             end
 
-        end     // not reset
+        end     // not rst
     end  //always
 
     ////////////////////////////////////////////////
@@ -154,20 +155,20 @@ module rx_tlp_trigger (
     ////////////////////////////////////////////////
     always @(posedge clk) begin
         
-        if (reset) begin  // reset
-            trigger_tlp <= 1'b0;
-            change_huge_page <= 1'b0;
-            send_numb_qws <= 1'b0;
+        if (rst) begin  // rst
+            trig_tlp <= 1'b0;
+            chng_lbuf <= 1'b0;
+            send_qws <= 1'b0;
 
             rx_idle <= 1'b0;
             trigger_fsm <= s18;
         end
 
-        else begin  // not reset
+        else begin  // not rst
 
             rx_idle <= 1'b0;
 
-            diff <= commited_wr_addr + (~commited_rd_addr) +1;
+            diff <= committed_prod + (~commited_rd_addr) +1;
             diff_tlp <= number_of_tlp_to_send + (~number_of_tlp_sent) +1;
 
             cfg_max_payload_size_reg <= cfg_max_payload_size;
@@ -197,24 +198,24 @@ module rx_tlp_trigger (
                 s1 : begin
                     huge_page_dirty <= 1'b1;
                     number_of_tlp_sent <= 'b0;
-                    qwords_to_send <= 'h10;
+                    qw_cnt <= 'h10;
                     if (aux_ethframe_endaddr[18]) begin       // 2MB
                         trigger_fsm <= s7;
                     end
                     else begin
-                        trigger_tlp <= 1'b1;
+                        trig_tlp <= 1'b1;
                         qwords_remaining <= diff_reg[3:0];
                         trigger_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qwords_to_send;
+                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
                     aux0_number_of_tlp_sent <= number_of_tlp_sent +1;
                     aux1_number_of_tlp_sent <= number_of_tlp_sent +2;
-                    aux0_huge_page_qw_offset <= huge_page_qw_offset + qwords_to_send;
-                    if (trigger_tlp_ack) begin
-                        trigger_tlp <= 1'b0;
+                    aux0_huge_page_qw_offset <= huge_page_qw_offset + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
                         trigger_fsm <= s3;
                     end
                 end
@@ -237,10 +238,10 @@ module rx_tlp_trigger (
                 end
 
                 s5 : begin
-                    qwords_to_send <= 'h20;
+                    qw_cnt <= 'h20;
                     double_inc <= 1'b1;
                     if (diff_tlp > 'h1) begin
-                        trigger_tlp <= 1'b1;
+                        trig_tlp <= 1'b1;
                         trigger_fsm <= s2;
                     end
                     else begin
@@ -250,9 +251,9 @@ module rx_tlp_trigger (
 
                 s6 : begin
                     double_inc <= 1'b0;
-                    qwords_to_send <= 'h10;
+                    qw_cnt <= 'h10;
                     if (diff_tlp) begin
-                        trigger_tlp <= 1'b1;
+                        trig_tlp <= 1'b1;
                         trigger_fsm <= s2;
                     end
                     else begin
@@ -262,12 +263,12 @@ module rx_tlp_trigger (
 
                 s7 : begin
                     if (!qwords_remaining) begin
-                        change_huge_page <= 1'b1;
+                        chng_lbuf <= 1'b1;
                         trigger_fsm <= s8;
                     end
                     else begin
-                        qwords_to_send <= {2'b0, qwords_remaining};
-                        trigger_tlp <= 1'b1;
+                        qw_cnt <= {2'b0, qwords_remaining};
+                        trig_tlp <= 1'b1;
                         trigger_fsm <= s9;
                     end
                 end
@@ -275,17 +276,17 @@ module rx_tlp_trigger (
                 s8 : begin
                     huge_page_dirty <= 1'b0;
                     huge_page_qw_offset <= 'h10;
-                    if (change_huge_page_ack) begin
-                        change_huge_page <= 1'b0;
+                    if (chng_lbuf_ack) begin
+                        chng_lbuf <= 1'b0;
                         trigger_fsm <= s0;
                     end
                 end
 
                 s9 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qwords_to_send;
-                    if (trigger_tlp_ack) begin
-                        trigger_tlp <= 1'b0;
-                        change_huge_page <= 1'b1;
+                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
+                        chng_lbuf <= 1'b1;
                         trigger_fsm <= s10;
                     end
                 end
@@ -295,8 +296,8 @@ module rx_tlp_trigger (
                     huge_page_qw_offset <= 'h10;
                     qwords_remaining <= 'b0;
                     huge_page_dirty <= 1'b0;
-                    if (change_huge_page_ack) begin
-                        change_huge_page <= 1'b0;
+                    if (chng_lbuf_ack) begin
+                        chng_lbuf <= 1'b0;
                         trigger_fsm <= s11;
                     end
                 end
@@ -308,7 +309,7 @@ module rx_tlp_trigger (
 
                 s12 : begin
                     if (!qwords_remaining) begin
-                        send_numb_qws <= 1'b1;
+                        send_qws <= 1'b1;
                         trigger_fsm <= s13;
                     end
                     else begin
@@ -318,16 +319,16 @@ module rx_tlp_trigger (
 
                 s13 : begin
                     huge_page_dirty <= 1'b0;
-                    if (send_numb_qws_ack) begin
-                        send_numb_qws <= 1'b0;
+                    if (send_qws_ack) begin
+                        send_qws <= 1'b0;
                         trigger_fsm <= s0;
                     end
                 end
 
                 s14 : begin
                     aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
-                    qwords_to_send <= {2'b0, qwords_remaining};
-                    trigger_tlp <= 1'b1;
+                    qw_cnt <= {2'b0, qwords_remaining};
+                    trig_tlp <= 1'b1;
                     if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
                         trigger_fsm <= s9;
                     end
@@ -337,10 +338,10 @@ module rx_tlp_trigger (
                 end
 
                 s15 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qwords_to_send;
-                    if (trigger_tlp_ack) begin
-                        trigger_tlp <= 1'b0;
-                        send_numb_qws <= 1'b1;
+                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
+                        send_qws <= 1'b1;
                         trigger_fsm <= s16;
                     end
                 end
@@ -350,16 +351,16 @@ module rx_tlp_trigger (
                     huge_page_qw_offset <= aux1_huge_page_qw_offset;
                     qwords_remaining <= 'b0;
                     huge_page_dirty <= 1'b0;
-                    if (send_numb_qws_ack) begin
-                        send_numb_qws <= 1'b0;
+                    if (send_qws_ack) begin
+                        send_qws <= 1'b0;
                         trigger_fsm <= s11;
                     end
                 end
 
                 s17 : begin
                     aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
-                    qwords_to_send <= diff_reg;
-                    trigger_tlp <= 1'b1;
+                    qw_cnt <= diff_reg;
+                    trig_tlp <= 1'b1;
                     if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
                         trigger_fsm <= s9;
                     end
@@ -368,7 +369,7 @@ module rx_tlp_trigger (
                     end
                 end
 
-                s18 : begin      // simplify reset logic
+                s18 : begin      // simplify rst logic
                     diff <= 'b0;
                     commited_rd_addr <= 'b0;
                     huge_page_qw_offset <= 'h10;
@@ -383,10 +384,10 @@ module rx_tlp_trigger (
 
             endcase
 
-        end     // not reset
+        end     // not rst
     end  //always
 
-endmodule // rx_tlp_trigger
+endmodule // eth2tlp_ctrl
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

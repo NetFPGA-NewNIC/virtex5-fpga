@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_mac_interface.v
+*        mac2buff.v
 *
 *  Project:
 *
@@ -12,10 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Receives ethernet frames from the MAC core and writes it to the
-*        rx internal buffer. If the ethernet CRC (FCS) is invalid, the module
-*        will drop the frame. If the internal buffer is almost full, the module
-*        will drop the current frame.
+*        eth frames 2 internal buff
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -45,35 +42,27 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
-`include "includes.v"
 
-module rx_mac_interface (
+module mac2buff (
 
-    input    clk,
-    input    reset,
+    input                    clk,
+    input                    rst,
 
-    // MAC Rx
-    input    [63:0]      rx_data,
-    input    [7:0]       rx_data_valid,
-    input                rx_good_frame,
-    input                rx_bad_frame,
+    // MAC rx
+    input        [63:0]      mac_rx_data,
+    input        [7:0]       mac_rx_data_valid,
+    input                    mac_rx_good_frame,
+    input                    mac_rx_bad_frame,
 
-    // Internal memory driver
-    output reg    [`BF:0]     wr_addr,
-    output reg    [63:0]      wr_data,
-    
-    // Internal logic
-    output reg                rx_activity,
-    output reg    [`BF:0]     commited_wr_addr,
-    input         [`BF:0]     commited_rd_addr,
+    // buff
+    output reg   [`BF:0]     wr_addr,
+    output reg   [63:0]      wr_data,
 
-    input         [31:0]      sys_nsecs,
-    input         [31:0]      sys_secs,
-    input                     sys_nsecs_update,
-    input                     sys_secs_update,
-    input                     timestamp_en,
-
-    output reg    [15:0]      dropped_pkts
+    // fwd logic
+    output reg               activity,
+    output reg   [`BF:0]     committed_prod,
+    input        [`BF:0]     committed_cons,
+    output reg   [15:0]      dropped_pkts
     );
 
     // localparam
@@ -88,109 +77,38 @@ module rx_mac_interface (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local ethernet frame reception and memory write
+    // Local mac2buff
     //-------------------------------------------------------
-    reg     [7:0]     rx_fsm;
-    reg     [15:0]    byte_counter;
-    reg     [`BF:0]   aux_wr_addr;
-    reg     [`BF:0]   diff;
-    // /*(* KEEP = "TRUE" *)*/reg     [31:0]   dropped_pkts;
-    reg     [31:0]   pkt_nsec;
-    reg     [31:0]   pkt_sec;
-    
-    reg     [7:0]    rx_data_valid_reg;
-    reg              rx_good_frame_reg;
-    reg              rx_bad_frame_reg;
-    reg              timestamp_en_synch0;
-    reg              timestamp_en_synch1;
-
-    //-------------------------------------------------------
-    // Local ts_sec-and-ts_nsec-generation
-    //-------------------------------------------------------
-    reg     [7:0]    time_fsm;
-    reg     [31:0]   ts_sec;
-    reg     [31:0]   ts_nsec;
-    reg     [27:0]   free_running;
-
-    ////////////////////////////////////////////////
-    // ts_sec-and-ts_nsec-generation
-    ////////////////////////////////////////////////
-    always @(posedge clk) begin
-
-        if (reset) begin  // reset
-            timestamp_en_synch0 <= 1'b0;
-            timestamp_en_synch1 <= 1'b0;
-            time_fsm <= s0;
-        end
-        
-        else begin  // not reset
-
-            timestamp_en_synch0 <= timestamp_en;
-            timestamp_en_synch1 <= timestamp_en_synch0;
-
-            case (time_fsm)
-
-                s0 : begin
-                    free_running <= 'b0;
-                    ts_nsec <= 'b0;
-                    ts_sec <= 'b0;
-                    if (timestamp_en_synch1) begin
-                        time_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    ts_nsec <= ts_nsec + 6;
-                    free_running <= free_running +1;
-                    if (free_running == 28'd156250000) begin
-                        free_running <= 'b0;
-                        ts_sec <= ts_sec +1;
-                        ts_nsec <= 'b0;
-                    end
-                    if (sys_nsecs_update) begin
-                        ts_nsec <= sys_nsecs;
-                    end
-                    if (sys_secs_update) begin
-                        ts_sec <= sys_secs;
-                    end
-                    if (!timestamp_en_synch1) begin
-                        time_fsm <= s0;
-                    end
-                end
-
-                default : begin 
-                    time_fsm <= s0;
-                end
-
-            endcase
-
-        end     // not reset
-    end  //always
+    reg          [7:0]       rx_fsm;
+    reg          [15:0]      byte_counter;
+    reg          [`BF:0]     aux_wr_addr;
+    reg          [`BF:0]     diff;
+    reg          [7:0]       rx_data_valid_reg;
+    reg                      rx_good_frame_reg;
+    reg                      rx_bad_frame_reg;
 
     ////////////////////////////////////////////////
     // ethernet frame reception and memory write
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
-        if (reset) begin  // reset
-            commited_wr_addr <= 'b0;
+        if (rst) begin  // rst
+            committed_prod <= 'b0;
             dropped_pkts <= 'b0;
-            rx_activity <= 1'b0;
+            activity <= 1'b0;
             rx_fsm <= s0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
             
-            diff <= aux_wr_addr + (~commited_rd_addr) +1;
-            rx_activity <= 1'b0;
+            diff <= aux_wr_addr + (~committed_cons) +1;
+            activity <= 1'b0;
 
             case (rx_fsm)
 
                 s0 : begin                                  // configure mac core to present preamble and save the packet timestamp while its reception
                     byte_counter <= 'b0;
-                    aux_wr_addr <= commited_wr_addr +1;
-                    pkt_nsec <= ts_nsec;
-                    pkt_sec <= ts_sec;
+                    aux_wr_addr <= committed_prod +1;
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s1;
                     end
@@ -200,7 +118,7 @@ module rx_mac_interface (
                     wr_data <= rx_data;
                     wr_addr <= aux_wr_addr;
                     aux_wr_addr <= aux_wr_addr +1;
-                    rx_activity <= 1'b1;
+                    activity <= 1'b1;
 
                     rx_data_valid_reg <= rx_data_valid;
                     rx_good_frame_reg <= rx_good_frame;
@@ -249,15 +167,13 @@ module rx_mac_interface (
                 end
 
                 s2 : begin
-                    wr_data <= {pkt_sec[0], 15'b0, byte_counter, pkt_nsec};
-                    wr_addr <= commited_wr_addr;
-                    rx_activity <= 1'b1;
+                    wr_data <= {1'b0, 15'b0, byte_counter, 32'b0};
+                    wr_addr <= committed_prod;
+                    activity <= 1'b1;
 
-                    commited_wr_addr <= aux_wr_addr;                      // commit the packet
+                    committed_prod <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;
                     byte_counter <= 'b0;
-                    pkt_nsec <= ts_nsec;
-                    pkt_sec <= ts_sec;
 
                     if (rx_data_valid) begin        // sof (preamble)
                         rx_fsm <= s1;
@@ -279,11 +195,10 @@ module rx_mac_interface (
                 end
 
             endcase
-        end     // not reset
+        end     // not rst
     end  //always
-   
 
-endmodule // rx_mac_interface
+endmodule // mac2buff
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

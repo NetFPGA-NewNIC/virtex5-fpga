@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        synch_type0.v
+*        sync_type0.v
 *
 *  Project:
 *
@@ -43,22 +43,19 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
-`include "includes.v"
 
-module synch_type0 #(
-    parameter W = 32,
-    parameter SENSITIVE_OUTPUT = 0) (
+module sync_type0 # (
+    parameter W = 32
+    ) (
 
-    input    clk_out,                       // freq(clk_out) < freq(clk_in)
-    input    reset_clk_out,
+    input                    clk_out,         // freq(clk_out) < freq(clk_in)
+    input                    rst_out,
 
-    input    clk_in,
-    input    reset_clk_in,
+    input                    clk_in,
+    input                    rst_in,
 
-    input         [W:0]        in,
-    output reg    [W:0]        out,
-
-    output reg                 update
+    input        [W-1:0]     in,
+    output reg   [W-1:0]     out
     );
 
     // localparam
@@ -77,28 +74,28 @@ module synch_type0 #(
     //-------------------------------------------------------
     // Local a
     //-------------------------------------------------------
-    reg     [9:0]     fsm_a;
-    reg     [W:0]     bus_in_last;
-    reg               synch;
-    reg     [W:0]     cross;
+    reg          [9:0]       fsm_a;
+    reg          [W-1:0]     bus_in_last;
+    reg                      sync;
+    reg          [W-1:0]     cross;
 
     //-------------------------------------------------------
     // Local b
     //-------------------------------------------------------
-    reg               synch_reg0;
-    reg               synch_reg1;
+    reg                      sync_reg0;
+    reg                      sync_reg1;
 
     ////////////////////////////////////////////////
     // a
     ////////////////////////////////////////////////
     always @(posedge clk_in) begin
 
-        if (reset_clk_in) begin  // reset
-            synch <= 1'b0;
+        if (rst_in) begin  // rst
+            sync <= 1'b0;
             fsm_a <= s0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
 
             case (fsm_a)
 
@@ -116,14 +113,14 @@ module synch_type0 #(
 
                 s2 : begin
                     bus_in_last <= cross;
-                    synch <= 1'b1;
+                    sync <= 1'b1;
                     fsm_a <= s3;
                 end
 
                 s3 : fsm_a <= s4;
 
                 s4 : begin
-                    synch <= 1'b0;
+                    sync <= 1'b0;
                     fsm_a <= s5;
                 end
 
@@ -139,7 +136,7 @@ module synch_type0 #(
                 end
 
             endcase
-        end     // not reset
+        end     // not rst
     end  //always
 
     ////////////////////////////////////////////////
@@ -147,29 +144,25 @@ module synch_type0 #(
     ////////////////////////////////////////////////
     always @(posedge clk_out) begin
 
-        if (reset_clk_out) begin  // reset
-            synch_reg0 <= 1'b0;
-            synch_reg1 <= 1'b0;
-            update <= 1'b0;
-            if (SENSITIVE_OUTPUT)
-                out <= 'b0;
+        if (rst_out) begin  // rst
+            sync_reg0 <= 1'b0;
+            sync_reg1 <= 1'b0;
+            out <= 'b0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
 
-            synch_reg0 <= synch;
-            synch_reg1 <= synch_reg0;
+            sync_reg0 <= sync;
+            sync_reg1 <= sync_reg0;
 
-            update <= 1'b0;
-
-            if (synch_reg1) begin
-                update <= 1'b1;
+            if (sync_reg1) begin
                 out <= cross;
             end
-        end     // not reset
+
+        end     // not rst
     end  //always
 
-endmodule // synch_type0
+endmodule // sync_type0
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_interrupt_gen.v
+*        rx_irq_gen.v
 *
 *  Project:
 *
@@ -43,18 +43,17 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_interrupt_gen (
+module rx_irq_gen (
 
-    input                   clk,
-    input                   reset,
+    input                    clk,
+    input                    rst,
 
-    input                   rx_activity,
-    input       [63:0]      hw_pointer,
-    input       [63:0]      sw_pointer,
-    input                   huge_page_status_1,
-    input                   huge_page_status_2,
+    input                    mac_activity,
+    input                    hst_rdy,
+    input        [63:0]      hw_ptr,
+    input        [63:0]      sw_ptr,
 
-    output reg              send_interrupt
+    output reg               send_irq
     );
 
     // localparam
@@ -68,53 +67,51 @@ module rx_interrupt_gen (
     localparam s7 = 8'b01000000;
     localparam s8 = 8'b10000000;
 
-    // Local wires and reg
-
     //-------------------------------------------------------
     // Local interrupts_gen
     //-------------------------------------------------------  
-    reg     [7:0]   interrupt_gen_fsm;
-    reg             rx_activity_reg0;
-    reg             rx_activity_reg1;
+    reg          [7:0]       interrupt_gen_fsm;
+    reg                      mac_activity_reg0;
+    reg                      mac_activity_reg1;
 
     ////////////////////////////////////////////////
     // interrupts_gen
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
-        if (reset) begin  // reset
-            rx_activity_reg0 <= 1'b0;
-            rx_activity_reg1 <= 1'b0;
-            send_interrupt <= 1'b0;
+        if (rst) begin  // rst
+            mac_activity_reg0 <= 1'b0;
+            mac_activity_reg1 <= 1'b0;
+            send_irq <= 1'b0;
             interrupt_gen_fsm <= s0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
 
-            rx_activity_reg0 <= rx_activity;
-            rx_activity_reg1 <= rx_activity_reg0;
+            mac_activity_reg0 <= mac_activity;
+            mac_activity_reg1 <= mac_activity_reg0;
 
             case (interrupt_gen_fsm)
 
                 s0 : begin
-                    if (huge_page_status_1 || huge_page_status_2) begin
+                    if (hst_rdy) begin
                         interrupt_gen_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    if (rx_activity_reg1) begin
-                        send_interrupt <= 1'b1;
+                    if (mac_activity_reg1) begin
+                        send_irq <= 1'b1;
                         interrupt_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    if (rx_activity_reg1 || (hw_pointer != sw_pointer)) begin
-                        send_interrupt <= 1'b1;
+                    if (mac_activity_reg1 || (hw_ptr != sw_ptr)) begin
+                        send_irq <= 1'b1;
                     end
                     else begin
-                        send_interrupt <= 1'b0;
+                        send_irq <= 1'b0;
                     end
                 end
 
@@ -123,11 +120,11 @@ module rx_interrupt_gen (
                 end
 
             endcase
-        end     // not reset
+        end     // not rst
     end  //always
    
 
-endmodule // rx_interrupt_gen
+endmodule // rx_irq_gen
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
