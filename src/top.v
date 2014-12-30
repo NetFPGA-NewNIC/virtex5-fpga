@@ -45,7 +45,7 @@
 `include "includes.v"
 
 module top ( 
-    // PCIe //
+    // PCIe
     input                    sys_clk_p,
     input                    sys_clk_n,
     //input                    sys_reset_n,    // MF: no reset available
@@ -176,11 +176,6 @@ module top (
     wire    [15:0]                                    cfg_lstatus_c;
     wire    [15:0]                                    cfg_lcommand_c;
 
-    //-------------------------------------------------------
-    // Local Wires 
-    //-------------------------------------------------------
-    wire                                              reset250;
-    
     //////////////////////////////////////////////////////////////////////////////////////////
     // Reception side of the NIC signal declaration
     //////////////////////////////////////////////////////////////////////////////////////////
