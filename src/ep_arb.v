@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        enpoint_arbitration.v
+*        ep_arb.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between all subsystems.
+*        Arbitrates access to PCIe endpoint between subsystems.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -41,25 +41,33 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
+`include "includes.v"
 
-module enpoint_arbitration (
+module ep_arb (
 
-    input                  trn_clk,
-    input                  reset,
+    input                    clk,
+    input                    rst,
 
-    // Rx
-    output reg             rx_turn,
-    input                  rx_driven,
+    // CHN trn
+    input                    chn_trn,
+    output reg               chn_drvn,
+    output reg               chn_reqep,
+
+    // ARB
 
     // Tx
-    output reg             tx_turn,
-    input                  tx_driven,
+    output reg               tx_trn,
+    input                    tx_drvn,
 
-    output reg             intctrl_turn,
-    input                  intctrl_driven,
-    input                  intctrl_req_ep
+    // Rx
+    output reg               rx_trn,
+    input                    rx_drvn,
 
+    // IRQ
+    output reg               irqctrl_trn,
+    input                    irqctrl_drvn,
+    input                    irqctrl_reqep
     );
 
     // localparam
@@ -74,17 +82,17 @@ module enpoint_arbitration (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local send_tlps_machine
+    // Local ARB
     //-------------------------------------------------------   
-    reg     [7:0]   fsm;
-    reg             turn_bit;
+    reg          [7:0]       fsm;
+    reg                      turn_bit;
 
     ////////////////////////////////////////////////
-    // Arbitration
+    // ARB
     ////////////////////////////////////////////////
-    always @(posedge trn_clk) begin
+    always @(posedge clk) begin
 
-        if (reset) begin  // reset
+        if (rst) begin  // rst
             rx_turn <= 1'b0;
             tx_turn <= 1'b0;
             intctrl_turn <= 1'b0;
@@ -92,12 +100,12 @@ module enpoint_arbitration (
             fsm <= s0;
         end
         
-        else begin  // not reset
+        else begin  // not rst
 
             case (fsm)
 
                 s0 : begin
-                    if ( (!rx_driven) && (!tx_driven) && (!intctrl_driven) ) begin
+                    if ((!rx_driven) && (!tx_driven) && (!intctrl_driven)) begin
                         turn_bit <= ~turn_bit;
                         if (!turn_bit) begin
                             rx_turn <= 1'b1;
@@ -121,7 +129,7 @@ module enpoint_arbitration (
                 end
 
                 s2 : begin
-                    if ( (!rx_driven) && (!tx_driven) ) begin
+                    if ((!rx_driven) && (!tx_driven)) begin
                         intctrl_turn <= 1'b1;
                         fsm <= s3;
                     end
@@ -137,11 +145,10 @@ module enpoint_arbitration (
                 end
 
             endcase
-        end     // not reset
+        end     // not rst
     end  //always
-   
 
-endmodule // enpoint_arbitration
+endmodule // ep_arb
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

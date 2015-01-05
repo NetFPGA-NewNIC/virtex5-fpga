@@ -41,10 +41,11 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 `include "includes.v"
 
 module sw_wrbck # (
+    parameter BARHIT = 2,
     parameter BARMP = 6'bxxxxxx
     ) (
 
@@ -96,7 +97,7 @@ module sw_wrbck # (
             case (tlp_rx_fsm)
 
                 s0 : begin
-                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rbar_hit_n[2])) begin
+                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rbar_hit_n[BARHIT])) begin
                         if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
                             tlp_rx_fsm <= s1;
                         end
@@ -123,15 +124,8 @@ module sw_wrbck # (
                 end
 
                 s2 : begin
-                    sw_ptr_i[7:0] <= aux_dw[31:24];
-                    sw_ptr_i[15:8] <= aux_dw[23:16];
-                    sw_ptr_i[23:16] <= aux_dw[15:8];
-                    sw_ptr_i[31:24] <= aux_dw[7:0];
-
-                    sw_ptr_i[39:32] <= trn_rd[63:56];
-                    sw_ptr_i[47:40] <= trn_rd[55:48];
-                    sw_ptr_i[55:48] <= trn_rd[47:40];
-                    sw_ptr_i[63:56] <= trn_rd[39:32];
+                    sw_ptr_i[31:0] <= dw_endian_conv(aux_dw);
+                    sw_ptr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
@@ -153,15 +147,8 @@ module sw_wrbck # (
                 end
 
                 s4 : begin
-                    sw_ptr_i[7:0]   <= trn_rd[63:56];
-                    sw_ptr_i[15:8]  <= trn_rd[55:48];
-                    sw_ptr_i[23:16] <= trn_rd[47:40];
-                    sw_ptr_i[31:24] <= trn_rd[39:32];
-
-                    sw_ptr_i[39:32] <= trn_rd[31:24];
-                    sw_ptr_i[47:40] <= trn_rd[23:16];
-                    sw_ptr_i[55:48] <= trn_rd[15:8];
-                    sw_ptr_i[63:56] <= trn_rd[7:0];
+                    sw_ptr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
+                    sw_ptr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
                         tlp_rx_fsm <= s0;
                     end

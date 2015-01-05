@@ -43,10 +43,12 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 `include "includes.v"
 
-module buff2tlp (
+module buff2tlp # (
+    parameter BW = 10
+    ) (
 
     input                    clk,
     input                    rst,
@@ -79,10 +81,10 @@ module buff2tlp (
     input        [5:0]       qw_cnt,
 
     // mac2buff
-    output reg   [`BF:0]     committed_cons,
+    output reg   [BW-1:0]    committed_cons,
 
     // buff
-    output reg   [`BF:0]     rd_addr,
+    output reg   [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
     // irq_gen
@@ -143,9 +145,9 @@ module buff2tlp (
     reg          [31:0]      aux_qw_cnt;
     reg          [31:0]      next_qw_cnt;
     reg          [31:0]      look_ahead_lbuf_qw_cnt;
-    reg          [`BF:0]     rd_addr_prev1;
-    reg          [`BF:0]     rd_addr_prev2;
-    reg          [`BF:0]     look_ahead_committed_cons;
+    reg          [BW-1:0]    rd_addr_prev1;
+    reg          [BW-1:0]    rd_addr_prev2;
+    reg          [BW-1:0]    look_ahead_committed_cons;
     reg          [31:0]      aux_rd_data;
     reg                      close_lbuf;
     reg          [15:0]      dropped_pkts_reg;
@@ -295,16 +297,7 @@ module buff2tlp (
                     aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td <= {
-                                rd_data[7:0],
-                                rd_data[15:8],
-                                rd_data[23:16],
-                                rd_data[31:24],
-                                rd_data[39:32],
-                                rd_data[47:40],
-                                rd_data[55:48],
-                                rd_data[63:56]
-                            };
+                        trn_td <= qw_endian_conv(rd_data);
 
                         rd_addr <= rd_addr +1;
 
@@ -386,11 +379,8 @@ module buff2tlp (
                 s12 : begin
                     lbuf_qw_cnt <= {next_qw_cnt[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
-                        trn_td <= {
-                                aux_qw_cnt[7:0],
-                                aux_qw_cnt[15:8],
-                                aux_qw_cnt[23:16],
-                                aux_qw_cnt[31:24],
+                        trn_td[63:32] <= dw_endian_conv(aux_qw_cnt);
+                        trn_td[31:0] <= {
                                 {7'b0, close_lbuf},
                                 dropped_pkts_reg[7:0],
                                 dropped_pkts_reg[15:8],
@@ -484,13 +474,9 @@ module buff2tlp (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td <= {
-                                host_mem_addr[31:0],
-                                rd_data[7:0],
-                                rd_data[15:8],
-                                rd_data[23:16],
-                                rd_data[31:24]
-                            };
+                        trn_td[63:32] <= host_mem_addr[31:0];
+                        trn_td[31:0] <= dw_endian_conv(rd_data[31:0]);
+
                         rd_addr <= rd_addr +1;
                         send_fsm <= s20;
                     end
@@ -520,16 +506,9 @@ module buff2tlp (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         aux_rd_data <= rd_data[63:32];
-                        trn_td <= {
-                                aux_rd_data[7:0],
-                                aux_rd_data[15:8],
-                                aux_rd_data[23:16],
-                                aux_rd_data[31:24],
-                                rd_data[7:0],
-                                rd_data[15:8],
-                                rd_data[23:16],
-                                rd_data[31:24]
-                            };
+                        trn_td[63:32] <= dw_endian_conv(aux_rd_data);
+                        trn_td[31:0] <= dw_endian_conv(rd_data[31:0]);
+
                         rd_addr <= rd_addr +1;
                         tlp_qw_cnt <= tlp_qw_cnt +1;
                         if (tlp_qw_cnt == qw_in_tlp) begin
@@ -601,13 +580,8 @@ module buff2tlp (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         lbuf_dn <= close_lbuf;
-                        trn_td <= {
-                                lbuf_addr[31:0],
-                                aux_qw_cnt[7:0],
-                                aux_qw_cnt[15:8],
-                                aux_qw_cnt[23:16],
-                                aux_qw_cnt[31:24]
-                            };
+                        trn_td[63:32] <= lbuf_addr[31:0];
+                        trn_td[31:0] <= dw_endian_conv(aux_qw_cnt);
                         send_fsm <= s26;
                     end
                 end

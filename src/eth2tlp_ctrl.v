@@ -42,10 +42,11 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
-`include "includes.v"
+`default_nettype none
 
-module eth2tlp_ctrl (
+module eth2tlp_ctrl # (
+    parameter BW = 10
+    ) (
 
     input                    clk,
     input                    rst,
@@ -54,7 +55,7 @@ module eth2tlp_ctrl (
     input        [2:0]       cfg_max_payload_size,
 
     // mac2buff
-    input        [`BF:0]     committed_prod,
+    input        [BW:0]      committed_prod,
     input                    mac_activity,
 
     // eth2tlp_ctrl
@@ -100,21 +101,21 @@ module eth2tlp_ctrl (
     // Local trigger-logic
     //-------------------------------------------------------
     reg          [17:0]      trigger_fsm;
-    reg          [`BF:0]     diff;
-    reg          [`BF:0]     diff_reg;
-    reg          [`BF:0]     commited_rd_addr;
-    reg          [`BF:0]     aux_commited_rd_addr;
+    reg          [Bw:0]     diff;
+    reg          [Bw:0]     diff_reg;
+    reg          [Bw:0]     commited_rd_addr;
+    reg          [Bw:0]     aux_commited_rd_addr;
     reg                      huge_page_dirty;
     reg          [18:0]      huge_page_qw_offset;
     reg          [18:0]      aux0_huge_page_qw_offset;
     reg          [18:0]      aux1_huge_page_qw_offset;
     reg          [18:0]      aux_ethframe_endaddr;
     reg          [3:0]       qwords_remaining;
-    reg          [`BF-4:0]   number_of_tlp_sent;
-    reg          [`BF-4:0]   aux0_number_of_tlp_sent;
-    reg          [`BF-4:0]   aux1_number_of_tlp_sent;
-    reg          [`BF-4:0]   number_of_tlp_to_send;
-    reg          [`BF-3:0]   diff_tlp;
+    reg          [BW-4:0]   number_of_tlp_sent;
+    reg          [BW-4:0]   aux0_number_of_tlp_sent;
+    reg          [BW-4:0]   aux1_number_of_tlp_sent;
+    reg          [BW-4:0]   number_of_tlp_to_send;
+    reg          [BW-3:0]   diff_tlp;
     reg                      rx_idle;
     reg                      double_inc;
     reg                      max_tlp_size256;
@@ -181,7 +182,7 @@ module eth2tlp_ctrl (
                     rx_idle <= 1'b1;
                     aux_ethframe_endaddr <= huge_page_qw_offset + diff;
                     diff_reg <= diff;
-                    number_of_tlp_to_send <= diff[`BF:4];
+                    number_of_tlp_to_send <= diff[BW:4];
                     double_inc <= 1'b0;
 
                     if (diff >= 'h10) begin

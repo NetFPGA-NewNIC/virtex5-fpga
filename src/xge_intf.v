@@ -76,7 +76,7 @@ module xge_intf (
     output                   phy_mdc,
     inout                    phy_mdio,
 
-    // Host conf intf
+    // MDIO conf intf
     output                   host_clk,
     output                   host_reset,
     input        [1:0]       host_opcode,

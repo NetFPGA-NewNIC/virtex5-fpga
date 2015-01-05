@@ -101,10 +101,10 @@ module rx_gv_lbuf (
             case (giv_lbuf_fsm)
 
                 s0 : begin
+                    lbuf_addr <= lbuf1_addr;
+                    lbuf64b <= | lbuf1_addr[63:32];
                     if (lbuf1_en) begin
                         lbuf_en <= 1'b1;
-                        lbuf_addr <= lbuf1_addr;
-                        lbuf64b <= | lbuf1_addr[63:32];
                         giv_lbuf_fsm <= s1;
                     end
                 end
@@ -118,10 +118,10 @@ module rx_gv_lbuf (
                 end
 
                 s2 : begin
+                    lbuf_addr <= lbuf2_addr;
+                    lbuf64b <= | lbuf2_addr[63:32];
                     if (lbuf2_en) begin
                         lbuf_en <= 1'b1;
-                        lbuf_addr <= lbuf2_addr;
-                        lbuf64b <= | lbuf2_addr[63:32];
                         giv_lbuf_fsm <= s3;
                     end
                 end

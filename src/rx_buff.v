@@ -40,12 +40,12 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
-`include "includes.v"
+`default_nettype none
 
 module rx_buff # (
     parameter  AW = 10,
-    parameter  DW = 64) ( 
+    parameter  DW = 64
+    ) ( 
 
     input      [AW-1:0]     a,
     input      [DW-1:0]     d,

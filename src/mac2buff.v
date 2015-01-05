@@ -41,9 +41,11 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 
-module mac2buff (
+module mac2buff # (
+    parameter BW = 10
+    ) (
 
     input                    clk,
     input                    rst,
@@ -55,13 +57,13 @@ module mac2buff (
     input                    mac_rx_bad_frame,
 
     // buff
-    output reg   [`BF:0]     wr_addr,
+    output reg   [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
     // fwd logic
     output reg               activity,
-    output reg   [`BF:0]     committed_prod,
-    input        [`BF:0]     committed_cons,
+    output reg   [BW-1:0]    committed_prod,
+    input        [BW-1:0]    committed_cons,
     output reg   [15:0]      dropped_pkts
     );
 
@@ -76,19 +78,21 @@ module mac2buff (
     localparam s7 = 8'b01000000;
     localparam s8 = 8'b10000000;
 
+    localparam MAX_DIFF = (2**BW) - 6;
+
     //-------------------------------------------------------
     // Local mac2buff
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [15:0]      byte_counter;
-    reg          [`BF:0]     aux_wr_addr;
-    reg          [`BF:0]     diff;
+    reg          [BW-1:0]    aux_wr_addr;
+    reg          [BW-1:0]    diff;
     reg          [7:0]       rx_data_valid_reg;
     reg                      rx_good_frame_reg;
     reg                      rx_bad_frame_reg;
 
     ////////////////////////////////////////////////
-    // ethernet frame reception and memory write
+    // Inbound ethernet frame to buff
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -155,7 +159,7 @@ module mac2buff (
                         end
                     endcase
 
-                    if (diff > `MAX_DIFF) begin         // buffer is more than 90%
+                    if (diff > MAX_DIFF) begin           // buffer is almost full
                         rx_fsm <= s3;
                     end
                     else if (rx_good_frame) begin        // eof (good frame)

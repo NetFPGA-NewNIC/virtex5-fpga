@@ -41,10 +41,10 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
-`include "includes.v"
+`default_nettype none
 
 module rx_lbuf_mgmt # (
+    parameter BARHIT = 2,
     parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
     parameter BARMP_LBUF1_EN = 6'bxxxxxx,
     parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
@@ -93,16 +93,17 @@ module rx_lbuf_mgmt # (
         .lbuf2_en(lbuf2_en),                                   // O
         .lbuf2_dn(lbuf2_dn),                                   // I
         // gv_lbuf
-        .lbuf_addr(lbuf2_addr),                               // O [63:0]
-        .lbuf_en(lbuf2_en),                                   // O
-        .lbuf64b(lbuf64b),                                    // O
-        .lbuf_dn(lbuf2_dn)                                    // I
+        .lbuf_addr(lbuf2_addr),                                // O [63:0]
+        .lbuf_en(lbuf2_en),                                    // O
+        .lbuf64b(lbuf64b),                                     // O
+        .lbuf_dn(lbuf2_dn)                                     // I
         );
 
     //-------------------------------------------------------
     // hst_ctrl
     //-------------------------------------------------------
     rx_hst_ctrl # (
+        .BARHIT(BARHIT),
         .BARMP_LBUF1_ADDR(BARMP_LBUF1_ADDR),
         .BARMP_LBUF1_EN(BARMP_LBUF1_EN),
         .BARMP_LBUF2_ADDR(BARMP_LBUF2_ADDR),

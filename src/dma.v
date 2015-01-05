@@ -41,21 +41,22 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 
 module dma ( 
 
     // PCIe
     input                    sys_clk_p,
     input                    sys_clk_n,
-    //input                    sys_reset_n,                // MF: no reset available
     output       [7:0]       pci_exp_txp,
     output       [7:0]       pci_exp_txn,
     input        [7:0]       pci_exp_rxp,
     input        [7:0]       pci_exp_rxn,
 
-    input                    clk156_25,
-    input                    reset156_25,
+    output                   pcie_rst,
+
+    input                    mac_clk,
+    input                    mac_rst,
 
     // MAC tx
     output                   mac_tx_underrun,
@@ -68,14 +69,19 @@ module dma (
     input        [63:0]      mac_rx_data,
     input        [7:0]       mac_rx_data_valid,
     input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame
+    input                    mac_rx_bad_frame,
 
+    // MDIO conf intf
+    input                    host_clk,
+    input                    host_reset,
+    output       [1:0]       host_opcode,
+    output       [9:0]       host_addr,
+    output       [31:0]      host_wr_data,
+    input        [31:0]      host_rd_data,
+    output                   host_miim_sel,
+    output                   host_req,
+    input                    host_miim_rdy
     );
-
-    //-------------------------------------------------------
-    // Local pcie_endpoint_reset 
-    //-------------------------------------------------------
-    wire                     reset250;
 
     //-------------------------------------------------------
     // Local PCIe ep
@@ -155,18 +161,32 @@ module dma (
     wire         [63:0]      cfg_dsn_n_c;
 
     //-------------------------------------------------------
+    // EP arb
+    //-------------------------------------------------------
+    wire                     chn0_trn;
+    wire                     chn0_drvn;
+    wire                     chn0_reqep;
+
+    //-------------------------------------------------------
+    // Local CHN0
+    //-------------------------------------------------------
+    wire         [15:0]      cfg_completer_id;
+    wire         [2:0]       cfg_max_rd_req_size;
+    wire         [2:0]       cfg_max_payload_size;
+
+    //-------------------------------------------------------
     // Virtex5-FX Global Clock Buffer
     //-------------------------------------------------------
     IBUFDS refclk_ibuf (.O(sys_clk_c), .I(sys_clk_p), .IB(sys_clk_n));  // 100 MHz
 
     //-------------------------------------------------------
-    // pcie_endpoint_reset
+    // ep_rst
     //-------------------------------------------------------
-    pcie_endpoint_reset pcie_endpoint_reset_mod (
+    ep_rst ep_rst_mod (
         .clk250(trn_clk_c),                                    // I
         .trn_reset_n(trn_reset_n_c),                           // I
         .trn_lnk_up_n(trn_lnk_up_n_c),                         // I
-        .reset250(reset250)                                    // O
+        .rst250(pcie_rst)                                      // O
         );
 
     //-------------------------------------------------------
@@ -284,6 +304,94 @@ module dma (
         `else
         .fast_train_simulation_only(1'b0)
         `endif
+        );
+
+    //-------------------------------------------------------
+    // CHN0
+    //-------------------------------------------------------
+    chn #(
+        .BARHIT(2)
+    ) chn0 (
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        .pcie_clk(trn_clk_c),                                  // I
+        .pcie_rst(pcie_rst),                                   // I
+        // MAC tx
+        .mac_tx_underrun(mac_tx_underrun),                     // O
+        .mac_tx_data(mac_tx_data),                             // O [63:0]
+        .mac_tx_data_valid(mac_tx_data_valid),                 // O [7:0]
+        .mac_tx_start(mac_tx_start),                           // O
+        .mac_tx_ack(mac_tx_ack),                               // I
+        // MAC rx
+        .mac_rx_data(mac_rx_data),                             // O [63:0]
+        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
+        .mac_rx_good_frame(mac_rx_good_frame),                 // O
+        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // TRN tx
+        .trn_td(rx_trn_td),                                    // O [63:0]
+        .trn_trem_n(rx_trn_trem_n),                            // O [7:0]
+        .trn_tsof_n(rx_trn_tsof_n),                            // O
+        .trn_teof_n(rx_trn_teof_n),                            // O
+        .trn_tsrc_rdy_n(rx_trn_tsrc_rdy_n),                    // O
+        .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
+        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
+        // TRN rx
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rerrfwd_n(trn_rerrfwd_n),                         // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        // CFG
+        .cfg_interrupt_n(cfg_interrupt_n_c),                   // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n_c),           // I
+        .cfg_bus_number(cfg_bus_number_c),                     // I [7:0]
+        .cfg_device_number(cfg_device_number_c),               // I [4:0]
+        .cfg_function_number(cfg_function_number_c),           // I [2:0]
+        .cfg_dcommand(cfg_dcommand_c),                         // I [15:0]
+        // EP arb
+        .chn_trn(chn0_trn),                                    // I
+        .chn_drvn(chn0_drvn),                                  // O
+        .chn_reqep(chn0_reqep)                                 // O
+        );
+
+    //-------------------------------------------------------
+    // MDIOCONF
+    //-------------------------------------------------------
+    mdioconf mdioconf_mod (
+        // PCIe
+        .sys_clk_p(sys_clk_p),                                 // I
+        .sys_clk_n(sys_clk_n),                                 // I
+        .pci_exp_txp(pci_exp_txp),                             // O [7:0]
+        .pci_exp_txn(pci_exp_txn),                             // O [7:0]
+        .pci_exp_rxp(pci_exp_rxp),                             // I [7:0]
+        .pci_exp_rxn(pci_exp_rxn),                             // I [7:0]
+        .pcie_rst(pcie_rst),                                   // O
+        // xge_intf
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        // MAC tx
+        .mac_tx_underrun(mac_tx_underrun),                     // O
+        .mac_tx_data(mac_tx_data),                             // O [63:0]
+        .mac_tx_data_valid(mac_tx_data_valid),                 // O [7:0]
+        .mac_tx_start(mac_tx_start),                           // O
+        .mac_tx_ack(mac_tx_ack),                               // I
+        // MAC rx
+        .mac_rx_data(mac_rx_data),                             // O [63:0]
+        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
+        .mac_rx_good_frame(mac_rx_good_frame),                 // O
+        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // Host Conf Intf
+        .host_clk(mac_host_clk),                               // I
+        .host_reset(mac_host_reset),                           // I
+        .host_opcode(mac_host_opcode),                         // O [1:0]
+        .host_addr(mac_host_addr),                             // O [9:0]
+        .host_wr_data(mac_host_wr_data),                       // O [31:0]
+        .host_rd_data(mac_host_rd_data),                       // I [31:0]
+        .host_miim_sel(mac_host_miim_sel),                     // O
+        .host_req(mac_host_req),                               // O
+        .host_miim_rdy(mac_host_miim_rdy)                      // I
         );
 
 endmodule // dma

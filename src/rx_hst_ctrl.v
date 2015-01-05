@@ -41,10 +41,11 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 `include "includes.v"
 
 module rx_hst_ctrl # (
+    parameter BARHIT = 2,
     parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
     parameter BARMP_LBUF1_EN = 6'bxxxxxx,
     parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
@@ -84,7 +85,7 @@ module rx_hst_ctrl # (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local TLP reception
+    // Local Rx TLP
     //-------------------------------------------------------
     reg          [7:0]       tlp_rx_fsm;
     reg                      lbuf1_en_i;
@@ -94,7 +95,7 @@ module rx_hst_ctrl # (
     reg          [63:0]      lbuf2_addr_i;
 
     ////////////////////////////////////////////////
-    // huge_page_status
+    // Output driver
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -118,7 +119,7 @@ module rx_hst_ctrl # (
     end  //always
 
     ////////////////////////////////////////////////
-    // huge_page_address and unlock TLP reception
+    // Rx TLP
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -139,7 +140,7 @@ module rx_hst_ctrl # (
             case (tlp_rx_fsm)
 
                 s0 : begin
-                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rbar_hit_n[2])) begin
+                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n) && (!trn_rbar_hit_n[BARHIT])) begin
                         if (trn_rd[62:56] == `MEM_WR32_FMT_TYPE) begin
                             tlp_rx_fsm <= s1;
                         end
@@ -180,30 +181,16 @@ module rx_hst_ctrl # (
                 end
 
                 s2 : begin
-                    lbuf1_addr_i[7:0] <= aux_dw[31:24];
-                    lbuf1_addr_i[15:8] <= aux_dw[23:16];
-                    lbuf1_addr_i[23:16] <= aux_dw[15:8];
-                    lbuf1_addr_i[31:24] <= aux_dw[7:0];
-
-                    lbuf1_addr_i[39:32] <= trn_rd[63:56];
-                    lbuf1_addr_i[47:40] <= trn_rd[55:48];
-                    lbuf1_addr_i[55:48] <= trn_rd[47:40];
-                    lbuf1_addr_i[63:56] <= trn_rd[39:32];
+                    lbuf1_addr_i[31:0] <= dw_endian_conv(aux_dw);
+                    lbuf1_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
                 end
 
                 s3 : begin
-                    lbuf2_addr_i[7:0] <= aux_dw[31:24];
-                    lbuf2_addr_i[15:8] <= aux_dw[23:16];
-                    lbuf2_addr_i[23:16] <= aux_dw[15:8];
-                    lbuf2_addr_i[31:24] <= aux_dw[7:0];
-
-                    lbuf2_addr_i[39:32] <= trn_rd[63:56];
-                    lbuf2_addr_i[47:40] <= trn_rd[55:48];
-                    lbuf2_addr_i[55:48] <= trn_rd[47:40];
-                    lbuf2_addr_i[63:56] <= trn_rd[39:32];
+                    lbuf2_addr_i[31:0] <= dw_endian_conv(aux_dw);
+                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
@@ -239,30 +226,16 @@ module rx_hst_ctrl # (
                 end
 
                 s5 : begin
-                    lbuf1_addr_i[7:0]   <= trn_rd[63:56];
-                    lbuf1_addr_i[15:8]  <= trn_rd[55:48];
-                    lbuf1_addr_i[23:16] <= trn_rd[47:40];
-                    lbuf1_addr_i[31:24] <= trn_rd[39:32];
-
-                    lbuf1_addr_i[39:32] <= trn_rd[31:24];
-                    lbuf1_addr_i[47:40] <= trn_rd[23:16];
-                    lbuf1_addr_i[55:48] <= trn_rd[15:8];
-                    lbuf1_addr_i[63:56] <= trn_rd[7:0];
+                    lbuf1_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
+                    lbuf1_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
                 end
 
                 s6 : begin
-                    lbuf2_addr_i[7:0]   <= trn_rd[63:56];
-                    lbuf2_addr_i[15:8]  <= trn_rd[55:48];
-                    lbuf2_addr_i[23:16] <= trn_rd[47:40];
-                    lbuf2_addr_i[31:24] <= trn_rd[39:32];
-
-                    lbuf2_addr_i[39:32] <= trn_rd[31:24];
-                    lbuf2_addr_i[47:40] <= trn_rd[23:16];
-                    lbuf2_addr_i[55:48] <= trn_rd[15:8];
-                    lbuf2_addr_i[63:56] <= trn_rd[7:0];
+                    lbuf2_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
+                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end

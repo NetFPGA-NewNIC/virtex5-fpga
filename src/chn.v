@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        channel.v
+*        chn.v
 *
 *  Project:
 *
@@ -41,15 +41,17 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-//`default_nettype none
+`default_nettype none
 
-module channel ( 
+module chn # ( 
+    parameter BARHIT = 2
+    ) (
 
-    input                    clk156_25,
-    input                    rst156_25,
+    input                    mac_clk,
+    input                    mac_rst,
 
-    input                    clk250,
-    input                    rst250,
+    input                    pcie_clk,
+    input                    pcie_rst,
 
     // MAC tx
     output                   mac_tx_underrun,
@@ -156,14 +158,15 @@ module channel (
     // Tx
     //-------------------------------------------------------
     tx #(
+        .BARHIT(BARHIT),
         .BARMP_LBUF1(6'bxxxxxx),
         .BARMP_LBUF2(6'bxxxxxx),
         .BARMP_WRBCK()
     ) tx_mod (
-        .mac_clk(clk156_25),                                   // I
-        .mac_rst(rst156_25),                                   // I
-        .pcie_clk(clk250),                                     // I
-        .pcie_rst(rst250),                                     // I
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        .pcie_clk(pcie_clk),                                   // I
+        .pcie_rst(pcie_rst),                                   // I
         // MAC tx
         .mac_tx_underrun(mac_tx_underrun),                     // I
         .mac_tx_data(mac_tx_data),                             // I [63:0]
@@ -199,16 +202,17 @@ module channel (
     // Rx
     //-------------------------------------------------------
     rx #(
+        .BARHIT(BARHIT),
         .BARMP_LBUF1_ADDR(6'b010000),
         .BARMP_LBUF1_EN  (6'b011000),
         .BARMP_LBUF2_ADDR(6'b010010),
         .BARMP_LBUF2_EN  (6'b011001),
-        .BARMP_WRBCK()
+        .BARMP_WRBCK     (6'b011110)
     ) rx_mod (
-        .mac_clk(clk156_25),                                   // I
-        .mac_rst(rst156_25),                                   // I
-        .pcie_clk(clk250),                                     // I
-        .pcie_rst(rst250),                                     // I
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        .pcie_clk(pcie_clk),                                   // I
+        .pcie_rst(pcie_rst),                                   // I
         // MAC rx
         .mac_rx_data(mac_rx_data),                             // O [63:0]
         .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
@@ -245,8 +249,8 @@ module channel (
     assign send_irq = tx_send_irq | rx_send_irq;
 
     irq_ctrl irq_ctrl_mod (
-        .clk(clk250),                                          // I
-        .rst(rst250),                                          // I
+        .clk(pcie_clk),                                        // I
+        .rst(pcie_rst),                                        // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
         .trn_rrem_n(trn_rrem),                                 // I [7:0]
@@ -271,8 +275,8 @@ module channel (
     // EP arb
     //-------------------------------------------------------
     ep_arb ep_arb_mod (
-        .clk(clk250),                                          // I
-        .rst(rst250),                                          // I
+        .clk(pcie_clk),                                        // I
+        .rst(pcie_rst),                                        // I
         // CHN trn
         .chn_trn(chn_trn),                                     // I
         .chn_drvn(chn_drvn),                                   // O
@@ -287,7 +291,7 @@ module channel (
         .irqctrl_reqep(irqctrl_reqep)                          // I
         );
 
-endmodule // channel
+endmodule // chn
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

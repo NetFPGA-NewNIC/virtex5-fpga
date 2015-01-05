@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        pcie_endpoint_reset.v
+*        ep_rst.v
 *
 *  Project:
 *
@@ -44,12 +44,12 @@
 //`default_nettype none
 `include "includes.v"
 
-module pcie_endpoint_reset (
+module ep_rst (
 
-    input                     clk250,
-    input                     trn_reset_n,
-    input                     trn_lnk_up_n,
-    output reg                reset250
+    input                    clk250,
+    input                    trn_reset_n,
+    input                    trn_lnk_up_n,
+    output reg               rst250
     );
 
     // localparam
@@ -73,7 +73,7 @@ module pcie_endpoint_reset (
     //-------------------------------------------------------
     // Local reset
     //-------------------------------------------------------
-    reg     [14:0]   reset_fsm = 'b0;
+    reg          [14:0]      reset_fsm = 'b0;
 
     ////////////////////////////////////////////////
     // reset
@@ -89,7 +89,7 @@ module pcie_endpoint_reset (
             case (reset_fsm)
 
                 s0 : begin
-                    reset250 <= 1'b1;
+                    rst250 <= 1'b1;
                     reset_fsm <= s1;
                 end
 
@@ -105,7 +105,7 @@ module pcie_endpoint_reset (
                 end
 
                 s6 : begin
-                    reset250 <= 1'b0;
+                    rst250 <= 1'b0;
                     reset_fsm <= s7;
                 end
 
@@ -123,7 +123,7 @@ module pcie_endpoint_reset (
         end     // not reset
     end  //always
 
-endmodule // pcie_endpoint_reset
+endmodule // ep_rst
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
