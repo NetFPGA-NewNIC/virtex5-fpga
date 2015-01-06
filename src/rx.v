@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module rx # (
     // BAR MAPPING
@@ -139,7 +139,7 @@ module rx # (
     //-------------------------------------------------------
     // Local buff2tlp
     //-------------------------------------------------------
-    wire         [BW:0]      committed_cons;
+    wire         [BW-1:0]    committed_cons;
 
     //-------------------------------------------------------
     // Local lbuf_mgmt
@@ -252,11 +252,11 @@ module rx # (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN tx
-        .trn_td(rx_trn_td),                                    // O [63:0]
-        .trn_trem_n(rx_trn_trem_n),                            // O [7:0]
-        .trn_tsof_n(rx_trn_tsof_n),                            // O
-        .trn_teof_n(rx_trn_teof_n),                            // O
-        .trn_tsrc_rdy_n(rx_trn_tsrc_rdy_n),                    // O
+        .trn_td(trn_td),                                       // O [63:0]
+        .trn_trem_n(trn_trem_n),                               // O [7:0]
+        .trn_tsof_n(trn_tsof_n),                               // O
+        .trn_teof_n(trn_teof_n),                               // O
+        .trn_tsrc_rdy_n(trn_tsrc_rdy_n),                       // O
         .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
         .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         // CFG
@@ -302,7 +302,7 @@ module rx # (
         .rst(pcie_rst),                                        // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
@@ -324,7 +324,7 @@ module rx # (
         .rst(pcie_rst),                                        // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I

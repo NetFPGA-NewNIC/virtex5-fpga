@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module mdioconf # (
     parameter BARHIT = 0,
@@ -123,7 +123,7 @@ module mdioconf # (
         .rst(pcie_rst),                                        // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I

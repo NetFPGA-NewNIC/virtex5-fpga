@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module chn # ( 
     parameter BARHIT = 2,
@@ -173,55 +173,55 @@ module chn # (
 
     assign send_irq = tx_send_irq | rx_send_irq;
 
-    //-------------------------------------------------------
-    // Tx
-    //-------------------------------------------------------
-    tx #(
-        // BAR MAPPING
-        .BARHIT(BARHIT),
-        .BARMP_LBUF1_ADDR(TX_BARMP_LBUF1_ADDR),
-        .BARMP_LBUF1_EN(TX_BARMP_LBUF1_EN),
-        .BARMP_LBUF2_ADDR(TX_BARMP_LBUF2_ADDR),
-        .BARMP_LBUF2_EN(TX_BARMP_LBUF2_EN),
-        .BARMP_CPL_BUFF(TX_BARMP_CPL_BUFF),
-        .BARMP_WRBCK(TX_BARMP_WRBCK),
-        // MISC
-        .BW(9)
-    ) tx_mod (
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
-        .pcie_clk(pcie_clk),                                   // I
-        .pcie_rst(pcie_rst),                                   // I
-        // MAC tx
-        .mac_tx_underrun(mac_tx_underrun),                     // I
-        .mac_tx_data(mac_tx_data),                             // I [63:0]
-        .mac_tx_data_valid(mac_tx_data_valid),                 // I [7:0]
-        .mac_tx_start(mac_tx_start),                           // I
-        .mac_tx_ack(mac_tx_ack),                               // O
-        // TRN tx
-        .trn_td(tx_trn_td),                                    // O [63:0]
-        .trn_trem_n(tx_trn_trem_n),                            // O [7:0]
-        .trn_tsof_n(tx_trn_tsof_n),                            // O
-        .trn_teof_n(tx_trn_teof_n),                            // O
-        .trn_tsrc_rdy_n(tx_trn_tsrc_rdy_n),                    // O
-        .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
-        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
-        // TRN rx
-        .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
-        .trn_rsof_n(trn_rsof_n),                               // I
-        .trn_reof_n(trn_reof_n),                               // I
-        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
-        .trn_rerrfwd_n(trn_rerrfwd_n),                         // I
-        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
-        // CFG
-        .cfg_completer_id(cfg_completer_id),                   // I [15:0]
-        .cfg_max_rd_req_size(cfg_max_rd_req_size),             // I [2:0]
-        .send_irq(tx_send_irq),                                // O
-        // EP arb
-        .my_trn(tx_trn),                                       // I
-        .drv_ep(tx_drvn)                                       // O
-        );
+    ////-------------------------------------------------------
+    //// Tx
+    ////-------------------------------------------------------
+    //tx #(
+    //    // BAR MAPPING
+    //    .BARHIT(BARHIT),
+    //    .BARMP_LBUF1_ADDR(TX_BARMP_LBUF1_ADDR),
+    //    .BARMP_LBUF1_EN(TX_BARMP_LBUF1_EN),
+    //    .BARMP_LBUF2_ADDR(TX_BARMP_LBUF2_ADDR),
+    //    .BARMP_LBUF2_EN(TX_BARMP_LBUF2_EN),
+    //    .BARMP_CPL_BUFF(TX_BARMP_CPL_BUFF),
+    //    .BARMP_WRBCK(TX_BARMP_WRBCK),
+    //    // MISC
+    //    .BW(9)
+    //) tx_mod (
+    //    .mac_clk(mac_clk),                                     // I
+    //    .mac_rst(mac_rst),                                     // I
+    //    .pcie_clk(pcie_clk),                                   // I
+    //    .pcie_rst(pcie_rst),                                   // I
+    //    // MAC tx
+    //    .mac_tx_underrun(mac_tx_underrun),                     // I
+    //    .mac_tx_data(mac_tx_data),                             // I [63:0]
+    //    .mac_tx_data_valid(mac_tx_data_valid),                 // I [7:0]
+    //    .mac_tx_start(mac_tx_start),                           // I
+    //    .mac_tx_ack(mac_tx_ack),                               // O
+    //    // TRN tx
+    //    .trn_td(tx_trn_td),                                    // O [63:0]
+    //    .trn_trem_n(tx_trn_trem_n),                            // O [7:0]
+    //    .trn_tsof_n(tx_trn_tsof_n),                            // O
+    //    .trn_teof_n(tx_trn_teof_n),                            // O
+    //    .trn_tsrc_rdy_n(tx_trn_tsrc_rdy_n),                    // O
+    //    .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
+    //    .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
+    //    // TRN rx
+    //    .trn_rd(trn_rd),                                       // I [63:0]
+    //    .trn_rrem_n(trn_rrem_n),                               // I [7:0]
+    //    .trn_rsof_n(trn_rsof_n),                               // I
+    //    .trn_reof_n(trn_reof_n),                               // I
+    //    .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+    //    .trn_rerrfwd_n(trn_rerrfwd_n),                         // I
+    //    .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+    //    // CFG
+    //    .cfg_completer_id(cfg_completer_id),                   // I [15:0]
+    //    .cfg_max_rd_req_size(cfg_max_rd_req_size),             // I [2:0]
+    //    .send_irq(tx_send_irq),                                // O
+    //    // EP arb
+    //    .my_trn(tx_trn),                                       // I
+    //    .drv_ep(tx_drvn)                                       // O
+    //    );
 
     //-------------------------------------------------------
     // Rx
@@ -284,14 +284,11 @@ module chn # (
         .rst(pcie_rst),                                        // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
-        .trn_rsrc_dsc_n(trn_rsrc_dsc_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
-        .trn_rdst_rdy_n(trn_rdst_rdy_n),                       // I
-        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         // CFG
         .cfg_interrupt_n(cfg_interrupt_n),                     // O
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I

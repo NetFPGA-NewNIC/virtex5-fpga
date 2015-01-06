@@ -49,15 +49,18 @@
 function [31:0] dw_endian_conv (
     input        [31:0]      dw
     );
+begin
     dw_endian_conv[7:0]   = dw[31:24];
     dw_endian_conv[15:8]  = dw[23:16];
     dw_endian_conv[23:16] = dw[15:8];
     dw_endian_conv[31:24] = dw[7:0];
+end
 endfunction
 
 function [63:0] qw_endian_conv (
     input        [63:0]      qw
     );
+begin
     qw_endian_conv[7:0]   = qw[63:56];
     qw_endian_conv[15:8]  = qw[55:48];
     qw_endian_conv[23:16] = qw[47:40];
@@ -66,4 +69,5 @@ function [63:0] qw_endian_conv (
     qw_endian_conv[47:40] = qw[23:16];
     qw_endian_conv[55:48] = qw[15:8];
     qw_endian_conv[63:56] = qw[7:0];
+end
 endfunction

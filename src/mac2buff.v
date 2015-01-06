@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module mac2buff # (
     parameter BW = 10
@@ -51,10 +51,10 @@ module mac2buff # (
     input                    rst,
 
     // MAC rx
-    input        [63:0]      mac_rx_data,
-    input        [7:0]       mac_rx_data_valid,
-    input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame,
+    input        [63:0]      rx_data,
+    input        [7:0]       rx_data_valid,
+    input                    rx_good_frame,
+    input                    rx_bad_frame,
 
     // buff
     output reg   [BW-1:0]    wr_addr,

@@ -41,8 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
-`include "includes.v"
+//`default_nettype none
 
 module irq_hst_ctrl # (
     parameter BARHIT = 2,
@@ -68,6 +67,7 @@ module irq_hst_ctrl # (
     output reg   [31:0]      irq_thr
     );
 
+    `include "includes.v"
     // localparam
     localparam s0 = 8'b00000000;
     localparam s1 = 8'b00000001;

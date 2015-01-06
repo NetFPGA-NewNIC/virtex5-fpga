@@ -41,8 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
-`include "includes.v"
+//`default_nettype none
 
 module rx_hst_ctrl # (
     parameter BARHIT = 2,
@@ -73,6 +72,7 @@ module rx_hst_ctrl # (
     input                    lbuf2_dn
     );
 
+    `include "includes.v"
     // localparam
     localparam s0 = 8'b00000000;
     localparam s1 = 8'b00000001;

@@ -29,20 +29,20 @@ NET "usr_100MHz"      LOC = "AN25"  | IOSTANDARD = LVCMOS33;        # 100MHZ clk
 
 NET  "sys_clk_p"       LOC = "AT4"  ;
 NET  "sys_clk_n"       LOC = "AT3"  ;
-INST "refclk_ibuf"     DIFF_TERM = "TRUE" ;
+INST "dma_mod/refclk_ibuf"     DIFF_TERM = "TRUE" ;
 
 # refclk for Port XAUI D
 NET "refclk_D_p"  LOC = "D27" ;
 NET "refclk_D_n"  LOC = "C27" ;
 
 # PCIe Lanes 0, 1
-INST "ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[0].GT_i" LOC = GTX_DUAL_X1Y5;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[0].GT_i" LOC = GTX_DUAL_X1Y5;
 # PCIe Lanes 2, 3
-INST "ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[2].GT_i" LOC = GTX_DUAL_X1Y4;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[2].GT_i" LOC = GTX_DUAL_X1Y4;
 # PCIe Lanes 4, 5
-INST "ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[4].GT_i" LOC = GTX_DUAL_X1Y3;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[4].GT_i" LOC = GTX_DUAL_X1Y3;
 # PCIe Lanes 6, 7
-INST "ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[6].GT_i" LOC = GTX_DUAL_X1Y2;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/GTD[6].GT_i" LOC = GTX_DUAL_X1Y2;
 
 # XAUI D
 INST xge_intf_d/xaui_mod/xaui_block/rocketio_wrapper_i/tile0_xaui_v10_4_rocketio_wrapper_i/gtx_dual_i LOC=GTX_DUAL_X0Y11;
@@ -57,20 +57,20 @@ NET "ael2005_mdio"            LOC = "AL20" | IOSTANDARD = LVCMOS33;
 ###############################################################################
 
 # Xilinx PCIe endpoint BlockRAM placement
-INST "ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_retry/generate_sdp.ram_sdp_inst"      LOC = RAMB36_X5Y20;
-INST "ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_tx/generate_tdp2[1].ram_tdp2_inst" LOC = RAMB36_X5Y19;
-INST "ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_rx/generate_tdp2[1].ram_tdp2_inst" LOC = RAMB36_X5Y18;
-INST "ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_tx/generate_tdp2[0].ram_tdp2_inst" LOC = RAMB36_X5Y17;
-INST "ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_rx/generate_tdp2[0].ram_tdp2_inst" LOC = RAMB36_X5Y16;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_retry/generate_sdp.ram_sdp_inst"      LOC = RAMB36_X5Y20;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_tx/generate_tdp2[1].ram_tdp2_inst" LOC = RAMB36_X5Y19;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_rx/generate_tdp2[1].ram_tdp2_inst" LOC = RAMB36_X5Y18;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_tx/generate_tdp2[0].ram_tdp2_inst" LOC = RAMB36_X5Y17;
+INST "dma_mod/ep/pcie_ep0/pcie_blk/pcie_mim_wrapper_i/bram_tl_rx/generate_tdp2[0].ram_tdp2_inst" LOC = RAMB36_X5Y16;
 
 ###############################################################################
 # Timing Constraints
 ###############################################################################
 
 # Timing requirements and related constraints.
-NET "sys_clk_c"                                      PERIOD = 10ns;
+NET "dma_mod/sys_clk_c"                                      PERIOD = 10ns;
 
-NET "ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/gt_refclk_out[0]" TNM_NET = "MGTCLK" ;
+NET "dma_mod/ep/pcie_ep0/pcie_blk/SIO/.pcie_gt_wrapper_i/gt_refclk_out[0]" TNM_NET = "MGTCLK" ;
 
 TIMESPEC "TS_MGTCLK"  = PERIOD "MGTCLK" 100.00 MHz HIGH 50 % ;
 

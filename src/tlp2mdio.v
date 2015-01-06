@@ -41,8 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
-`include "includes.v"
+//`default_nettype none
 
 module tlp2mdio # (
     parameter BARHIT = 2,
@@ -65,6 +64,7 @@ module tlp2mdio # (
     output reg               acc_en
     );
 
+    `include "includes.v"
     // localparam
     localparam s0 = 8'b00000000;
     localparam s1 = 8'b00000001;

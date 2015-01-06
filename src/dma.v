@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module dma ( 
 
@@ -210,7 +210,7 @@ module dma (
     assign cfg_dsn_n_c = {32'h00000001,  {{8'h1},24'h000A35}};
     assign cfg_err_cor_n_c = 1'b1;
     assign cfg_err_ur_n_c = 1'b1;
-    assign cfg_err_ecrc_n = 1'b1;
+    assign cfg_err_ecrc_n_c = 1'b1;
     assign cfg_err_cpl_timeout_n_c = 1'b1;
     assign cfg_err_cpl_abort_n_c = 1'b1;
     assign cfg_err_cpl_unexpect_n_c = 1'b1;
@@ -385,7 +385,7 @@ module dma (
     //-------------------------------------------------------
     mdioconf #(
         .BARHIT(0),
-        .BARMP_WRREG(6'b000100),
+        .BARMP_WRREG(6'b000100)
     ) mdioconf_mod (
         .mac_rst(mac_rst),                                     // I
         .pcie_clk(trn_clk_c),                                  // I

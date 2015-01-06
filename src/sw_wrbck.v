@@ -41,8 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
-`include "includes.v"
+//`default_nettype none
 
 module sw_wrbck # (
     parameter BARHIT = 2,
@@ -63,6 +62,7 @@ module sw_wrbck # (
     output reg   [63:0]      sw_ptr
     );
 
+    `include "includes.v"
     // localparam
     localparam s0 = 8'b00000000;
     localparam s1 = 8'b00000001;
@@ -92,7 +92,7 @@ module sw_wrbck # (
         
         else begin  // not rst
 
-            sw_pointer <= sw_ptr_i;
+            sw_ptr <= sw_ptr_i;
 
             case (tlp_rx_fsm)
 
@@ -149,7 +149,7 @@ module sw_wrbck # (
                 s4 : begin
                     sw_ptr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
                     sw_ptr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
-                    if ( (!trn_rsrc_rdy_n) && (!trn_rdst_rdy_n)) begin
+                    if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
                 end

@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module irq # (
     parameter BARHIT = 2,
@@ -63,15 +63,15 @@ module irq # (
     input        [6:0]       trn_rbar_hit_n,
 
     // CFG
-    output reg               cfg_interrupt_n,
+    output                   cfg_interrupt_n,
     input                    cfg_interrupt_rdy_n,
     input        [3:0]       trn_tbuf_av,
     input                    send_irq,
 
     // EP arb
     input                    my_trn,
-    output reg               drv_ep,
-    output reg               req_ep
+    output                   drv_ep,
+    output                   req_ep
     );
 
     //-------------------------------------------------------
@@ -115,7 +115,7 @@ module irq # (
         .rst(rst),                                             // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I

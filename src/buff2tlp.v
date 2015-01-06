@@ -43,8 +43,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
-`include "includes.v"
+//`default_nettype none
 
 module buff2tlp # (
     parameter BW = 10
@@ -98,6 +97,7 @@ module buff2tlp # (
     input        [15:0]      dropped_pkts
     );
 
+    `include "includes.v"
     // localparam
     localparam s0  = 28'b0000000000000000000000000000;
     localparam s1  = 28'b0000000000000000000000000001;
@@ -133,7 +133,6 @@ module buff2tlp # (
     // Local send_tlps_machine
     //-------------------------------------------------------   
     reg          [27:0]      send_fsm;
-    reg                      lbuf_dn;
     reg          [8:0]       tlp_qw_cnt;
     reg          [4:0]       tlp_nmb;
     reg          [4:0]       look_ahead_tlp_nmb;
@@ -143,7 +142,7 @@ module buff2tlp # (
     reg          [63:0]      aux1_host_mem_addr;
     reg          [31:0]      lbuf_qw_cnt;
     reg          [31:0]      aux_qw_cnt;
-    reg          [31:0]      next_qw_cnt;
+    reg          [31:0]      nxt_qw_cnt;
     reg          [31:0]      look_ahead_lbuf_qw_cnt;
     reg          [BW-1:0]    rd_addr_prev1;
     reg          [BW-1:0]    rd_addr_prev2;
@@ -363,7 +362,7 @@ module buff2tlp # (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     aux_qw_cnt <= lbuf_qw_cnt;
-                    next_qw_cnt <= lbuf_qw_cnt + 'hF;
+                    nxt_qw_cnt <= lbuf_qw_cnt + 'hF;
                     send_fsm <= s11;
                 end
 
@@ -377,7 +376,7 @@ module buff2tlp # (
                 end
 
                 s12 : begin
-                    lbuf_qw_cnt <= {next_qw_cnt[31:4], 4'b0};
+                    lbuf_qw_cnt <= {nxt_qw_cnt[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
                         trn_td[63:32] <= dw_endian_conv(aux_qw_cnt);
                         trn_td[31:0] <= {
@@ -572,7 +571,7 @@ module buff2tlp # (
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
                     aux_qw_cnt <= lbuf_qw_cnt;
-                    next_qw_cnt <= lbuf_qw_cnt + 'hF;
+                    nxt_qw_cnt <= lbuf_qw_cnt + 'hF;
                     send_fsm <= s25;
                 end
 
@@ -587,7 +586,7 @@ module buff2tlp # (
                 end
 
                 s26 : begin
-                    lbuf_qw_cnt <= {next_qw_cnt[31:4], 4'b0};
+                    lbuf_qw_cnt <= {nxt_qw_cnt[31:4], 4'b0};
                     if (!trn_tdst_rdy_n) begin
                         trn_td[63:32] <= {
                                 {7'b0, close_lbuf},

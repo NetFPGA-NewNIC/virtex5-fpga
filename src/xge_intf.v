@@ -98,6 +98,7 @@ module xge_intf (
     //-------------------------------------------------------
     // Local XAUI
     //-------------------------------------------------------
+    wire                     xaui_reset;
     wire         [63:0]      xgmii_txd;
     wire         [7:0]       xgmii_txc;
     wire         [63:0]      xgmii_rxd;

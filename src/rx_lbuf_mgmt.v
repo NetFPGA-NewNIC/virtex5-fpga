@@ -41,7 +41,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`default_nettype none
+//`default_nettype none
 
 module rx_lbuf_mgmt # (
     parameter BARHIT = 2,
@@ -93,10 +93,10 @@ module rx_lbuf_mgmt # (
         .lbuf2_en(lbuf2_en),                                   // O
         .lbuf2_dn(lbuf2_dn),                                   // I
         // gv_lbuf
-        .lbuf_addr(lbuf2_addr),                                // O [63:0]
-        .lbuf_en(lbuf2_en),                                    // O
+        .lbuf_addr(lbuf_addr),                                 // O [63:0]
+        .lbuf_en(lbuf_en),                                     // O
         .lbuf64b(lbuf64b),                                     // O
-        .lbuf_dn(lbuf2_dn)                                     // I
+        .lbuf_dn(lbuf_dn)                                      // I
         );
 
     //-------------------------------------------------------
@@ -113,7 +113,7 @@ module rx_lbuf_mgmt # (
         .rst(rst),                                             // I
         // TRN rx
         .trn_rd(trn_rd),                                       // I [63:0]
-        .trn_rrem_n(trn_rrem),                                 // I [7:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
