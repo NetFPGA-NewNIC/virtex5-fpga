@@ -165,11 +165,17 @@ module chn # (
     assign cfg_max_rd_req_size = cfg_dcommand[14:12];
     assign cfg_max_payload_size = cfg_dcommand[7:5];
 
-    assign trn_td = tx_trn_td | rx_trn_td;
-    assign trn_trem_n = tx_trn_trem_n & rx_trn_trem_n;
-    assign trn_tsof_n = tx_trn_tsof_n & rx_trn_tsof_n;
-    assign trn_teof_n = tx_trn_teof_n & rx_trn_teof_n;
-    assign trn_tsrc_rdy_n = tx_trn_tsrc_rdy_n & rx_trn_tsrc_rdy_n;
+    //assign trn_td = tx_trn_td | rx_trn_td;
+    //assign trn_trem_n = tx_trn_trem_n & rx_trn_trem_n;
+    //assign trn_tsof_n = tx_trn_tsof_n & rx_trn_tsof_n;
+    //assign trn_teof_n = tx_trn_teof_n & rx_trn_teof_n;
+    //assign trn_tsrc_rdy_n = tx_trn_tsrc_rdy_n & rx_trn_tsrc_rdy_n;
+
+    assign trn_td = rx_trn_td;
+    assign trn_trem_n = rx_trn_trem_n;
+    assign trn_tsof_n = rx_trn_tsof_n;
+    assign trn_teof_n = rx_trn_teof_n;
+    assign trn_tsrc_rdy_n = rx_trn_tsrc_rdy_n;
 
     assign send_irq = tx_send_irq | rx_send_irq;
 
