@@ -318,6 +318,13 @@ module dma (
     //-------------------------------------------------------
     chn #(
         .BARHIT(2),
+        // Tx
+        .TX_BARMP_LBUF1_ADDR(6'b100000),
+        .TX_BARMP_LBUF1_EN  (6'b101000),
+        .TX_BARMP_LBUF2_ADDR(6'b100010),
+        .TX_BARMP_LBUF2_EN  (6'b101001),
+        .TX_BARMP_CPL_BUFF  (6'b101100),
+        .TX_BARMP_WRBCK     (6'b101110),
         // Rx
         .RX_BARMP_LBUF1_ADDR(6'b010000),
         .RX_BARMP_LBUF1_EN  (6'b011000),

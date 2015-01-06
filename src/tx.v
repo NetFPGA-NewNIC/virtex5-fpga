@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx.v
+*        tx.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Interconnects rx
+*        Interconnects tx
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,16 +43,17 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module rx # (
+module tx # (
     // BAR MAPPING
     parameter BARHIT = 2,
     parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
     parameter BARMP_LBUF1_EN = 6'bxxxxxx,
     parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
     parameter BARMP_LBUF2_EN = 6'bxxxxxx,
+    parameter BARMP_CPL_BUFF = 6'bxxxxxx,
     parameter BARMP_WRBCK = 6'bxxxxxx,
     // MISC
-    parameter BW = 10
+    parameter BW = 9
     ) (
 
     input                    mac_clk,
@@ -61,11 +62,12 @@ module rx # (
     input                    pcie_clk,
     input                    pcie_rst,
 
-    // MAC rx
-    input        [63:0]      mac_rx_data,
-    input        [7:0]       mac_rx_data_valid,
-    input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame,
+    // MAC tx
+    output                   mac_tx_underrun,
+    output       [63:0]      mac_tx_data,
+    output       [7:0]       mac_tx_data_valid,
+    output                   mac_tx_start,
+    input                    mac_tx_ack,
 
     // TRN tx
     output       [63:0]      trn_td,
@@ -96,11 +98,9 @@ module rx # (
     );
 
     //-------------------------------------------------------
-    // Local mac2buff
+    // Local buff2mac
     //-------------------------------------------------------
-    wire                     mac_activity;
-    wire         [BW-1:0]    committed_prod;
-    wire         [15:0]      dropped_pkts_cnt;
+    wire         [BW:0]      committed_cons;
 
     //-------------------------------------------------------
     // Local buff
@@ -113,31 +113,15 @@ module rx # (
     //-------------------------------------------------------
     // Local prod_sync
     //-------------------------------------------------------
-    wire         [BW-1:0]    committed_prod_sync;
+    wire         [BW:0]      committed_prod_sync;
 
     //-------------------------------------------------------
     // Local cons_sync
     //-------------------------------------------------------
-    wire         [BW-1:0]    committed_cons_sync;
+    wire         [BW:0]      committed_cons_sync;
 
     //-------------------------------------------------------
-    // Local dropped_pkts_cnt_sync
-    //-------------------------------------------------------
-    wire         [15:0]      dropped_pkts_cnt_sync;
-
-    //-------------------------------------------------------
-    // Local eth2tlp_ctrl
-    //-------------------------------------------------------
-    wire                     trig_tlp;
-    wire                     trig_tlp_ack;
-    wire                     chng_lbuf;
-    wire                     chng_lbuf_ack;
-    wire                     send_qws;
-    wire                     send_qws_ack;
-    wire         [5:0]       qw_cnt;
-
-    //-------------------------------------------------------
-    // Local buff2tlp
+    // Local tlp2buff
     //-------------------------------------------------------
     wire         [BW:0]      committed_cons;
 
@@ -156,33 +140,32 @@ module rx # (
     wire         [63:0]      sw_ptr;
 
     //-------------------------------------------------------
-    // mac2buff
+    // buff2mac
     //-------------------------------------------------------
-    mac2buff #(.BW(BW)) mac2buff_mod (
+    buff2mac #(.BW(BW)) buff2mac_mod (
         .clk(mac_clk),                                         // I
         .rst(mac_rst),                                         // I
-        // MAC rx
-        .rx_data(mac_rx_data),                                 // I [63:0]
-        .rx_data_valid(mac_rx_data_valid),                     // I [7:0]
-        .rx_good_frame(mac_rx_good_frame),                     // I
-        .rx_bad_frame(mac_rx_bad_frame),                       // I
+        // MAC tx
+        .tx_underrun(mac_tx_underrun),                         // O
+        .tx_data(mac_tx_data),                                 // O [63:0]
+        .tx_data_valid(mac_tx_data_valid),                     // O [7:0]
+        .tx_start(mac_tx_start),                               // O
+        .tx_ack(mac_tx_ack),                                   // I
         // buff
-        .wr_addr(wr_addr),                                     // O [BW-1:0]
-        .wr_data(wr_data),                                     // O [63:0]
-        // fwd logic
-        .activity(mac_activity),                               // O
-        .committed_prod(committed_prod),                       // O [BW-1:0]
-        .committed_cons(committed_cons_sync),                  // I [BW-1:0]
-        .dropped_pkts(dropped_pkts_cnt)                        // O [15:0]
+        .rd_addr(rd_addr),                                     // O [BW-1:0]
+        .rd_data(rd_data),                                     // I [63:0]
+        // bwd logic
+        .committed_cons(committed_cons),                       // O [BW:0]
+        .committed_prod(committed_prod)                        // I [BW:0]
         );
 
     //-------------------------------------------------------
     // buff
     //-------------------------------------------------------
     rx_buff #(.AW(BW), .DW(64)) buff_mod (
-        .a(wr_addr),                                           // I [BW-1:0]
+        .a(wr_addr),                                           // I [BW:0]
         .d(wr_data),                                           // I [63:0]
-        .dpra(rd_addr),                                        // I [BW-1:0]
+        .dpra(rd_addr),                                        // I [BW:0]
         .clk(mac_clk),                                         // I 
         .qdpo_clk(pcie_clk),                                   // I
         .qdpo(rd_data)                                         // O [63:0]
@@ -196,8 +179,8 @@ module rx # (
         .rst_out(pcie_rst),                                    // I
         .clk_in(mac_clk),                                      // I
         .rst_in(mac_rst),                                      // I
-        .in(committed_prod),                                   // I [BW-1:0]
-        .out(committed_prod_sync)                              // O [BW-1:0]
+        .in(committed_prod),                                   // I [BW:0]
+        .out(committed_prod_sync)                              // O [BW:0]
         );
 
     //-------------------------------------------------------
@@ -208,8 +191,8 @@ module rx # (
         .rst_out(mac_rst),                                     // I
         .clk_in(pcie_clk),                                     // I
         .rst_in(pcie_rst),                                     // I
-        .in(committed_cons),                                   // I [BW-1:0]
-        .out(committed_cons_sync)                              // O [BW-1:0]
+        .in(committed_cons),                                   // I [BW:0]
+        .out(committed_cons_sync)                              // O [BW:0]
         );
 
     //-------------------------------------------------------
@@ -233,7 +216,7 @@ module rx # (
         // CFG
         .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
         // mac2buff
-        .committed_prod(committed_prod_sync),                  // I [BW-1:0]
+        .committed_prod(committed_prod_sync),                  // I [BW:0]
         .mac_activity(mac_activity),                           // I
         // eth2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // O
@@ -275,9 +258,9 @@ module rx # (
         .send_qws_ack(send_qws_ack),                           // O
         .qw_cnt(qw_cnt),                                       // I [5:0]
         // mac2buff
-        .committed_cons(committed_cons),                       // O [BW-1:0]
+        .committed_cons(committed_cons),                       // O [BW:0]
         // buff
-        .rd_addr(rd_addr),                                     // O [BW-1:0]
+        .rd_addr(rd_addr),                                     // O [BW:0]
         .rd_data(rd_data),                                     // I [63:0]
         // irq_gen
         .hw_ptr(hw_ptr),                                       // O [63:0]
@@ -345,7 +328,7 @@ module rx # (
         .send_irq(send_irq)                                    // O
         );
 
-endmodule // rx
+endmodule // tx
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

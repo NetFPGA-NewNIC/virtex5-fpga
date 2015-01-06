@@ -45,6 +45,13 @@
 
 module chn # ( 
     parameter BARHIT = 2,
+    // Tx
+    parameter TX_BARMP_LBUF1_ADDR = 6'bxxxxxx,
+    parameter TX_BARMP_LBUF1_EN = 6'bxxxxxx,
+    parameter TX_BARMP_LBUF2_ADDR = 6'bxxxxxx,
+    parameter TX_BARMP_LBUF2_EN = 6'bxxxxxx,
+    parameter TX_BARMP_CPL_BUFF = 6'bxxxxxx,
+    parameter TX_BARMP_WRBCK = 6'bxxxxxx,
     // Rx
     parameter RX_BARMP_LBUF1_ADDR = 6'bxxxxxx,
     parameter RX_BARMP_LBUF1_EN = 6'bxxxxxx,
@@ -170,10 +177,16 @@ module chn # (
     // Tx
     //-------------------------------------------------------
     tx #(
+        // BAR MAPPING
         .BARHIT(BARHIT),
-        .BARMP_LBUF1(6'bxxxxxx),
-        .BARMP_LBUF2(6'bxxxxxx),
-        .BARMP_WRBCK()
+        .BARMP_LBUF1_ADDR(TX_BARMP_LBUF1_ADDR),
+        .BARMP_LBUF1_EN(TX_BARMP_LBUF1_EN),
+        .BARMP_LBUF2_ADDR(TX_BARMP_LBUF2_ADDR),
+        .BARMP_LBUF2_EN(TX_BARMP_LBUF2_EN),
+        .BARMP_CPL_BUFF(TX_BARMP_CPL_BUFF),
+        .BARMP_WRBCK(TX_BARMP_WRBCK),
+        // MISC
+        .BW(9)
     ) tx_mod (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
@@ -214,12 +227,15 @@ module chn # (
     // Rx
     //-------------------------------------------------------
     rx #(
+        // BAR MAPPING
         .BARHIT(BARHIT),
         .BARMP_LBUF1_ADDR(RX_BARMP_LBUF1_ADDR),
         .BARMP_LBUF1_EN(RX_BARMP_LBUF1_EN),
         .BARMP_LBUF2_ADDR(RX_BARMP_LBUF2_ADDR),
         .BARMP_LBUF2_EN(RX_BARMP_LBUF2_EN),
-        .BARMP_WRBCK(RX_BARMP_WRBCK)
+        .BARMP_WRBCK(RX_BARMP_WRBCK),
+        // MISC
+        .BW(10)
     ) rx_mod (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I

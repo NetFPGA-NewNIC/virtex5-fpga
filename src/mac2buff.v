@@ -84,7 +84,7 @@ module mac2buff # (
     // Local mac2buff
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
-    reg          [15:0]      byte_counter;
+    reg          [15:0]      len;
     reg          [BW-1:0]    aux_wr_addr;
     reg          [BW-1:0]    diff;
     reg          [7:0]       rx_data_valid_reg;
@@ -111,7 +111,7 @@ module mac2buff # (
             case (rx_fsm)
 
                 s0 : begin                                  // configure mac core to present preamble and save the packet timestamp while its reception
-                    byte_counter <= 'b0;
+                    len <= 'b0;
                     aux_wr_addr <= committed_prod +1;
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s1;
@@ -128,34 +128,34 @@ module mac2buff # (
                     rx_good_frame_reg <= rx_good_frame;
                     rx_bad_frame_reg <= rx_bad_frame;
                     
-                    case (rx_data_valid)     // increment byte_counter accordingly
+                    case (rx_data_valid)     // increment len accordingly
                         8'b00000000 : begin
-                            byte_counter <= byte_counter;       // don't increment
+                            len <= len;       // don't increment
                             aux_wr_addr <= aux_wr_addr;
                         end
                         8'b00000001 : begin
-                            byte_counter <= byte_counter + 1;
+                            len <= len + 1;
                         end
                         8'b00000011 : begin
-                            byte_counter <= byte_counter + 2;
+                            len <= len + 2;
                         end
                         8'b00000111 : begin
-                            byte_counter <= byte_counter + 3;
+                            len <= len + 3;
                         end
                         8'b00001111 : begin
-                            byte_counter <= byte_counter + 4;
+                            len <= len + 4;
                         end
                         8'b00011111 : begin
-                            byte_counter <= byte_counter + 5;
+                            len <= len + 5;
                         end
                         8'b00111111 : begin
-                            byte_counter <= byte_counter + 6;
+                            len <= len + 6;
                         end
                         8'b01111111 : begin
-                            byte_counter <= byte_counter + 7;
+                            len <= len + 7;
                         end
                         8'b11111111 : begin
-                            byte_counter <= byte_counter + 8;
+                            len <= len + 8;
                         end
                     endcase
 
@@ -171,13 +171,13 @@ module mac2buff # (
                 end
 
                 s2 : begin
-                    wr_data <= {1'b0, 15'b0, byte_counter, 32'b0};
+                    wr_data <= {1'b0, 15'b0, len, 32'b0};
                     wr_addr <= committed_prod;
                     activity <= 1'b1;
 
                     committed_prod <= aux_wr_addr;                      // commit the packet
                     aux_wr_addr <= aux_wr_addr +1;
-                    byte_counter <= 'b0;
+                    len <= 'b0;
 
                     if (rx_data_valid) begin        // sof (preamble)
                         rx_fsm <= s1;
