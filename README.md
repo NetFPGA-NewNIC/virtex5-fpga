@@ -7,10 +7,6 @@ NIC prototype for virtex5 netfpga-10g
 | BAR NUMBER | Offset in bytes | Used for | Access type | Access width |
 |:----------:|:---------------:|:--------:|:-----------:|:------------:|
 | BAR0 | 16 | MDIO configuration | WRO | DW |
-| BAR0 | 32 | tv_nsec | WRO | DW |
-| BAR0 | 36 | tv_sec | WRO | DW |
-| BAR0 | 40 | Rx timestamp enable | WRO | DW |
-| BAR0 | 44 | Rx timestamp disable | WRO | DW |
 
 ## BAR 2
 
