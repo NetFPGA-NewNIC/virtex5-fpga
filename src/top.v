@@ -167,15 +167,15 @@ module top (
         .mac_rx_good_frame(mac_rx_good_frame),                 // O
         .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
         // MDIO conf intf
-        .host_clk(mac_host_clk),                               // I
-        .host_reset(mac_host_reset),                           // I
-        .host_opcode(mac_host_opcode),                         // O [1:0]
-        .host_addr(mac_host_addr),                             // O [9:0]
-        .host_wr_data(mac_host_wr_data),                       // O [31:0]
-        .host_rd_data(mac_host_rd_data),                       // I [31:0]
-        .host_miim_sel(mac_host_miim_sel),                     // O
-        .host_req(mac_host_req),                               // O
-        .host_miim_rdy(mac_host_miim_rdy)                      // I
+        .mac_host_clk(mac_host_clk),                           // I
+        .mac_host_reset(mac_host_reset),                       // I
+        .mac_host_opcode(mac_host_opcode),                     // O [1:0]
+        .mac_host_addr(mac_host_addr),                         // O [9:0]
+        .mac_host_wr_data(mac_host_wr_data),                   // O [31:0]
+        .mac_host_rd_data(mac_host_rd_data),                   // I [31:0]
+        .mac_host_miim_sel(mac_host_miim_sel),                 // O
+        .mac_host_req(mac_host_req),                           // O
+        .mac_host_miim_rdy(mac_host_miim_rdy)                  // I
         );
 
 endmodule // top

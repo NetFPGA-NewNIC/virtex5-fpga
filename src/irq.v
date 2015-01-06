@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_lbuf_mgmt.v
+*        irq.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Receives lbuf addr and enable.
+*        Interconnects channel interrupt control.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,12 +43,11 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module rx_lbuf_mgmt # (
+module irq # (
     parameter BARHIT = 2,
-    parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF1_EN = 6'bxxxxxx,
-    parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF2_EN = 6'bxxxxxx
+    parameter BARMP_EN = 6'bxxxxxx,
+    parameter BARMP_DIS = 6'bxxxxxx,
+    parameter BARMP_THR = 6'bxxxxxx
     ) (
 
     input                    clk,
@@ -60,54 +59,57 @@ module rx_lbuf_mgmt # (
     input                    trn_rsof_n,
     input                    trn_reof_n,
     input                    trn_rsrc_rdy_n,
+    input                    trn_rerrfwd_n,
     input        [6:0]       trn_rbar_hit_n,
 
-    // lbuf_mgmt
-    output       [63:0]      lbuf_addr,
-    output                   lbuf_en,
-    output                   lbuf64b,
-    input                    lbuf_dn
+    // CFG
+    output reg               cfg_interrupt_n,
+    input                    cfg_interrupt_rdy_n,
+    input        [3:0]       trn_tbuf_av,
+    input                    send_irq,
+
+    // EP arb
+    input                    my_trn,
+    output reg               drv_ep,
+    output reg               req_ep
     );
 
     //-------------------------------------------------------
     // Local hst_ctrl
     //-------------------------------------------------------
-    wire         [63:0]      lbuf1_addr;
-    wire                     lbuf1_en;
-    wire                     lbuf1_dn;
-    wire         [63:0]      lbuf2_addr;
-    wire                     lbuf2_en;
-    wire                     lbuf2_dn;
+    wire                     irq_en;
+    wire                     irq_dis;
+    wire         [31:0]      irq_thr;
 
     //-------------------------------------------------------
-    // gv_lbuf
+    // irq_gen
     //-------------------------------------------------------
-    rx_gv_lbuf gv_lbuf_mod (
+    irq_gen irq_gen_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
         // hst_ctrl
-        .lbuf1_addr(lbuf1_addr),                               // O [63:0]
-        .lbuf1_en(lbuf1_en),                                   // O
-        .lbuf1_dn(lbuf1_dn),                                   // I
-        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
-        .lbuf2_en(lbuf2_en),                                   // O
-        .lbuf2_dn(lbuf2_dn),                                   // I
-        // gv_lbuf
-        .lbuf_addr(lbuf2_addr),                                // O [63:0]
-        .lbuf_en(lbuf2_en),                                    // O
-        .lbuf64b(lbuf64b),                                     // O
-        .lbuf_dn(lbuf2_dn)                                     // I
+        .irq_en(irq_en),                                       // I
+        .irq_dis(irq_dis),                                     // I
+        .irq_thr(irq_thr),                                     // I [31:0]
+        // CFG
+        .cfg_interrupt_n(cfg_interrupt_n),                     // O
+        .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
+        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
+        .send_irq(send_irq),                                   // I
+        // EP arb
+        .my_trn(my_trn),                                       // I
+        .drv_ep(drv_ep),                                       // O
+        .req_ep(req_ep)                                        // O
         );
 
     //-------------------------------------------------------
     // hst_ctrl
     //-------------------------------------------------------
-    rx_hst_ctrl # (
+    irq_hst_ctrl # (
         .BARHIT(BARHIT),
-        .BARMP_LBUF1_ADDR(BARMP_LBUF1_ADDR),
-        .BARMP_LBUF1_EN(BARMP_LBUF1_EN),
-        .BARMP_LBUF2_ADDR(BARMP_LBUF2_ADDR),
-        .BARMP_LBUF2_EN(BARMP_LBUF2_EN)
+        .BARMP_EN(BARMP_EN),
+        .BARMP_DIS(BARMP_DIS),
+        .BARMP_THR(BARMP_THR)
     ) hst_ctrl_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
@@ -119,15 +121,12 @@ module rx_lbuf_mgmt # (
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // hst_ctrl
-        .lbuf1_addr(lbuf1_addr),                               // O [63:0]
-        .lbuf1_en(lbuf1_en),                                   // O
-        .lbuf1_dn(lbuf1_dn),                                   // I
-        .lbuf2_addr(lbuf2_addr),                               // O [63:0]
-        .lbuf2_en(lbuf2_en),                                   // O
-        .lbuf2_dn(lbuf2_dn)                                    // I
+        .irq_en(irq_en),                                       // O
+        .irq_dis(irq_dis),                                     // O
+        .irq_thr(irq_thr)                                      // O [31:0]
         );
 
-endmodule // rx_lbuf_mgmt
+endmodule // irq
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

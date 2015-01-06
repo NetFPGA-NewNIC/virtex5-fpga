@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_irq_gen.v
+*        irq_gen.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Rx interrupt generation.
+*        Gen IRQs.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,17 +43,26 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module rx_irq_gen (
+module irq_gen (
 
     input                    clk,
     input                    rst,
 
-    input                    mac_activity,
-    input                    hst_rdy,
-    input        [63:0]      hw_ptr,
-    input        [63:0]      sw_ptr,
+    // hst_ctrl
+    input                    irq_en,
+    input                    irq_dis,
+    input        [31:0]      irq_thr,
 
-    output reg               send_irq
+    // CFG
+    output reg               cfg_interrupt_n,
+    input                    cfg_interrupt_rdy_n,
+    input        [3:0]       trn_tbuf_av,
+    input                    send_irq,
+
+    // EP arb
+    input                    my_trn,
+    output reg               drv_ep,
+    output reg               req_ep
     );
 
     // localparam
@@ -68,54 +77,83 @@ module rx_irq_gen (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local irq_gen
-    //-------------------------------------------------------  
+    // Local IRQ gen
+    //-------------------------------------------------------
     reg          [7:0]       irq_gen_fsm;
-    reg                      mac_activity_reg0;
-    reg                      mac_activity_reg1;
+    reg          [29:0]      counter;
 
     ////////////////////////////////////////////////
-    // irq_gen
+    // IRQ gen
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            mac_activity_reg0 <= 1'b0;
-            mac_activity_reg1 <= 1'b0;
-            send_irq <= 1'b0;
+            req_ep <= 1'b0;
+            drv_ep <= 1'b0;
+            cfg_interrupt_n <= 1'b1;
             irq_gen_fsm <= s0;
         end
         
         else begin  // not rst
 
-            mac_activity_reg0 <= mac_activity;
-            mac_activity_reg1 <= mac_activity_reg0;
-
             case (irq_gen_fsm)
 
                 s0 : begin
-                    if (hst_rdy) begin
+                    if (send_irq && !irq_dis) begin
+                        req_ep <= 1'b1;
                         irq_gen_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    if (mac_activity_reg1) begin
-                        send_irq <= 1'b1;
+                    if (my_trn) begin
+                        req_ep <= 1'b0;
+                        drv_ep <= 1'b1;
                         irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    if (mac_activity_reg1 || (hw_ptr != sw_ptr)) begin
-                        send_irq <= 1'b1;
+                    if (trn_tbuf_av[1]) begin
+                        cfg_interrupt_n <= 1'b0;
+                        irq_gen_fsm <= s3;
                     end
                     else begin
-                        send_irq <= 1'b0;
+                        drv_ep <= 1'b0;
+                        irq_gen_fsm <= s5;
                     end
                 end
 
-                default : begin
+                s3 : begin
+                    if (!cfg_interrupt_rdy_n) begin
+                        cfg_interrupt_n <= 1'b1;
+                        drv_ep <= 1'b0;
+                        irq_gen_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
+                    counter <= 'b0;
+                    if (irq_en) begin
+                        irq_gen_fsm <= s6;
+                    end
+                end
+
+                s5 : begin
+                    if (trn_tbuf_av[1]) begin
+                        req_ep <= 1'b1;
+                        irq_gen_fsm <= s1;
+                    end
+                end
+
+                s6 : begin
+                    counter <= counter + 1;
+                    if (irq_thr == counter) begin
+                        irq_gen_fsm <= s0;
+                    end
+                end
+
+                default : begin //other TLPs
                     irq_gen_fsm <= s0;
                 end
 
@@ -123,7 +161,7 @@ module rx_irq_gen (
         end     // not rst
     end  //always
 
-endmodule // rx_irq_gen
+endmodule // irq_gen
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

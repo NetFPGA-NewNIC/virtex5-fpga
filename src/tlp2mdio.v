@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_hst_ctrl.v
+*        tlp2mdio.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Receives lbuf addr and enable.
+*        Receives access to MDIO.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -44,12 +44,9 @@
 `default_nettype none
 `include "includes.v"
 
-module rx_hst_ctrl # (
+module tlp2mdio # (
     parameter BARHIT = 2,
-    parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF1_EN = 6'bxxxxxx,
-    parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF2_EN = 6'bxxxxxx
+    parameter BARMP_WRREG = 6'bxxxxxx
     ) (
 
     input                    clk,
@@ -63,14 +60,9 @@ module rx_hst_ctrl # (
     input                    trn_rsrc_rdy_n,
     input        [6:0]       trn_rbar_hit_n,
 
-    // hst_ctrl
-    output reg   [63:0]      lbuf1_addr,
-    output reg               lbuf1_en,
-    input                    lbuf1_dn,
-
-    output reg   [63:0]      lbuf2_addr,
-    output reg               lbuf2_en,
-    input                    lbuf2_dn
+    // tlp2mdio
+    output reg   [31:0]      acc_data,
+    output reg               acc_en
     );
 
     // localparam
@@ -88,33 +80,56 @@ module rx_hst_ctrl # (
     // Local Rx TLP
     //-------------------------------------------------------
     reg          [7:0]       tlp_rx_fsm;
-    reg                      lbuf1_en_i;
-    reg                      lbuf2_en_i;
     reg          [31:0]      aux_dw;
-    reg          [63:0]      lbuf1_addr_i;
-    reg          [63:0]      lbuf2_addr_i;
+    reg          [31:0]      acc_data_i;
+    reg                      rdy;
+
+    //-------------------------------------------------------
+    // Local Output driver
+    //-------------------------------------------------------
+    reg          [7:0]       odr_fsm;
 
     ////////////////////////////////////////////////
-    // Output driver
+    // Output driver. Keep high for 5 (250MHz) ticks (1 50MHz tick)
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            lbuf1_en <= 1'b0;
-            lbuf2_en <= 1'b0;
+            acc_en <= 1'b0;
+            odr_fsm <= s0;
         end
         
         else begin  // not rst
-            if (lbuf1_en_i) 
-                lbuf1_en <= 1'b1;
-            else if (lbuf1_dn) 
-                lbuf1_en <= 1'b0;
 
-            if (lbuf2_en_i) 
-                lbuf2_en <= 1'b1;
-            else if (lbuf2_dn) 
-                lbuf2_en <= 1'b0;
+            case (odr_fsm)
 
+                s0 : begin
+                    acc_data <= acc_data_i;
+                    if (rdy) begin
+                        odr_fsm <= s1;
+                    end
+                end
+
+                s1 : begin
+                    acc_en <= 1'b1;
+                    odr_fsm <= s2;
+                end
+
+                s2 : odr_fsm <= s3;
+                s3 : odr_fsm <= s4;
+                s4 : odr_fsm <= s5;
+                s5 : odr_fsm <= s6;
+
+                s6 : begin
+                    acc_en <= 1'b0;
+                    odr_fsm <= s0;
+                end
+
+                default : begin
+                    odr_fsm <= s0;
+                end
+
+            endcase
         end     // not rst
     end  //always
 
@@ -124,18 +139,13 @@ module rx_hst_ctrl # (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            lbuf1_en_i <= 1'b0;
-            lbuf2_en_i <= 1'b0;
+            rdy <= 1'b0;
             tlp_rx_fsm <= s0;
         end
         
         else begin  // not rst
 
-            lbuf1_en_i <= 1'b0;
-            lbuf2_en_i <= 1'b0;
-
-            lbuf1_addr <= lbuf1_addr_i;
-            lbuf2_addr <= lbuf2_addr_i;
+            rdy <= 1'b0;
 
             case (tlp_rx_fsm)
 
@@ -145,7 +155,7 @@ module rx_hst_ctrl # (
                             tlp_rx_fsm <= s1;
                         end
                         else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
-                            tlp_rx_fsm <= s4;
+                            tlp_rx_fsm <= s3;
                         end
                     end
                 end
@@ -155,22 +165,8 @@ module rx_hst_ctrl # (
                     if (!trn_rsrc_rdy_n) begin
                         case (trn_rd[39:34])
 
-                            BARMP_LBUF1_ADDR : begin
+                            BARMP_WRREG : begin
                                 tlp_rx_fsm <= s2;
-                            end
-
-                            BARMP_LBUF2_ADDR : begin
-                                tlp_rx_fsm <= s3;
-                            end
-
-                            BARMP_LBUF1_EN : begin
-                                lbuf1_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            BARMP_LBUF2_EN : begin
-                                lbuf2_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
                             end
 
                             default : begin //other addresses
@@ -181,41 +177,17 @@ module rx_hst_ctrl # (
                 end
 
                 s2 : begin
-                    lbuf1_addr_i[31:0] <= dw_endian_conv(aux_dw);
-                    lbuf1_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
+                    acc_data_i <= dw_endian_conv(aux_dw);
+                    rdy <= 1'b1;
+                    tlp_rx_fsm <= s0;
                 end
 
                 s3 : begin
-                    lbuf2_addr_i[31:0] <= dw_endian_conv(aux_dw);
-                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                s4 : begin
                     if (!trn_rsrc_rdy_n) begin
                         case (trn_rd[7:2])
 
-                            BARMP_LBUF1_ADDR : begin
-                                tlp_rx_fsm <= s5;
-                            end
-
-                            BARMP_LBUF2_ADDR : begin
-                                tlp_rx_fsm <= s6;
-                            end
-
-                            BARMP_LBUF1_EN : begin
-                                lbuf1_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
-                            end
-
-                            BARMP_LBUF2_EN : begin
-                                lbuf2_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
+                            BARMP_WRREG : begin
+                                tlp_rx_fsm <= s4;
                             end
 
                             default : begin //other addresses
@@ -225,20 +197,10 @@ module rx_hst_ctrl # (
                     end
                 end
 
-                s5 : begin
-                    lbuf1_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
-                    lbuf1_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
-                end
-
-                s6 : begin
-                    lbuf2_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
-                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
-                    if (!trn_rsrc_rdy_n) begin
-                        tlp_rx_fsm <= s0;
-                    end
+                s4 : begin
+                    acc_data_i <= dw_endian_conv(trn_rd[63:32]);
+                    rdy <= 1'b1;
+                    tlp_rx_fsm <= s0;
                 end
 
                 default : begin //other TLPs
@@ -249,7 +211,7 @@ module rx_hst_ctrl # (
         end     // not rst
     end  //always
 
-endmodule // rx_hst_ctrl
+endmodule // tlp2mdio
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

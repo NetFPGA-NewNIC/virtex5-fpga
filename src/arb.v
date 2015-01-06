@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        ep_arb.v
+*        arb.v
 *
 *  Project:
 *
@@ -44,7 +44,7 @@
 `default_nettype none
 `include "includes.v"
 
-module ep_arb (
+module arb (
 
     input                    clk,
     input                    rst,
@@ -65,9 +65,9 @@ module ep_arb (
     input                    rx_drvn,
 
     // IRQ
-    output reg               irqctrl_trn,
-    input                    irqctrl_drvn,
-    input                    irqctrl_reqep
+    output reg               irq_trn,
+    input                    irq_drvn,
+    input                    irq_reqep
     );
 
     // localparam
@@ -84,7 +84,7 @@ module ep_arb (
     //-------------------------------------------------------
     // Local ARB
     //-------------------------------------------------------   
-    reg          [7:0]       fsm;
+    reg          [7:0]       arb_fsm;
     reg                      turn_bit;
 
     ////////////////////////////////////////////////
@@ -93,62 +93,62 @@ module ep_arb (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            rx_turn <= 1'b0;
-            tx_turn <= 1'b0;
-            intctrl_turn <= 1'b0;
+            tx_trn <= 1'b0;
+            rx_trn <= 1'b0;
+            irq_trn <= 1'b0;
             turn_bit <= 1'b0;
-            fsm <= s0;
+            arb_fsm <= s0;
         end
         
         else begin  // not rst
 
-            case (fsm)
+            case (arb_fsm)
 
                 s0 : begin
-                    if ((!rx_driven) && (!tx_driven) && (!intctrl_driven)) begin
+                    if ((!tx_drvn) && (!rx_drvn) && (!irq_drvn)) begin
                         turn_bit <= ~turn_bit;
                         if (!turn_bit) begin
-                            rx_turn <= 1'b1;
+                            rx_trn <= 1'b1;
                         end
                         else begin
-                            tx_turn <= 1'b1;
+                            tx_trn <= 1'b1;
                         end
-                        fsm <= s1;
+                        arb_fsm <= s1;
                     end
                 end
 
                 s1 : begin
-                    rx_turn <= 1'b0;
-                    tx_turn <= 1'b0;
-                    if (intctrl_req_ep) begin
-                        fsm <= s2;
+                    tx_trn <= 1'b0;
+                    rx_trn <= 1'b0;
+                    if (irq_reqep) begin
+                        arb_fsm <= s2;
                     end
                     else begin
-                        fsm <= s0;
+                        arb_fsm <= s0;
                     end
                 end
 
                 s2 : begin
-                    if ((!rx_driven) && (!tx_driven)) begin
-                        intctrl_turn <= 1'b1;
-                        fsm <= s3;
+                    if ((!tx_drvn) && (!rx_drvn)) begin
+                        irq_trn <= 1'b1;
+                        arb_fsm <= s3;
                     end
                 end
 
                 s3 : begin
-                    intctrl_turn <= 1'b0;
-                    fsm <= s0;
+                    irq_trn <= 1'b0;
+                    arb_fsm <= s0;
                 end
 
                 default : begin 
-                    fsm <= s0;
+                    arb_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // ep_arb
+endmodule // arb
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

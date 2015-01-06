@@ -275,9 +275,9 @@ module rx # (
         .send_qws_ack(send_qws_ack),                           // O
         .qw_cnt(qw_cnt),                                       // I [5:0]
         // mac2buff
-        .committed_cons(committed_cons),                       // O [`BW:0]
+        .committed_cons(committed_cons),                       // O [BW:0]
         // buff
-        .rd_addr(rd_addr),                                     // O [`BW:0]
+        .rd_addr(rd_addr),                                     // O [BW:0]
         .rd_data(rd_data),                                     // I [63:0]
         // irq_gen
         .hw_ptr(hw_ptr),                                       // O [63:0]

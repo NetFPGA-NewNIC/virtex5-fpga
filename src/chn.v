@@ -44,7 +44,17 @@
 `default_nettype none
 
 module chn # ( 
-    parameter BARHIT = 2
+    parameter BARHIT = 2,
+    // Rx
+    parameter RX_BARMP_LBUF1_ADDR = 6'bxxxxxx,
+    parameter RX_BARMP_LBUF1_EN = 6'bxxxxxx,
+    parameter RX_BARMP_LBUF2_ADDR = 6'bxxxxxx,
+    parameter RX_BARMP_LBUF2_EN = 6'bxxxxxx,
+    parameter RX_BARMP_WRBCK = 6'bxxxxxx,
+    // IRQ
+    parameter IRQ_BARMP_EN = 6'bxxxxxx,
+    parameter IRQ_BARMP_DIS = 6'bxxxxxx,
+    parameter IRQ_BARMP_THR = 6'bxxxxxx
     ) (
 
     input                    mac_clk,
@@ -137,9 +147,9 @@ module chn # (
     wire                     tx_drvn;
     wire                     rx_trn;
     wire                     rx_drvn;
-    wire                     irqctrl_trn;
-    wire                     irqctrl_drvn;
-    wire                     irqctrl_reqep;
+    wire                     irq_trn;
+    wire                     irq_drvn;
+    wire                     irq_reqep;
 
     //-------------------------------------------------------
     // assigns
@@ -153,6 +163,8 @@ module chn # (
     assign trn_tsof_n = tx_trn_tsof_n & rx_trn_tsof_n;
     assign trn_teof_n = tx_trn_teof_n & rx_trn_teof_n;
     assign trn_tsrc_rdy_n = tx_trn_tsrc_rdy_n & rx_trn_tsrc_rdy_n;
+
+    assign send_irq = tx_send_irq | rx_send_irq;
 
     //-------------------------------------------------------
     // Tx
@@ -203,11 +215,11 @@ module chn # (
     //-------------------------------------------------------
     rx #(
         .BARHIT(BARHIT),
-        .BARMP_LBUF1_ADDR(6'b010000),
-        .BARMP_LBUF1_EN  (6'b011000),
-        .BARMP_LBUF2_ADDR(6'b010010),
-        .BARMP_LBUF2_EN  (6'b011001),
-        .BARMP_WRBCK     (6'b011110)
+        .BARMP_LBUF1_ADDR(RX_BARMP_LBUF1_ADDR),
+        .BARMP_LBUF1_EN(RX_BARMP_LBUF1_EN),
+        .BARMP_LBUF2_ADDR(RX_BARMP_LBUF2_ADDR),
+        .BARMP_LBUF2_EN(RX_BARMP_LBUF2_EN),
+        .BARMP_WRBCK(RX_BARMP_WRBCK)
     ) rx_mod (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
@@ -246,9 +258,12 @@ module chn # (
     //-------------------------------------------------------
     // IRQ
     //-------------------------------------------------------
-    assign send_irq = tx_send_irq | rx_send_irq;
-
-    irq_ctrl irq_ctrl_mod (
+    irq #(
+        .BARHIT(BARHIT),
+        .BARMP_EN(IRQ_BARMP_EN),
+        .BARMP_DIS(IRQ_BARMP_DIS),
+        .BARMP_THR(IRQ_BARMP_THR)
+    ) irq_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN rx
@@ -264,17 +279,18 @@ module chn # (
         // CFG
         .cfg_interrupt_n(cfg_interrupt_n),                     // O
         .cfg_interrupt_rdy_n(cfg_interrupt_rdy_n),             // I
+        .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         .send_irq(send_irq),                                   // I
         // EP arb
-        .my_trn(irqctrl_trn),                                  // I
-        .drv_ep(irqctrl_drvn),                                 // O
-        .req_ep(irqctrl_reqep)                                 // O
+        .my_trn(irq_trn),                                      // I
+        .drv_ep(irq_drvn),                                     // O
+        .req_ep(irq_reqep)                                     // O
         );
 
     //-------------------------------------------------------
-    // EP arb
+    // ARB
     //-------------------------------------------------------
-    ep_arb ep_arb_mod (
+    arb arb_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // CHN trn
@@ -286,9 +302,9 @@ module chn # (
         .tx_drvn(tx_drvn),                                     // I
         .rx_trn(rx_trn),                                       // O
         .rx_drvn(rx_drvn),                                     // I
-        .irqctrl_trn(irqctrl_trn),                             // O
-        .irqctrl_drvn(irqctrl_drvn),                           // I
-        .irqctrl_reqep(irqctrl_reqep)                          // I
+        .irq_trn(irq_trn),                                     // O
+        .irq_drvn(irq_drvn),                                   // I
+        .irq_reqep(irq_reqep)                                  // I
         );
 
 endmodule // chn

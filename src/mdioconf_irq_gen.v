@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_irq_gen.v
+*        mdioconf_irq_gen.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Rx interrupt generation.
+*        interrupt generation.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,17 +43,16 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module rx_irq_gen (
+module mdioconf_irq_gen (
 
     input                    clk,
     input                    rst,
 
-    input                    mac_activity,
-    input                    hst_rdy,
-    input        [63:0]      hw_ptr,
-    input        [63:0]      sw_ptr,
+    input                    send_irq,
 
-    output reg               send_irq
+    // CFG
+    output reg               cfg_interrupt_n,
+    input                    cfg_interrupt_rdy_n
     );
 
     // localparam
@@ -71,8 +70,8 @@ module rx_irq_gen (
     // Local irq_gen
     //-------------------------------------------------------  
     reg          [7:0]       irq_gen_fsm;
-    reg                      mac_activity_reg0;
-    reg                      mac_activity_reg1;
+    reg                      send_irq_reg0;
+    reg                      send_irq_reg1;
 
     ////////////////////////////////////////////////
     // irq_gen
@@ -80,40 +79,45 @@ module rx_irq_gen (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            mac_activity_reg0 <= 1'b0;
-            mac_activity_reg1 <= 1'b0;
-            send_irq <= 1'b0;
+            cfg_interrupt_n <= 1'b1;
             irq_gen_fsm <= s0;
         end
         
         else begin  // not rst
 
-            mac_activity_reg0 <= mac_activity;
-            mac_activity_reg1 <= mac_activity_reg0;
+            send_irq_reg0 <= send_irq;
+            send_irq_reg1 <= send_irq_reg0;
 
             case (irq_gen_fsm)
 
                 s0 : begin
-                    if (hst_rdy) begin
-                        irq_gen_fsm <= s1;
-                    end
+                    send_irq_reg0 <= 1'b0;
+                    send_irq_reg1 <= 1'b0;
+                    irq_gen_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (mac_activity_reg1) begin
-                        send_irq <= 1'b1;
+                    if (send_irq_reg1) begin
                         irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    if (mac_activity_reg1 || (hw_ptr != sw_ptr)) begin
-                        send_irq <= 1'b1;
-                    end
-                    else begin
-                        send_irq <= 1'b0;
+                    cfg_interrupt_n <= 1'b0;
+                    irq_gen_fsm <= s3;
+                end
+
+                s3 : begin
+                    if (!cfg_interrupt_rdy_n) begin
+                        cfg_interrupt_n <= 1'b1;
+                        irq_gen_fsm <= s4;
                     end
                 end
+
+                s4 : irq_gen_fsm <= s5;
+                s5 : irq_gen_fsm <= s6;
+                s6 : irq_gen_fsm <= s7;
+                s7 : irq_gen_fsm <= s0;
 
                 default : begin
                     irq_gen_fsm <= s0;
@@ -123,7 +127,7 @@ module rx_irq_gen (
         end     // not rst
     end  //always
 
-endmodule // rx_irq_gen
+endmodule // mdioconf_irq_gen
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
