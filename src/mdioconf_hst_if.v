@@ -151,7 +151,7 @@ module mdioconf_hst_if (
                     host_wr_data[15:0] <= 'b0;              // Pause frame MAC address
                     host_wr_data[23:16] <= 'b0;             // Reserved
                     host_wr_data[24] <= 1'b0;               // Control Frame Length Check Disable
-                    host_wr_data[25] <= 1'b0;               // Length/Type Error Check Disable
+                    host_wr_data[25] <= 1'b1;               // Length/Type Error Check Disable
                     host_wr_data[26] <= 1'b1;               // Receiver Preserve Preamble Enable
                     host_wr_data[27] <= 1'b1;               // VLAN Enable
                     host_wr_data[28] <= 1'b1;               // Receiver Enable
