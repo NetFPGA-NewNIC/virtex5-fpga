@@ -59,29 +59,28 @@ module sync_type0 # (
     );
 
     // localparam
-    localparam s0  = 10'b0000000000;
-    localparam s1  = 10'b0000000001;
-    localparam s2  = 10'b0000000010;
-    localparam s3  = 10'b0000000100;
-    localparam s4  = 10'b0000001000;
-    localparam s5  = 10'b0000010000;
-    localparam s6  = 10'b0000100000;
-    localparam s7  = 10'b0001000000;
-    localparam s8  = 10'b0010000000;
-    localparam s9  = 10'b0100000000;
-    localparam s10 = 10'b1000000000;
+    localparam s0 = 9'b000000000;
+    localparam s1 = 9'b000000001;
+    localparam s2 = 9'b000000010;
+    localparam s3 = 9'b000000100;
+    localparam s4 = 9'b000001000;
+    localparam s5 = 9'b000010000;
+    localparam s6 = 9'b000100000;
+    localparam s7 = 9'b001000000;
+    localparam s8 = 9'b010000000;
+    localparam s9 = 9'b100000000;
 
     //-------------------------------------------------------
     // Local a
     //-------------------------------------------------------
-    reg          [9:0]       fsm_a;
-    reg          [W-1:0]     bus_in_last;
+    reg          [8:0]       fsm_a;
     reg                      sync;
     reg          [W-1:0]     cross;
 
     //-------------------------------------------------------
     // Local b
     //-------------------------------------------------------
+    reg          [8:0]       fsm_b;
     reg                      sync_reg0;
     reg                      sync_reg1;
 
@@ -91,45 +90,38 @@ module sync_type0 # (
     always @(posedge clk_in) begin
 
         if (rst_in) begin  // rst
-            sync <= 1'b0;
             fsm_a <= s0;
         end
         
         else begin  // not rst
 
+            sync <= 1'b0;
+
             case (fsm_a)
 
-                s0 : begin
-                    bus_in_last <= 'b0;
-                    fsm_a <= s1;
-                end
+                s0 : fsm_a <= s1;
 
                 s1 : begin
-                    if (bus_in_last != in) begin
-                        cross <= in;
-                        fsm_a <= s2;
-                    end
+                    cross <= in;
+                    fsm_a <= s2;
                 end
 
                 s2 : begin
-                    bus_in_last <= cross;
                     sync <= 1'b1;
                     fsm_a <= s3;
                 end
 
-                s3 : fsm_a <= s4;
-
-                s4 : begin
-                    sync <= 1'b0;
-                    fsm_a <= s5;
+                s3 : begin
+                    sync <= 1'b1;
+                    fsm_a <= s4;
                 end
 
+                s4 : fsm_a <= s5;
                 s5 : fsm_a <= s6;
                 s6 : fsm_a <= s7;
                 s7 : fsm_a <= s8;
                 s8 : fsm_a <= s9;
-                s9 : fsm_a <= s10;
-                s10 : fsm_a <= s1;
+                s9 : fsm_a <= s0;
 
                 default : begin 
                     fsm_a <= s0;
@@ -145,9 +137,7 @@ module sync_type0 # (
     always @(posedge clk_out) begin
 
         if (rst_out) begin  // rst
-            sync_reg0 <= 1'b0;
-            sync_reg1 <= 1'b0;
-            out <= 'b0;
+            fsm_b <= s0;
         end
         
         else begin  // not rst
@@ -155,10 +145,26 @@ module sync_type0 # (
             sync_reg0 <= sync;
             sync_reg1 <= sync_reg0;
 
-            if (sync_reg1) begin
-                out <= cross;
-            end
+            case (fsm_b)
 
+                s0 : begin
+                    sync_reg0 <= 1'b0;
+                    sync_reg1 <= 1'b0;
+                    out <= 'b0;
+                    fsm_b <= s1;
+                end
+
+                s1 : begin
+                    if (sync_reg1) begin
+                        out <= cross;
+                    end
+                end
+
+                default : begin 
+                    fsm_b <= s0;
+                end
+
+            endcase
         end     // not rst
     end  //always
 

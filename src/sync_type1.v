@@ -73,13 +73,13 @@ module sync_type1 # (
     // Local a
     //-------------------------------------------------------
     reg          [7:0]       fsm_a;
-    reg          [W-1:0]     bus_in_last;
     reg                      sync;
     reg          [W-1:0]     cross;
 
     //-------------------------------------------------------
     // Local b
     //-------------------------------------------------------
+    reg          [7:0]       fsm_b;
     reg                      sync_reg0;
     reg                      sync_reg1;
 
@@ -89,41 +89,34 @@ module sync_type1 # (
     always @(posedge clk_in) begin
 
         if (rst_in) begin  // rst
-            sync <= 1'b0;
             fsm_a <= s0;
         end
         
         else begin  // not rst
 
+            sync <= 1'b0;
+
             case (fsm_a)
 
                 s0 : begin
-                    bus_in_last <= 'b0;
                     fsm_a <= s1;
                 end
 
                 s1 : begin
-                    if (bus_in_last != in) begin
-                        cross <= in;
-                        fsm_a <= s2;
-                    end
+                    cross <= in;
+                    fsm_a <= s2;
                 end
 
                 s2 : begin
-                    bus_in_last <= cross;
                     sync <= 1'b1;
                     fsm_a <= s3;
                 end
 
-                s3 : begin
-                    sync <= 1'b0;
-                    fsm_a <= s4;
-                end
-
+                s3 : fsm_a <= s4;
                 s4 : fsm_a <= s5;
                 s5 : fsm_a <= s6;
                 s6 : fsm_a <= s7;
-                s7 : fsm_a <= s1;
+                s7 : fsm_a <= s0;
 
                 default : begin 
                     fsm_a <= s0;
@@ -139,9 +132,7 @@ module sync_type1 # (
     always @(posedge clk_out) begin
 
         if (rst_out) begin  // rst
-            sync_reg0 <= 1'b0;
-            sync_reg1 <= 1'b0;
-            out <= 'b0;
+            fsm_b <= s0;
         end
         
         else begin  // not rst
@@ -149,10 +140,26 @@ module sync_type1 # (
             sync_reg0 <= sync;
             sync_reg1 <= sync_reg0;
 
-            if (sync_reg1) begin
-                out <= cross;
-            end
+            case (fsm_b)
 
+                s0 : begin
+                    sync_reg0 <= 1'b0;
+                    sync_reg1 <= 1'b0;
+                    out <= 'b0;
+                    fsm_b <= s1;
+                end
+
+                s1 : begin
+                    if (sync_reg1) begin
+                        out <= cross;
+                    end
+                end
+
+                default : begin 
+                    fsm_b <= s0;
+                end
+
+            endcase
         end     // not rst
     end  //always
 
