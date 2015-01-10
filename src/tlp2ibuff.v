@@ -140,13 +140,12 @@ module tlp2ibuff # (
     wire                     gc_updt_ack;
 
     //-------------------------------------------------------
-    // Local rcv_cpl
+    // Local ibuf_mgmt
     //-------------------------------------------------------
     // gc updt
     wire                     cpl1_rcved;
     wire                     cpl2_rcved;
     wire         [9:0]       cpl_dws;
-    wire         [4:0]       cpl_tag;
 
     //-------------------------------------------------------
     // mem_rd
@@ -225,10 +224,9 @@ module tlp2ibuff # (
         .wt_lbuf(wt_lbuf1),                                    // O
         .lbuf_addr(lbuf_addr),                                 // I [63:0]
         .lbuf_len(lbuf_len),                                   // I [31:0]
-        // rcv_cpl
+        // ibuf_mgmt
         .cpl_rcved(cpl1_rcved),                                // I
         .cpl_dws(cpl_dws),                                     // I [9:0]
-        .cpl_tag(cpl_tag),                                     // I [4:0]
         // gc updt
         .gc_addr(gc1_addr),                                   // O [63:0]
         .gc_updt(gc1_updt),                                   // O
@@ -246,10 +244,9 @@ module tlp2ibuff # (
         .wt_lbuf(wt_lbuf2),                                    // O
         .lbuf_addr(lbuf_addr),                                 // I [63:0]
         .lbuf_len(lbuf_len),                                   // I [31:0]
-        // rcv_cpl
+        // ibuf_mgmt
         .cpl_rcved(cpl2_rcved),                                // I
         .cpl_dws(cpl_dws),                                     // I [9:0]
-        .cpl_tag(cpl_tag),                                     // I [4:0]
         // gc updt
         .gc_addr(gc2_addr),                                   // O [63:0]
         .gc_updt(gc2_updt),                                   // O

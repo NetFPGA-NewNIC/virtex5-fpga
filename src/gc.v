@@ -57,8 +57,7 @@ module gc (
     // rcv_cpl
     input                    cpl_rcved,
     input        [9:0]       cpl_dws,
-    input        [4:0]       cpl_tag,
-
+s
     // gc updt
     output reg   [63:0]      gc_addr,
     output reg               gc_updt,
