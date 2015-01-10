@@ -110,6 +110,8 @@ module chn # (
     input        [15:0]      cfg_dcommand,
 
     // EP arb
+    input        [4:0]       tag_trn,
+    output                   tag_inc,
     input                    chn_trn,
     output                   chn_drvn,
     output                   chn_reqep
@@ -152,6 +154,7 @@ module chn # (
     //-------------------------------------------------------
     wire                     tx_trn;
     wire                     tx_drvn;
+    wire                     tx_reqep;
     wire                     rx_trn;
     wire                     rx_drvn;
     wire                     irq_trn;
@@ -222,7 +225,8 @@ module chn # (
         .tag_trn(tag_trn),                                     // I [4:0]
         .tag_inc(tag_inc),                                     // O
         .my_trn(tx_trn),                                       // I
-        .drv_ep(tx_drvn)                                       // O
+        .drv_ep(tx_drvn),                                      // O
+        .req_ep(tx_reqep)                                      // O
         );
 
     //-------------------------------------------------------
@@ -315,6 +319,7 @@ module chn # (
         // ARB
         .tx_trn(tx_trn),                                       // O
         .tx_drvn(tx_drvn),                                     // I
+        .tx_reqep(tx_reqep),                                   // I
         .rx_trn(rx_trn),                                       // O
         .rx_drvn(rx_drvn),                                     // I
         .irq_trn(irq_trn),                                     // O

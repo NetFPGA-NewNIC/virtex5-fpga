@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        arb.v
+*        gc_mxr.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between subsystems.
+*        Updates gc in order.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,31 +43,25 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module arb (
+module gc_mxr (
 
     input                    clk,
     input                    rst,
 
-    // CHN trn
-    input                    chn_trn,
-    output reg               chn_drvn,
-    output reg               chn_reqep,
+    // gc updt 1
+    input        [63:0]      gc1_addr,
+    input                    gc1_updt,
+    output reg               gc1_updt_ack,
 
-    // ARB
+    // gc updt 2
+    input        [63:0]      gc2_addr,
+    input                    gc2_updt,
+    output reg               gc2_updt_ack,
 
-    // Tx
-    output reg               tx_trn,
-    input                    tx_drvn,
-    input                    tx_reqep,
-
-    // Rx
-    output reg               rx_trn,
-    input                    rx_drvn,
-
-    // IRQ
-    output reg               irq_trn,
-    input                    irq_drvn,
-    input                    irq_reqep
+    // gc updt
+    output reg   [63:0]      gc_addr,
+    output reg               gc_updt,
+    input                    gc_updt_ack
     );
 
     // localparam
@@ -82,67 +76,72 @@ module arb (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local ARB
+    // Local gc_mxr
     //-------------------------------------------------------   
-    reg          [7:0]       arb_fsm;
+    reg          [7:0]       mxr_fsm;
 
     ////////////////////////////////////////////////
-    // ARB
+    // gc_mxr
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            arb_fsm <= s0;
+            mxr_fsm <= s0;
         end
         
         else begin  // not rst
 
-            chn_reqep <= 1'b1;
-            tx_trn <= 1'b0;
-            rx_trn <= 1'b0;
-            irq_trn <= 1'b0;
+            gc1_updt_ack <= 1'b0;
+            gc2_updt_ack <= 1'b0;
 
-            case (arb_fsm)
+            case (mxr_fsm)
 
                 s0 : begin
-                    chn_drvn <= 1'b0;
-                    arb_fsm <= s1;
+                    gc_updt <= 1'b0;
+                    mxr_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (chn_trn) begin
-                        chn_drvn <= 1'b1;
-                        if (irq_reqep) begin
-                            irq_trn <= 1'b1;
-                        end
-                        else if (tx_reqep) begin
-                            tx_trn <= 1'b1;
-                        end
-                        else begin
-                            rx_trn <= 1'b1;
-                        end
-                        arb_fsm <= s2;
+                    gc_addr <= gc1_addr;
+                    if (gc1_updt) begin
+                        gc1_updt_ack <= 1'b1;
+                        gc_updt <= 1'b1;
+                        mxr_fsm <= s2;
                     end
                 end
 
-                s2 : arb_fsm <= s3;
+                s2 : begin
+                    if (gc_updt_ack) begin
+                        gc_updt <= 1'b0;
+                        mxr_fsm <= s3;
+                    end
+                end
 
                 s3 : begin
-                    if ((!tx_drvn) && (!rx_drvn) && (!irq_drvn)) begin
-                        chn_drvn <= 1'b0;
-                        arb_fsm <= s1;
+                    gc_addr <= gc2_addr;
+                    if (gc2_updt) begin
+                        gc2_updt_ack <= 1'b1;
+                        gc_updt <= 1'b1;
+                        mxr_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
+                    if (gc_updt_ack) begin
+                        gc_updt <= 1'b0;
+                        mxr_fsm <= s1;
                     end
                 end
 
                 default : begin 
-                    arb_fsm <= s0;
+                    mxr_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // arb
+endmodule // gc_mxr
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

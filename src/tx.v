@@ -97,7 +97,8 @@ module tx # (
     input        [4:0]       tag_trn,
     output                   tag_inc,
     input                    my_trn,
-    output                   drv_ep
+    output                   drv_ep,
+    output                   req_ep
     );
 
     //-------------------------------------------------------
@@ -145,6 +146,7 @@ module tx # (
     //-------------------------------------------------------
     // Local irq_gen
     //-------------------------------------------------------
+    wire                     dta_rdy;
     wire         [63:0]      hw_ptr;
     wire         [63:0]      sw_ptr;
 
@@ -209,10 +211,10 @@ module tx # (
     //-------------------------------------------------------
     tlp2ibuff #(
         // HST NOTIFICATIONS
-        .DSCW(DSCW),
-        .DSC_CPL_MSG(DSC_CPL_MSG),
-        .DSC_BASE_QW(DSC_BASE_QW),
-        .GC_BASE_QW(GC_BASE_QW),
+        .DSCW(1),
+        .DSC_CPL_MSG(32'hCACABEEF),
+        .DSC_BASE_QW(0),
+        .GC_BASE_QW(1),
         // MISC
         .BW(BW)
     ) tlp2ibuff_mod (
@@ -253,12 +255,14 @@ module tx # (
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // irq_gen
+        .send_irq(dta_rdy),                                    // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
         .tag_trn(tag_trn),                                     // I [4:0]
         .tag_inc(tag_inc),                                     // O
         .my_trn(my_trn),                                       // I
-        .drv_ep(drv_ep)                                        // O
+        .drv_ep(drv_ep),                                       // O
+        .req_ep(req_ep)                                        // O
         );
 
     //-------------------------------------------------------
@@ -318,7 +322,7 @@ module tx # (
     tx_irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
-        .dta_rdy(),                                     // I
+        .dta_rdy(dta_rdy),                                     // I
         .hw_ptr(hw_ptr),                                       // I [63:0]
         .sw_ptr(sw_ptr),                                       // I [63:0]
         .send_irq(send_irq)                                    // O

@@ -99,13 +99,15 @@ module tlp2ibuff # (
     output       [63:0]      wr_data,
 
     // irq_gen
+    output                   send_irq,
     output       [63:0]      hw_ptr,
 
     // EP arb
     input        [4:0]       tag_trn,
     output                   tag_inc,
     input                    my_trn,
-    output                   drv_ep
+    output                   drv_ep,
+    output                   req_ep
     );
 
     //-------------------------------------------------------
@@ -120,10 +122,31 @@ module tlp2ibuff # (
     // dsc_mgmt
     wire                     dsc_rdy;
     wire                     dsc_rdy_ack;
-    // gc_mgmt
+
+    //-------------------------------------------------------
+    // Local gc_mxr
+    //-------------------------------------------------------
+    // gc updt 1
+    wire         [63:0]      gc1_addr;
+    wire                     gc1_updt;
+    wire                     gc1_updt_ack;
+    // gc updt 2
+    wire         [63:0]      gc2_addr;
+    wire                     gc2_updt;
+    wire                     gc2_updt_ack;
+    // gc updt
     wire         [63:0]      gc_addr;
     wire                     gc_updt;
     wire                     gc_updt_ack;
+
+    //-------------------------------------------------------
+    // Local rcv_cpl
+    //-------------------------------------------------------
+    // gc updt
+    wire                     cpl1_rcved;
+    wire                     cpl2_rcved;
+    wire         [9:0]       cpl_dws;
+    wire         [4:0]       cpl_tag;
 
     //-------------------------------------------------------
     // mem_rd
@@ -167,7 +190,81 @@ module tlp2ibuff # (
         .tag_trn(tag_trn),                                     // I [4:0]
         .tag_inc(tag_inc),                                     // O
         .my_trn(my_trn),                                       // I
-        .drv_ep(drv_ep)                                        // O
+        .drv_ep(drv_ep),                                       // O
+        .req_ep(req_ep)                                        // O
+        );
+
+    //-------------------------------------------------------
+    // gc_mxr
+    //-------------------------------------------------------
+    gc_mxr gc_mxr_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        // gc updt 1
+        .gc1_addr(gc1_addr),                                   // I [63:0]
+        .gc1_updt(gc1_updt),                                   // I
+        .gc1_updt_ack(gc1_updt_ack),                           // O
+        // gc updt 2
+        .gc2_addr(gc2_addr),                                   // I [63:0]
+        .gc2_updt(gc2_updt),                                   // I
+        .gc2_updt_ack(gc2_updt_ack),                           // O
+        // gc updt
+        .gc_addr(gc_addr),                                     // O [63:0]
+        .gc_updt(gc_updt),                                     // O
+        .gc_updt_ack(gc_updt_ack)                              // I
+        );
+
+    //-------------------------------------------------------
+    // GC 1
+    //-------------------------------------------------------
+    gc gc1_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        // lbuf_mgmt
+        .rd_lbuf(rd_lbuf1),                                    // I
+        .wt_lbuf(wt_lbuf1),                                    // O
+        .lbuf_addr(lbuf_addr),                                 // I [63:0]
+        .lbuf_len(lbuf_len),                                   // I [31:0]
+        // rcv_cpl
+        .cpl_rcved(cpl1_rcved),                                // I
+        .cpl_dws(cpl_dws),                                     // I [9:0]
+        .cpl_tag(cpl_tag),                                     // I [4:0]
+        // gc updt
+        .gc_addr(gc1_addr),                                   // O [63:0]
+        .gc_updt(gc1_updt),                                   // O
+        .gc_updt_ack(gc1_updt_ack)                            // I
+        );
+
+    //-------------------------------------------------------
+    // GC 2
+    //-------------------------------------------------------
+    gc gc2_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        // lbuf_mgmt
+        .rd_lbuf(rd_lbuf2),                                    // I
+        .wt_lbuf(wt_lbuf2),                                    // O
+        .lbuf_addr(lbuf_addr),                                 // I [63:0]
+        .lbuf_len(lbuf_len),                                   // I [31:0]
+        // rcv_cpl
+        .cpl_rcved(cpl2_rcved),                                // I
+        .cpl_dws(cpl_dws),                                     // I [9:0]
+        .cpl_tag(cpl_tag),                                     // I [4:0]
+        // gc updt
+        .gc_addr(gc2_addr),                                   // O [63:0]
+        .gc_updt(gc2_updt),                                   // O
+        .gc_updt_ack(gc2_updt_ack)                            // I
+        );
+
+    //-------------------------------------------------------
+    // IRQ gen
+    //-------------------------------------------------------
+    col_irq col_irq_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        .wt_lbuf1(wt_lbuf1),                                   // I
+        .wt_lbuf2(wt_lbuf2),                                   // I
+        .send_irq(send_irq)                                    // O
         );
 
 endmodule // tlp2ibuff

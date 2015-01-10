@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        arb.v
+*        col_irq.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between subsystems.
+*        Collapses irq.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,31 +43,15 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module arb (
+module col_irq (
 
     input                    clk,
     input                    rst,
 
-    // CHN trn
-    input                    chn_trn,
-    output reg               chn_drvn,
-    output reg               chn_reqep,
+    input                    wt_lbuf1,
+    input                    wt_lbuf2,
 
-    // ARB
-
-    // Tx
-    output reg               tx_trn,
-    input                    tx_drvn,
-    input                    tx_reqep,
-
-    // Rx
-    output reg               rx_trn,
-    input                    rx_drvn,
-
-    // IRQ
-    output reg               irq_trn,
-    input                    irq_drvn,
-    input                    irq_reqep
+    output reg               send_irq
     );
 
     // localparam
@@ -82,67 +66,51 @@ module arb (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local ARB
+    // Local col_irq
     //-------------------------------------------------------   
-    reg          [7:0]       arb_fsm;
+    reg          [7:0]       col_fsm;
 
     ////////////////////////////////////////////////
-    // ARB
+    // col_irq
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            arb_fsm <= s0;
+            col_fsm <= s0;
         end
         
         else begin  // not rst
 
-            chn_reqep <= 1'b1;
-            tx_trn <= 1'b0;
-            rx_trn <= 1'b0;
-            irq_trn <= 1'b0;
+            send_irq <= 1'b0;
 
-            case (arb_fsm)
+            case (col_fsm)
 
                 s0 : begin
-                    chn_drvn <= 1'b0;
-                    arb_fsm <= s1;
+                    col_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (chn_trn) begin
-                        chn_drvn <= 1'b1;
-                        if (irq_reqep) begin
-                            irq_trn <= 1'b1;
-                        end
-                        else if (tx_reqep) begin
-                            tx_trn <= 1'b1;
-                        end
-                        else begin
-                            rx_trn <= 1'b1;
-                        end
-                        arb_fsm <= s2;
+                    if (wt_lbuf1 || wt_lbuf2) begin
+                        col_fsm <= s2;
                     end
                 end
 
-                s2 : arb_fsm <= s3;
-
-                s3 : begin
-                    if ((!tx_drvn) && (!rx_drvn) && (!irq_drvn)) begin
-                        chn_drvn <= 1'b0;
-                        arb_fsm <= s1;
+                s2 : begin
+                    if (!wt_lbuf1 && !wt_lbuf2) begin
+                        send_irq <= 1'b1;
+                        col_fsm <= s1;
                     end
                 end
 
                 default : begin 
-                    arb_fsm <= s0;
+                    col_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // arb
+endmodule // col_irq
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

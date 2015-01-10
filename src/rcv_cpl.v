@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        mem_rd.v
+*        rcv_cpl.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module mem_rd # (
+module rcv_cpl # (
     parameter DSCW = 1,
     parameter DSC_CPL_MSG = 32'hCACABEEF,
     parameter DSC_BASE_QW = 0,
@@ -216,7 +216,7 @@ module mem_rd # (
                     tag_inc <= 1'b1;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                lbuf64b_reg ? `MEM_RD64_FMT_TYPE : `MEM_RD32_FMT_TYPE,
+                                lbuf64b_reg ? `rcv_cpl64_FMT_TYPE : `rcv_cpl32_FMT_TYPE,
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -397,7 +397,7 @@ module mem_rd # (
         end     // not rst
     end  //always
 
-endmodule // mem_rd
+endmodule // rcv_cpl
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

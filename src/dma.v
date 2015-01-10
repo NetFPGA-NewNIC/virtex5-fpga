@@ -161,11 +161,14 @@ module dma (
     wire         [63:0]      cfg_dsn_n_c;
 
     //-------------------------------------------------------
-    // EP arb
+    // Local CHN ARB
     //-------------------------------------------------------
+    wire         [4:0]       tag_trn;
+    // CHN0 trn
     wire                     chn0_trn;
     wire                     chn0_drvn;
     wire                     chn0_reqep;
+    wire                     chn0_tag_inc;
 
     //-------------------------------------------------------
     // Local CHN0
@@ -314,6 +317,21 @@ module dma (
         );
 
     //-------------------------------------------------------
+    // CHN ARB
+    //-------------------------------------------------------
+    chn_arb chn_arb_mod (
+        .clk(trn_clk_c),                                       // I
+        .rst(pcie_rst),                                        // I
+        // TAG mgmt
+        .tag_trn(tag_trn),                                     // I [4:0]
+        // CHN0 trn
+        .chn0_trn(chn0_trn),                                   // O
+        .chn0_drvn(chn0_drvn),                                 // I
+        .chn0_reqep(chn0_reqep),                               // I
+        .chn0_tag_inc(chn0_tag_inc)                            // I
+        );
+
+    //-------------------------------------------------------
     // CHN0
     //-------------------------------------------------------
     chn #(
@@ -375,6 +393,8 @@ module dma (
         .cfg_function_number(cfg_function_number_c),           // I [2:0]
         .cfg_dcommand(cfg_dcommand_c),                         // I [15:0]
         // EP arb
+        .tag_trn(tag_trn),                                     // I [4:0]
+        .tag_inc(chn0_tag_inc),                                // O
         .chn_trn(chn0_trn),                                    // I
         .chn_drvn(chn0_drvn),                                  // O
         .chn_reqep(chn0_reqep)                                 // O

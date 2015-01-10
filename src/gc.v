@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        arb.v
+*        gc.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between subsystems.
+*        Monitors pulled data reception.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,31 +43,26 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module arb (
+module gc (
 
     input                    clk,
     input                    rst,
 
-    // CHN trn
-    input                    chn_trn,
-    output reg               chn_drvn,
-    output reg               chn_reqep,
+    // lbuf_mgmt
+    input                    rd_lbuf,
+    output reg               wt_lbuf,
+    input        [63:0]      lbuf_addr,
+    input        [31:0]      lbuf_len,
 
-    // ARB
+    // rcv_cpl
+    input                    cpl_rcved,
+    input        [9:0]       cpl_dws,
+    input        [4:0]       cpl_tag,
 
-    // Tx
-    output reg               tx_trn,
-    input                    tx_drvn,
-    input                    tx_reqep,
-
-    // Rx
-    output reg               rx_trn,
-    input                    rx_drvn,
-
-    // IRQ
-    output reg               irq_trn,
-    input                    irq_drvn,
-    input                    irq_reqep
+    // gc updt
+    output reg   [63:0]      gc_addr,
+    output reg               gc_updt,
+    input                    gc_updt_ack
     );
 
     // localparam
@@ -82,67 +77,96 @@ module arb (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local ARB
+    // Local gc
     //-------------------------------------------------------   
-    reg          [7:0]       arb_fsm;
+    reg          [7:0]       mon_fsm;
+    reg          [63:0]      lbuf_addr_reg;
+    reg          [31:0]      lbuf_len_reg;
+    reg          [31:0]      lbuf_len_reg;
+    reg          [31:0]      dw_cnt;
+    reg          [31:0]      nxt_dw_cnt;
 
     ////////////////////////////////////////////////
-    // ARB
+    // gc
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            arb_fsm <= s0;
+            wt_lbuf <= 1'b0;
+            mon_fsm <= s0;
         end
         
         else begin  // not rst
 
-            chn_reqep <= 1'b1;
-            tx_trn <= 1'b0;
-            rx_trn <= 1'b0;
-            irq_trn <= 1'b0;
+            gc_addr <= lbuf_addr_reg + {lbuf_len_reg, 3'b0};
 
-            case (arb_fsm)
+            case (mon_fsm)
 
                 s0 : begin
-                    chn_drvn <= 1'b0;
-                    arb_fsm <= s1;
+                    gc_updt <= 1'b0;
+                    mon_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (chn_trn) begin
-                        chn_drvn <= 1'b1;
-                        if (irq_reqep) begin
-                            irq_trn <= 1'b1;
-                        end
-                        else if (tx_reqep) begin
-                            tx_trn <= 1'b1;
-                        end
-                        else begin
-                            rx_trn <= 1'b1;
-                        end
-                        arb_fsm <= s2;
+                    lbuf_addr_reg <= lbuf_addr;
+                    lbuf_len_reg <= lbuf_len;
+                    dw_cnt <= 'b0;
+                    if (rd_lbuf) begin
+                        mon_fsm <= s2;
                     end
                 end
 
-                s2 : arb_fsm <= s3;
+                s2 : begin
+                    wt_lbuf <= 1'b1;
+                    nxt_dw_cnt <= dw_cnt + cpl_dws;
+                    if (cpl_rcved) begin
+                        mon_fsm <= s3;
+                    end
+                end
 
                 s3 : begin
-                    if ((!tx_drvn) && (!rx_drvn) && (!irq_drvn)) begin
-                        chn_drvn <= 1'b0;
-                        arb_fsm <= s1;
+                    dw_cnt <= nxt_dw_cnt;
+                    mon_fsm <= s4;
+                end
+
+                s4 : begin
+                    if ({lbuf_len_reg, 1'b0} == dw_cnt) begin
+                        gc_updt <= 1'b1;
+                        mon_fsm <= s5;
+                    end
+                    else begin
+                        mon_fsm <= s2;
+                    end
+                end
+
+                s5 : begin
+                    if (gc_updt_ack) begin
+                        wt_lbuf <= 1'b0;
+                        gc_updt <= 1'b0;
+                        if (!rd_lbuf) begin
+                            mon_fsm <= s1;
+                        end
+                        else begin
+                            mon_fsm <= s6;
+                        end
+                    end
+                end
+
+                s6 : begin
+                    if (!rd_lbuf) begin
+                        mon_fsm <= s1;
                     end
                 end
 
                 default : begin 
-                    arb_fsm <= s0;
+                    mon_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // arb
+endmodule // gc
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

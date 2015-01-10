@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        arb.v
+*        chn_arb.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Arbitrates access to PCIe endpoint between subsystems.
+*        arbitrates access to PCIe endpoint between channels.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,31 +43,25 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module arb (
+module chn_arb (
 
     input                    clk,
     input                    rst,
 
-    // CHN trn
-    input                    chn_trn,
-    output reg               chn_drvn,
-    output reg               chn_reqep,
+    // TAG mgmt
+    output reg   [4:0]       tag_trn,
 
-    // ARB
+    // CHN0 trn
+    output reg               chn0_trn,
+    input                    chn0_drvn,
+    input                    chn0_reqep,
+    input                    chn0_tag_inc,
 
-    // Tx
-    output reg               tx_trn,
-    input                    tx_drvn,
-    input                    tx_reqep,
-
-    // Rx
-    output reg               rx_trn,
-    input                    rx_drvn,
-
-    // IRQ
-    output reg               irq_trn,
-    input                    irq_drvn,
-    input                    irq_reqep
+    // CHN1 trn
+    output reg               chn1_trn,
+    input                    chn1_drvn,
+    input                    chn1_reqep,
+    input                    chn1_tag_inc
     );
 
     // localparam
@@ -82,67 +76,78 @@ module arb (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local ARB
+    // Local chn_arb
     //-------------------------------------------------------   
-    reg          [7:0]       arb_fsm;
+    reg          [7:0]       chn_arb_fsm;
+    reg          [7:0]       nxt_tag;
 
     ////////////////////////////////////////////////
-    // ARB
+    // chn_arb
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            arb_fsm <= s0;
+            chn_arb_fsm <= s0;
         end
         
         else begin  // not rst
 
-            chn_reqep <= 1'b1;
-            tx_trn <= 1'b0;
-            rx_trn <= 1'b0;
-            irq_trn <= 1'b0;
+            chn0_trn <= 1'b0;
+            chn1_trn <= 1'b0;
 
-            case (arb_fsm)
+            nxt_tag <= tag_trn + 1;
+            if (chn0_tag_inc || chn1_tag_inc) begin
+                tag_trn <= nxt_tag;
+            end
+
+            case (chn_arb_fsm)
 
                 s0 : begin
-                    chn_drvn <= 1'b0;
-                    arb_fsm <= s1;
+                    chn0_trn <= 1'b0;
+                    chn1_trn <= 1'b0;
+                    tag_trn <= 'b0;
+                    chn_arb_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (chn_trn) begin
-                        chn_drvn <= 1'b1;
-                        if (irq_reqep) begin
-                            irq_trn <= 1'b1;
+                    if (!chn0_drvn) begin
+                        if (chn1_reqep) begin
+                            chn1_trn <= 1'b1;
+                            chn_arb_fsm <= s3;
                         end
-                        else if (tx_reqep) begin
-                            tx_trn <= 1'b1;
+                        else if (chn0_reqep) begin
+                            chn0_trn <= 1'b1;
+                            chn_arb_fsm <= s2;
                         end
-                        else begin
-                            rx_trn <= 1'b1;
-                        end
-                        arb_fsm <= s2;
                     end
                 end
 
-                s2 : arb_fsm <= s3;
+                s2 : chn_arb_fsm <= s1;
 
-                s3 : begin
-                    if ((!tx_drvn) && (!rx_drvn) && (!irq_drvn)) begin
-                        chn_drvn <= 1'b0;
-                        arb_fsm <= s1;
+                s3 : chn_arb_fsm <= s4;
+
+                s4 : begin
+                    if (!chn1_drvn) begin
+                        if (chn0_reqep) begin
+                            chn0_trn <= 1'b1;
+                            chn_arb_fsm <= s2;
+                        end
+                        else if (chn1_reqep) begin
+                            chn1_trn <= 1'b1;
+                            chn_arb_fsm <= s3;
+                        end
                     end
                 end
 
                 default : begin 
-                    arb_fsm <= s0;
+                    chn_arb_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // arb
+endmodule // chn_arb
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
