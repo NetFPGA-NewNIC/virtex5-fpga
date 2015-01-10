@@ -50,7 +50,7 @@ module tx_frm_sync # (
     input                    clk,
     input                    rst,
 
-    // buff
+    // ibuff
     input        [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 

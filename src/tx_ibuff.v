@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        tx_interrupt_gen.v
+*        tx_ibuff.v
 *
 *  Project:
 *
@@ -12,8 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Rx interrupt generation.
-*
+*        Internal buffers
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
 *
@@ -42,78 +41,50 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
+`include "includes.v"
 
-module tx_interrupt_gen (
+module tx_ibuff # (
+    parameter  AW = 9,
+    parameter  DW = 64) ( 
 
+    input      [AW-1:0]     a,
+    input      [DW-1:0]     d,
+    input      [AW-1:0]     dpra,
     input                   clk,
-    input                   reset,
-
-    input       [63:0]      hw_pointer,
-    input       [63:0]      sw_pointer,
-    input                   data_ready,
-
-    output reg              send_interrupt
+    input                   qdpo_clk,
+    output reg [DW-1:0]     qdpo
     );
 
-    // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
-    localparam s4 = 8'b00001000;
-    localparam s5 = 8'b00010000;
-    localparam s6 = 8'b00100000;
-    localparam s7 = 8'b01000000;
-    localparam s8 = 8'b10000000;
-
-    // Local wires and reg
+    //-------------------------------------------------------
+    // Local port a
+    //-------------------------------------------------------
+    reg     [AW-1:0]     a_reg;
+    reg     [DW-1:0]     d_reg;
+    reg     [DW-1:0]     dpram[(2**AW)-1:0];
 
     //-------------------------------------------------------
-    // Local interrupts_gen
-    //-------------------------------------------------------  
-    reg     [7:0]   interrupt_gen_fsm;
-    reg             data_ready_reg;
+    // Local port b
+    //-------------------------------------------------------
+    reg     [AW-1:0]     dpra_reg;
 
     ////////////////////////////////////////////////
-    // interrupts_gen
+    // port a
     ////////////////////////////////////////////////
     always @(posedge clk) begin
-
-        if (reset) begin  // reset
-            send_interrupt <= 1'b0;
-            interrupt_gen_fsm <= s0;
-        end
-        
-        else begin  // not reset
-
-            data_ready_reg <= data_ready;
-
-            case (interrupt_gen_fsm)
-
-                s0 : begin
-                    if (data_ready || data_ready_reg) begin
-                        send_interrupt <= 1'b1;
-                        interrupt_gen_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    if (hw_pointer == sw_pointer) begin
-                        send_interrupt <= 1'b0;
-                        interrupt_gen_fsm <= s0;
-                    end
-                end
-
-                default : begin
-                    interrupt_gen_fsm <= s0;
-                end
-
-            endcase
-        end     // not reset
+        a_reg <= a;
+        d_reg <= d;
+        dpram[a_reg] <= d_reg;
     end  //always
-   
 
-endmodule // tx_interrupt_gen
+    ////////////////////////////////////////////////
+    // port b
+    ////////////////////////////////////////////////
+    always @(posedge qdpo_clk) begin
+        dpra_reg <= dpra;
+        qdpo <= dpram[dpra];
+    end  //always
+
+endmodule // tx_ibuff
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

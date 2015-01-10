@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_buff.v
+*        rx_ibuff.v
 *
 *  Project:
 *
@@ -42,7 +42,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_buff # (
+module rx_ibuff # (
     parameter  AW = 10,
     parameter  DW = 64
     ) ( 
@@ -95,7 +95,7 @@ module rx_buff # (
         end
     end  //always
 
-endmodule // rx_buff
+endmodule // rx_ibuff
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

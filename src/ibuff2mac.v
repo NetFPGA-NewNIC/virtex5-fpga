@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        buff2mac.v
+*        ibuff2mac.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module buff2mac # (
+module ibuff2mac # (
     parameter BW = 9
     ) (
 
@@ -51,18 +51,18 @@ module buff2mac # (
     input                    rst,
 
     // MAC tx
-    output reg               tx_underrun,
-    output reg   [63:0]      tx_data,
-    output reg   [7:0]       tx_data_valid,
-    output reg               tx_start,
+    output                   tx_underrun,
+    output       [63:0]      tx_data,
+    output       [7:0]       tx_data_valid,
+    output                   tx_start,
     input                    tx_ack,
 
-    // buff
+    // ibuff
     output       [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
     // bwd logic
-    output reg   [BW:0]      committed_cons,
+    output       [BW:0]      committed_cons,
     input        [BW:0]      committed_prod
     );
 
@@ -82,7 +82,7 @@ module buff2mac # (
     tx_frm_sync #(.BW(BW)) frm_sync_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
-        // buff
+        // ibuff
         .rd_addr(rd_addr),                                     // I [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
@@ -108,22 +108,22 @@ module buff2mac # (
         .tx_data_valid(tx_data_valid),                         // O [7:0]
         .tx_start(tx_start),                                   // O
         .tx_ack(tx_ack),                                       // I
-        // buff
+        // ibuff
         .rd_addr(rd_addr),                                     // O [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
         .committed_cons(committed_cons),                       // O [BW:0]
         .committed_prod(committed_prod),                       // I [BW:0]
         // frm_sync
-        .trig(trig),                                           // O
+        .trig(trig),                                           // I
         .qw_len(qw_len),                                       // I [12:0]
-        .lst_ben(lst_ben),                                     // O [7:0]
-        .rsk(rsk),                                             // O
-        .rsk_tk(rsk_tk),                                       // I
-        .sync(sync)                                            // I
+        .lst_ben(lst_ben),                                     // I [7:0]
+        .rsk(rsk),                                             // I
+        .rsk_tk(rsk_tk),                                       // O
+        .sync(sync)                                            // O
         );
 
-endmodule // buff2mac
+endmodule // ibuff2mac
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

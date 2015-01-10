@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_hst_ctrl.v
+*        hst_ctrl.v
 *
 *  Project:
 *
@@ -43,12 +43,13 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_hst_ctrl # (
+module hst_ctrl # (
     parameter BARHIT = 2,
-    parameter BARMP_LBUF1_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF1_EN = 6'bxxxxxx,
-    parameter BARMP_LBUF2_ADDR = 6'bxxxxxx,
-    parameter BARMP_LBUF2_EN = 6'bxxxxxx
+    parameter BARMP_CPL_ADDR = 6'b111111,
+    parameter BARMP_LBUF1_ADDR = 6'b111111,
+    parameter BARMP_LBUF1_EN = 6'b111111,
+    parameter BARMP_LBUF2_ADDR = 6'b111111,
+    parameter BARMP_LBUF2_EN = 6'b111111
     ) (
 
     input                    clk,
@@ -63,11 +64,15 @@ module rx_hst_ctrl # (
     input        [6:0]       trn_rbar_hit_n,
 
     // hst_ctrl
+    output reg   [63:0]      cpl_addr,
+
     output reg   [63:0]      lbuf1_addr,
+    output reg   [31:0]      lbuf1_len,
     output reg               lbuf1_en,
     input                    lbuf1_dn,
 
     output reg   [63:0]      lbuf2_addr,
+    output reg   [31:0]      lbuf2_len,
     output reg               lbuf2_en,
     input                    lbuf2_dn
     );
@@ -93,6 +98,7 @@ module rx_hst_ctrl # (
     reg          [31:0]      aux_dw;
     reg          [63:0]      lbuf1_addr_i;
     reg          [63:0]      lbuf2_addr_i;
+    reg          [63:0]      cpl_addr_i;
 
     ////////////////////////////////////////////////
     // Output driver
@@ -105,16 +111,21 @@ module rx_hst_ctrl # (
         end
         
         else begin  // not rst
-            if (lbuf1_en_i) 
+            if (lbuf1_en_i) begin
                 lbuf1_en <= 1'b1;
-            else if (lbuf1_dn) 
+                lbuf1_len <= dw_endian_conv(aux_dw);
+            end
+            else if (lbuf1_dn) begin
                 lbuf1_en <= 1'b0;
+            end
 
-            if (lbuf2_en_i) 
+            if (lbuf2_en_i) begin
                 lbuf2_en <= 1'b1;
-            else if (lbuf2_dn) 
+                lbuf2_len <= dw_endian_conv(aux_dw);
+            end
+            else if (lbuf2_dn) begin
                 lbuf2_en <= 1'b0;
-
+            end
         end     // not rst
     end  //always
 
@@ -137,6 +148,8 @@ module rx_hst_ctrl # (
             lbuf1_addr <= lbuf1_addr_i;
             lbuf2_addr <= lbuf2_addr_i;
 
+            cpl_addr <= cpl_addr_i;
+
             case (tlp_rx_fsm)
 
                 s0 : begin
@@ -145,7 +158,7 @@ module rx_hst_ctrl # (
                             tlp_rx_fsm <= s1;
                         end
                         else if (trn_rd[62:56] == `MEM_WR64_FMT_TYPE) begin
-                            tlp_rx_fsm <= s4;
+                            tlp_rx_fsm <= s5;
                         end
                     end
                 end
@@ -173,6 +186,10 @@ module rx_hst_ctrl # (
                                 tlp_rx_fsm <= s0;
                             end
 
+                            BARMP_CPL_ADDR : begin
+                                tlp_rx_fsm <= s4;
+                            end
+
                             default : begin //other addresses
                                 tlp_rx_fsm <= s0;
                             end
@@ -189,6 +206,14 @@ module rx_hst_ctrl # (
                 end
 
                 s3 : begin
+                    cpl_addr_i[31:0] <= dw_endian_conv(aux_dw);
+                    cpl_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
+                    if (!trn_rsrc_rdy_n) begin
+                        tlp_rx_fsm <= s0;
+                    end
+                end
+
+                s4 : begin
                     lbuf2_addr_i[31:0] <= dw_endian_conv(aux_dw);
                     lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
@@ -196,16 +221,16 @@ module rx_hst_ctrl # (
                     end
                 end
 
-                s4 : begin
+                s5 : begin
                     if (!trn_rsrc_rdy_n) begin
                         case (trn_rd[7:2])
 
                             BARMP_LBUF1_ADDR : begin
-                                tlp_rx_fsm <= s5;
+                                tlp_rx_fsm <= s6;
                             end
 
                             BARMP_LBUF2_ADDR : begin
-                                tlp_rx_fsm <= s6;
+                                tlp_rx_fsm <= s7;
                             end
 
                             BARMP_LBUF1_EN : begin
@@ -218,6 +243,10 @@ module rx_hst_ctrl # (
                                 tlp_rx_fsm <= s0;
                             end
 
+                            BARMP_CPL_ADDR : begin
+                                tlp_rx_fsm <= s8;
+                            end
+
                             default : begin //other addresses
                                 tlp_rx_fsm <= s0;
                             end
@@ -225,7 +254,7 @@ module rx_hst_ctrl # (
                     end
                 end
 
-                s5 : begin
+                s6 : begin
                     lbuf1_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
                     lbuf1_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
@@ -233,9 +262,17 @@ module rx_hst_ctrl # (
                     end
                 end
 
-                s6 : begin
+                s7 : begin
                     lbuf2_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
                     lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
+                    if (!trn_rsrc_rdy_n) begin
+                        tlp_rx_fsm <= s0;
+                    end
+                end
+
+                s8 : begin
+                    cpl_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
+                    cpl_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
@@ -249,7 +286,7 @@ module rx_hst_ctrl # (
         end     // not rst
     end  //always
 
-endmodule // rx_hst_ctrl
+endmodule // hst_ctrl
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

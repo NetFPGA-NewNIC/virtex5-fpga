@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        mac2buff.v
+*        mac2ibuff.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module mac2buff # (
+module mac2ibuff # (
     parameter BW = 10
     ) (
 
@@ -56,7 +56,7 @@ module mac2buff # (
     input                    rx_good_frame,
     input                    rx_bad_frame,
 
-    // buff
+    // ibuff
     output reg   [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
@@ -81,7 +81,7 @@ module mac2buff # (
     localparam MAX_DIFF = (2**BW) - 6;
 
     //-------------------------------------------------------
-    // Local mac2buff
+    // Local mac2ibuff
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [15:0]      len;
@@ -92,7 +92,7 @@ module mac2buff # (
     reg                      rx_bad_frame_reg;
 
     ////////////////////////////////////////////////
-    // Inbound ethernet frame to buff
+    // Inbound ethernet frame to ibuff
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -159,7 +159,7 @@ module mac2buff # (
                         end
                     endcase
 
-                    if (diff > MAX_DIFF) begin           // buffer is almost full
+                    if (diff > MAX_DIFF) begin           // ibuffer is almost full
                         rx_fsm <= s3;
                     end
                     else if (rx_good_frame) begin        // eof (good frame)
@@ -202,7 +202,7 @@ module mac2buff # (
         end     // not rst
     end  //always
 
-endmodule // mac2buff
+endmodule // mac2ibuff
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

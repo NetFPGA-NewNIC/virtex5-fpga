@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        buff2tlp.v
+*        ibuff2tlp.v
 *
 *  Project:
 *
@@ -45,7 +45,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module buff2tlp # (
+module ibuff2tlp # (
     parameter BW = 10
     ) (
 
@@ -79,10 +79,10 @@ module buff2tlp # (
     output reg               send_qws_ack,
     input        [5:0]       qw_cnt,
 
-    // mac2buff
+    // mac2ibuff
     output reg   [BW-1:0]    committed_cons,
 
-    // buff
+    // ibuff
     output reg   [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
@@ -130,7 +130,7 @@ module buff2tlp # (
     localparam s28 = 28'b1000000000000000000000000000;
 
     //-------------------------------------------------------
-    // Local send_tlps_machine
+    // Local send_fsm
     //-------------------------------------------------------   
     reg          [27:0]      send_fsm;
     reg          [8:0]       tlp_qw_cnt;
@@ -150,11 +150,12 @@ module buff2tlp # (
     reg          [31:0]      aux_rd_data;
     reg                      close_lbuf;
     reg          [15:0]      dropped_pkts_reg;
+    reg          [15:0]      cfg_completer_id_reg;
     
     assign hw_ptr = host_mem_addr;
 
     ////////////////////////////////////////////////
-    // write request TLP generation to huge_page
+    // send_fsm
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -189,6 +190,8 @@ module buff2tlp # (
             rd_addr_prev2 <= rd_addr_prev1;
 
             dropped_pkts_reg <= dropped_pkts;
+
+            cfg_completer_id_reg <= cfg_completer_id;
 
             case (send_fsm)
 
@@ -251,7 +254,7 @@ module buff2tlp # (
                                 {qw_in_tlp, 1'b0}  //lenght in DWs. 10-bit field    // QWs x2 equals DWs
                             };
                     trn_td[31:0] <= {
-                                cfg_completer_id,   //Requester ID
+                                cfg_completer_id_reg,   //Requester ID
                                 {3'b0, tlp_nmb },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
@@ -354,7 +357,7 @@ module buff2tlp # (
                                 10'h02  //lenght equal 2 DW 
                             };
                     trn_td[31:0] <= {
-                                cfg_completer_id,   //Requester ID
+                                cfg_completer_id_reg,   //Requester ID
                                 {4'b0, 4'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
@@ -450,7 +453,7 @@ module buff2tlp # (
                                 {qw_in_tlp, 1'b0}  //lenght in DWs. 10-bit field    // QWs x2 equals DWs
                             };
                     trn_td[31:0] <= {
-                                cfg_completer_id,   //Requester ID
+                                cfg_completer_id_reg,   //Requester ID
                                 {3'b0, tlp_nmb },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
@@ -563,7 +566,7 @@ module buff2tlp # (
                                 10'h02  //lenght equal 2 DW 
                             };
                     trn_td[31:0] <= {
-                                cfg_completer_id,   //Requester ID
+                                cfg_completer_id_reg,   //Requester ID
                                 {4'b0, 4'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
@@ -620,7 +623,7 @@ module buff2tlp # (
         end     // not rst
     end  //always
 
-endmodule // buff2tlp
+endmodule // ibuff2tlp
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

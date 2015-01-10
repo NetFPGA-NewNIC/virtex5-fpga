@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_gv_lbuf.v
+*        tx_irq_gen.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Gives lbufs.
+*        Tx interrupt generation.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,25 +43,16 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_gv_lbuf (
+module tx_irq_gen (
 
     input                    clk,
     input                    rst,
 
-    // hst_ctrl
-    input        [63:0]      lbuf1_addr,
-    input                    lbuf1_en,
-    output reg               lbuf1_dn,
+    input                    dta_rdy,
+    input        [63:0]      hw_ptr,
+    input        [63:0]      sw_ptr,
 
-    input        [63:0]      lbuf2_addr,
-    input                    lbuf2_en,
-    output reg               lbuf2_dn,
-
-    // gv_lbuf
-    output reg   [63:0]      lbuf_addr,
-    output reg               lbuf_en,
-    output reg               lbuf64b,
-    input                    lbuf_dn
+    output reg               send_irq
     );
 
     // localparam
@@ -76,72 +67,56 @@ module rx_gv_lbuf (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local gv_lbuf
-    //-------------------------------------------------------
-    reg          [7:0]       giv_lbuf_fsm;
+    // Local irq_gen
+    //-------------------------------------------------------  
+    reg          [7:0]       irq_gen_fsm;
+    reg                      dta_rdy_reg;
 
     ////////////////////////////////////////////////
-    // gv_lbuf
+    // irq_gen
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            lbuf1_dn <= 1'b0;
-            lbuf2_dn <= 1'b0;
-            lbuf_en <= 1'b0;
-            giv_lbuf_fsm <= s0;
+            send_irq <= 1'b0;
+            irq_gen_fsm <= s0;
         end
-
+        
         else begin  // not rst
 
-            lbuf1_dn <= 1'b0;
-            lbuf2_dn <= 1'b0;
+            dta_rdy_reg <= dta_rdy;
 
-            case (giv_lbuf_fsm)
+            case (irq_gen_fsm)
 
                 s0 : begin
-                    lbuf_addr <= lbuf1_addr;
-                    lbuf64b <= | lbuf1_addr[63:32];
-                    if (lbuf1_en) begin
-                        lbuf_en <= 1'b1;
-                        giv_lbuf_fsm <= s1;
-                    end
+                    send_irq <= 1'b0;
+                    dta_rdy_reg <= 1'b0;
+                    irq_gen_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (lbuf_dn) begin
-                        lbuf_en <= 1'b0;
-                        lbuf1_dn <= 1'b1;
-                        giv_lbuf_fsm <= s2;
+                    if (dta_rdy || dta_rdy_reg) begin
+                        send_irq <= 1'b1;
+                        irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    lbuf_addr <= lbuf2_addr;
-                    lbuf64b <= | lbuf2_addr[63:32];
-                    if (lbuf2_en) begin
-                        lbuf_en <= 1'b1;
-                        giv_lbuf_fsm <= s3;
-                    end
-                end
-
-                s3 : begin
-                    if (lbuf_dn) begin
-                        lbuf_en <= 1'b0;
-                        lbuf2_dn <= 1'b1;
-                        giv_lbuf_fsm <= s0;
+                    if (hw_ptr == sw_ptr) begin
+                        send_irq <= 1'b0;
+                        irq_gen_fsm <= s1;
                     end
                 end
 
                 default : begin
-                    giv_lbuf_fsm <= s0;
+                    irq_gen_fsm <= s0;
                 end
 
             endcase
         end     // not rst
     end  //always
 
-endmodule // rx_gv_lbuf
+endmodule // tx_irq_gen
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

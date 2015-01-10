@@ -57,7 +57,7 @@ module tx_eth # (
     output reg               tx_start,
     input                    tx_ack,
 
-    // buff
+    // ibuff
     output       [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
@@ -105,9 +105,6 @@ module tx_eth # (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            tx_underrun <= 1'b0;
-            tx_start <= 1'b0;
-            tx_data_valid <= 'b0;
             snd_fsm <= s0;
         end
         
