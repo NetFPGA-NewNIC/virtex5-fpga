@@ -44,9 +44,6 @@
 //`default_nettype none
 
 module ibuf_mgmt # (
-    // GLBL
-    parameter 
-    // LOCL
     parameter MX_OS_RQ = 4,
     // MISC
     parameter BW = 9
@@ -64,7 +61,6 @@ module ibuf_mgmt # (
     input        [6:0]       trn_rbar_hit_n,
 
     // CFG
-    input        [15:0]      cfg_completer_id,
     input        [2:0]       cfg_max_rd_req_size,
 
     // lbuf_mgmt
@@ -78,11 +74,11 @@ module ibuf_mgmt # (
     input                    lbuf_en,
     output reg               lbuf_dn,
 
-    // ibuff2mac
+    // ibuf2mac
     output reg   [BW:0]      committed_prod,
     input        [BW:0]      committed_cons,
 
-    // ibuff
+    // ibuf
     output       [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
@@ -151,6 +147,7 @@ module ibuf_mgmt # (
     reg          [BW:0]      iprod_reg;
     reg          [BW:0]      nxt_iprod;
     reg          [1:0]       rq2lbuf[0:31];
+    reg          [4:0]       trgt_tag_lkup[0:MX_OS_RQ-1];
 
     //-------------------------------------------------------
     // Local ftr_fsm
@@ -163,7 +160,7 @@ module ibuf_mgmt # (
     reg          [4:0]       tlp_tag;
 
     //-------------------------------------------------------
-    // Local wr2ibuff
+    // Local wr2ibuf
     //-------------------------------------------------------   
     reg          [14:0]      wr_fsm;
     reg          [14:0]      commit_prod_fsm;
@@ -178,8 +175,8 @@ module ibuf_mgmt # (
     reg                      tlp_len_odd;
     reg          [9:0]       rcv_len[0:31];
     reg          [9:0]       nxt_rcv_len;
-    reg          [BW:0]      ibuff_addr[0:31];
-    reg          [BW:0]      nxt_ibuff_addr;
+    reg          [BW:0]      ibuf_addr[0:31];
+    reg          [BW:0]      nxt_ibuf_addr;
     reg          [BW:0]      nxt_wr_addr;
     reg          [BW:0]      nxt_wr_addr_p1;
     reg          [31:0]      saved_dw[0:31];
@@ -187,9 +184,10 @@ module ibuf_mgmt # (
     reg          [31:0]      aux_dw;
     reg                      eo_cpl;
     reg          [4:0]       trgt_tag;
-    reg          [4:0]       nxt_trgt_tag;
     integer                  j;
     reg                      data_ready[0:31];
+    reg                      rq_dn;
+    reg          [4:0]       tag_dn;
 
     //-------------------------------------------------------
     // Local ftr_fsm
@@ -302,6 +300,7 @@ module ibuf_mgmt # (
                     iprod_reg <= iprod;
                     rq_len[rd_tag] <= rd_qw_i;
                     snt_rq <= nxt_snt_rq;
+                    trgt_tag_lkup[snt_rq] <= rd_tag;
 
                     rd_tag_reg <= rd_tag;
                     if (rd_ack) begin
@@ -372,6 +371,10 @@ module ibuf_mgmt # (
                 exp_tlp[rd_tag_reg] <= 1'b1;
             end
 
+            if (rq_dn) begin
+                exp_tlp[tag_dn] <= 1'b0;
+            end
+
             case (ftr_fsm)
 
                 s0 : begin
@@ -407,7 +410,7 @@ module ibuf_mgmt # (
     end  //always
 
     ////////////////////////////////////////////////
-    // wr2ibuff
+    // wr2ibuf
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
@@ -419,19 +422,20 @@ module ibuf_mgmt # (
         else begin  // not rst
 
             eo_cpl <= 1'b0;
+            rq_dn <= 1'b0;
 
             trn_rd_reg <= trn_rd;
             trn_reof_n_reg <= trn_reof_n;
             trn_rsrc_rdy_n_reg <= trn_rsrc_rdy_n;
 
             if (rd && rd_ack) begin
-                ibuff_addr[rd_tag] <= iprod_reg;
+                ibuf_addr[rd_tag] <= iprod_reg;
                 rcv_len[rd_tag] <= 'b0;
                 saved_dw_en[rd_tag] <= 1'b0;
             end
 
-            nxt_trgt_tag <= trgt_tag + 1;
             nxt_cpl_rq <= cpl_rq + 1;
+            trgt_tag <= trgt_tag_lkup[cpl_rq];
             case (commit_prod_fsm)
 
                 s0 : begin
@@ -444,23 +448,26 @@ module ibuf_mgmt # (
                     commit_prod_fsm <= s1;
                 end
 
-                s1 : begin
+                s1 : commit_prod_fsm <= s2; // delay for trgt_tag
+
+                s2 : begin
                     if (data_ready[trgt_tag]) begin
-                        committed_prod <= ibuff_addr[trgt_tag];
+                        committed_prod <= ibuf_addr[trgt_tag];
                     end
                     if ((rcv_len[trgt_tag] == rq_len[trgt_tag]) && data_ready[trgt_tag]) begin
-                        commit_prod_fsm <= s2;
+                        commit_prod_fsm <= s3;
                     end
                 end
 
-                s2 : begin
-                    trgt_tag <= nxt_trgt_tag;
+                s3 : begin
                     cpl_rq <= nxt_cpl_rq;
                     data_ready[trgt_tag] <= 1'b0;
+                    rq_dn <= 1'b1;
+                    tag_dn <= trgt_tag;
                     commit_prod_fsm <= s1;
                 end
 
-                default : begin //other TLPs
+                default : begin
                     commit_prod_fsm <= s0;
                 end
 
@@ -483,15 +490,15 @@ module ibuf_mgmt # (
                 end
 
                 s2 : begin
-                    nxt_ibuff_addr <= ibuff_addr[tlp_tag_reg] + tlp_len_qw;
+                    nxt_ibuf_addr <= ibuf_addr[tlp_tag_reg] + tlp_len_qw;
                     nxt_rcv_len <= rcv_len[tlp_tag_reg] + tlp_len_qw;
 
                     data_ready[tlp_tag_reg] <= 1'b0;
 
-                    nxt_wr_addr <= ibuff_addr[tlp_tag_reg];
-                    nxt_wr_addr_p1 <= ibuff_addr[tlp_tag_reg] + 1;
+                    nxt_wr_addr <= ibuf_addr[tlp_tag_reg];
+                    nxt_wr_addr_p1 <= ibuf_addr[tlp_tag_reg] + 1;
 
-                    wr_addr <= ibuff_addr[tlp_tag_reg];
+                    wr_addr <= ibuf_addr[tlp_tag_reg];
                     wr_data[63:32] <= dw_endian_conv(trn_rd_reg[31:0]);
                     wr_data[31:0] <= saved_dw[tlp_tag_reg];
 
@@ -515,7 +522,7 @@ module ibuf_mgmt # (
                 end
 
                 s3 : begin   // P -> P
-                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
                     saved_dw_en[tlp_tag_reg] <= 1'b0;
 
@@ -534,7 +541,7 @@ module ibuf_mgmt # (
                 end
 
                 s4 : begin   // P -> I
-                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
 
                     saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[31:0]);
@@ -555,7 +562,7 @@ module ibuf_mgmt # (
                 end
 
                 s5 : begin   // I -> P
-                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
 
                     saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[63:31]);
@@ -574,7 +581,7 @@ module ibuf_mgmt # (
                 end
 
                 s5 : begin   // I -> I
-                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr + 1;
+                    ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr + 1;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
 

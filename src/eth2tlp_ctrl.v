@@ -54,7 +54,7 @@ module eth2tlp_ctrl # (
     // CFG
     input        [2:0]       cfg_max_payload_size,
 
-    // mac2ibuff
+    // mac2ibuf
     input        [BW-1:0]    committed_prod,
     input                    mac_activity,
 

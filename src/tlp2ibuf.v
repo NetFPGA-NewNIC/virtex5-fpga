@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        tlp2ibuff.v
+*        tlp2ibuf.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module tlp2ibuff # (
+module tlp2ibuf # (
     // HST NOTIFICATIONS
     parameter DSCW = 1,
     parameter DSC_CPL_MSG = 32'hCACABEEF,
@@ -91,11 +91,11 @@ module tlp2ibuff # (
     input                    lbuf64b,
     output                   lbuf_dn,
 
-    // ibuff2mac
+    // ibuf2mac
     output       [BW:0]      committed_prod,
     input        [BW:0]      committed_cons,
 
-    // ibuff
+    // ibuf
     output       [BW-1:0]    wr_addr,
     output       [63:0]      wr_data,
 
@@ -195,6 +195,54 @@ module tlp2ibuff # (
         );
 
     //-------------------------------------------------------
+    // ibuf_mgmt
+    //-------------------------------------------------------
+    ibuf_mgmt #(
+        .MX_OS_RQ(4),
+        .BW(BW)
+    ) ibuf_mgmt_mod (
+        .clk(clk),                                             // I
+        .rst(rst),                                             // I
+        // TRN rx
+        .trn_rd(trn_rd),                                       // I [63:0]
+        .trn_rrem_n(trn_rrem_n),                               // I [7:0]
+        .trn_rsof_n(trn_rsof_n),                               // I
+        .trn_reof_n(trn_reof_n),                               // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
+        // CFG
+        .cfg_max_rd_req_size(cfg_max_rd_req_size),             // I [2:0]
+        // lbuf_mgmt
+        .rd_lbuf1(rd_lbuf1),                                   // I
+        .rd_lbuf2(rd_lbuf2),                                   // I
+        .wt_lbuf1(wt_lbuf1),                                   // I
+        .wt_lbuf2(wt_lbuf2),                                   // I
+        .lbuf_addr(lbuf_addr),                                 // I [63:0]
+        .lbuf_len(lbuf_len),                                   // I [31:0]
+        .lbuf_en(lbuf_en),                                     // I
+        .lbuf_dn(lbuf_dn),                                     // O
+        // ibuf2mac
+        .committed_prod(committed_prod),                       // O [BW:0]
+        .committed_cons(committed_cons),                       // I [BW:0]
+        // ibuf
+        .wr_addr(wr_addr),                                     // O [BW-1:0]
+        .wr_data(wr_data),                                     // O [63:0]
+        // gc
+        .cpl1_rcved(cpl1_rcved),                               // O
+        .cpl2_rcved(cpl2_rcved),                               // O
+        .cpl_dws(cpl_dws),                                     // O [9:0]
+        // mem_rd
+        .hst_addr(hst_addr),                                   // O [63:0]
+        .rd(rd),                                               // O
+        .rd_qw(rd_qw),                                         // O [8:0]
+        .rd_ack(rd_ack),                                       // I
+        .rd_tag(rd_tag),                                       // I [4:0]
+        // dsc_mgmt
+        .dsc_rdy(dsc_rdy),                                     // O
+        .dsc_rdy_ack(dsc_rdy_ack)                              // I
+        );
+
+    //-------------------------------------------------------
     // gc_mxr
     //-------------------------------------------------------
     gc_mxr gc_mxr_mod (
@@ -265,7 +313,7 @@ module tlp2ibuff # (
         .send_irq(send_irq)                                    // O
         );
 
-endmodule // tlp2ibuff
+endmodule // tlp2ibuf
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        ibuff2tlp.v
+*        ibuf2tlp.v
 *
 *  Project:
 *
@@ -45,7 +45,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module ibuff2tlp # (
+module ibuf2tlp # (
     parameter BW = 10
     ) (
 
@@ -79,10 +79,10 @@ module ibuff2tlp # (
     output reg               send_qws_ack,
     input        [5:0]       qw_cnt,
 
-    // mac2ibuff
+    // mac2ibuf
     output reg   [BW-1:0]    committed_cons,
 
-    // ibuff
+    // ibuf
     output reg   [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
@@ -623,7 +623,7 @@ module ibuff2tlp # (
         end     // not rst
     end  //always
 
-endmodule // ibuff2tlp
+endmodule // ibuf2tlp
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

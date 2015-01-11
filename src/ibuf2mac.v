@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        ibuff2mac.v
+*        ibuf2mac.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module ibuff2mac # (
+module ibuf2mac # (
     parameter BW = 9
     ) (
 
@@ -57,7 +57,7 @@ module ibuff2mac # (
     output                   tx_start,
     input                    tx_ack,
 
-    // ibuff
+    // ibuf
     output       [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 
@@ -82,7 +82,7 @@ module ibuff2mac # (
     tx_frm_sync #(.BW(BW)) frm_sync_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
-        // ibuff
+        // ibuf
         .rd_addr(rd_addr),                                     // I [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
@@ -108,7 +108,7 @@ module ibuff2mac # (
         .tx_data_valid(tx_data_valid),                         // O [7:0]
         .tx_start(tx_start),                                   // O
         .tx_ack(tx_ack),                                       // I
-        // ibuff
+        // ibuf
         .rd_addr(rd_addr),                                     // O [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
@@ -123,7 +123,7 @@ module ibuff2mac # (
         .sync(sync)                                            // O
         );
 
-endmodule // ibuff2mac
+endmodule // ibuf2mac
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

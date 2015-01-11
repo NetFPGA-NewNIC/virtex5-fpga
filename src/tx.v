@@ -102,12 +102,12 @@ module tx # (
     );
 
     //-------------------------------------------------------
-    // Local ibuff2mac
+    // Local ibuf2mac
     //-------------------------------------------------------
     wire         [BW:0]      committed_cons;
 
     //-------------------------------------------------------
-    // Local ibuff
+    // Local ibuf
     //-------------------------------------------------------
     wire         [BW-1:0]    wr_addr;
     wire         [63:0]      wr_data;
@@ -125,7 +125,7 @@ module tx # (
     wire         [BW:0]      committed_cons_sync;
 
     //-------------------------------------------------------
-    // Local tlp2ibuff
+    // Local tlp2ibuf
     //-------------------------------------------------------
     wire         [BW:0]      committed_prod;
     wire                     req_ep_i;
@@ -157,9 +157,9 @@ module tx # (
     assign req_ep = req_ep_i | lbuf_en;
 
     //-------------------------------------------------------
-    // ibuff2mac
+    // ibuf2mac
     //-------------------------------------------------------
-    ibuff2mac #(.BW(BW)) ibuff2mac_mod (
+    ibuf2mac #(.BW(BW)) ibuf2mac_mod (
         .clk(mac_clk),                                         // I
         .rst(mac_rst),                                         // I
         // MAC tx
@@ -168,7 +168,7 @@ module tx # (
         .tx_data_valid(mac_tx_data_valid),                     // O [7:0]
         .tx_start(mac_tx_start),                               // O
         .tx_ack(mac_tx_ack),                                   // I
-        // ibuff
+        // ibuf
         .rd_addr(rd_addr),                                     // O [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
@@ -177,9 +177,9 @@ module tx # (
         );
 
     //-------------------------------------------------------
-    // ibuff
+    // ibuf
     //-------------------------------------------------------
-    tx_ibuff #(.AW(BW), .DW(64)) ibuff_mod (
+    tx_ibuf #(.AW(BW), .DW(64)) ibuf_mod (
         .a(wr_addr),                                           // I [BW-1:0]
         .d(wr_data),                                           // I [63:0]
         .dpra(rd_addr),                                        // I [BW-1:0]
@@ -213,9 +213,9 @@ module tx # (
         );
 
     //-------------------------------------------------------
-    // tlp2ibuff
+    // tlp2ibuf
     //-------------------------------------------------------
-    tlp2ibuff #(
+    tlp2ibuf #(
         // HST NOTIFICATIONS
         .DSCW(1),
         .DSC_CPL_MSG(32'hCACABEEF),
@@ -223,7 +223,7 @@ module tx # (
         .GC_BASE_QW(1),
         // MISC
         .BW(BW)
-    ) tlp2ibuff_mod (
+    ) tlp2ibuf_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN tx
@@ -255,10 +255,10 @@ module tx # (
         .lbuf_en(lbuf_en),                                     // I
         .lbuf64b(lbuf64b),                                     // I
         .lbuf_dn(lbuf_dn),                                     // O
-        // ibuff2mac
+        // ibuf2mac
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons_sync),                  // I [BW:0]
-        // ibuff
+        // ibuf
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // irq_gen

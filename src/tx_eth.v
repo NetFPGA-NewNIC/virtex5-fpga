@@ -57,7 +57,7 @@ module tx_eth # (
     output reg               tx_start,
     input                    tx_ack,
 
-    // ibuff
+    // ibuf
     output       [BW-1:0]    rd_addr,
     input        [63:0]      rd_data,
 

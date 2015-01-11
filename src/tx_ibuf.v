@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_ibuff.v
+*        tx_ibuf.v
 *
 *  Project:
 *
@@ -41,11 +41,11 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 //`default_nettype none
+`include "includes.v"
 
-module rx_ibuff # (
-    parameter  AW = 10,
-    parameter  DW = 64
-    ) ( 
+module tx_ibuf # (
+    parameter  AW = 9,
+    parameter  DW = 64) ( 
 
     input      [AW-1:0]     a,
     input      [DW-1:0]     d,
@@ -60,8 +60,7 @@ module rx_ibuff # (
     //-------------------------------------------------------
     reg     [AW-1:0]     a_reg;
     reg     [DW-1:0]     d_reg;
-    reg     [DW-1:0]     dpram_0[(2**(AW-1))-1:0];
-    reg     [DW-1:0]     dpram_1[(2**(AW-1))-1:0];
+    reg     [DW-1:0]     dpram[(2**AW)-1:0];
 
     //-------------------------------------------------------
     // Local port b
@@ -74,12 +73,7 @@ module rx_ibuff # (
     always @(posedge clk) begin
         a_reg <= a;
         d_reg <= d;
-        if (!a_reg[AW-1]) begin
-            dpram_0[a_reg[AW-2:0]] <= d_reg;
-        end
-        else begin
-            dpram_1[a_reg[AW-2:0]] <= d_reg;
-        end
+        dpram[a_reg] <= d_reg;
     end  //always
 
     ////////////////////////////////////////////////
@@ -87,15 +81,10 @@ module rx_ibuff # (
     ////////////////////////////////////////////////
     always @(posedge qdpo_clk) begin
         dpra_reg <= dpra;
-        if (!dpra_reg[AW-1]) begin
-            qdpo <= dpram_0[dpra_reg[AW-2:0]];
-        end
-        else begin
-            qdpo <= dpram_1[dpra_reg[AW-2:0]];
-        end
+        qdpo <= dpram[dpra];
     end  //always
 
-endmodule // rx_ibuff
+endmodule // tx_ibuf
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
