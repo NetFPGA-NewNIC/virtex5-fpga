@@ -128,6 +128,7 @@ module tx # (
     // Local tlp2ibuff
     //-------------------------------------------------------
     wire         [BW:0]      committed_prod;
+    wire                     req_ep_i;
 
     //-------------------------------------------------------
     // Local lbuf_mgmt
@@ -149,6 +150,11 @@ module tx # (
     wire                     dta_rdy;
     wire         [63:0]      hw_ptr;
     wire         [63:0]      sw_ptr;
+
+    //-------------------------------------------------------
+    // assigns
+    //-------------------------------------------------------
+    assign req_ep = req_ep_i | lbuf_en;
 
     //-------------------------------------------------------
     // ibuff2mac
@@ -251,6 +257,7 @@ module tx # (
         .lbuf_dn(lbuf_dn),                                     // O
         // ibuff2mac
         .committed_prod(committed_prod),                       // O [BW:0]
+        .committed_cons(committed_cons_sync),                  // I [BW:0]
         // ibuff
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
@@ -262,7 +269,7 @@ module tx # (
         .tag_inc(tag_inc),                                     // O
         .my_trn(my_trn),                                       // I
         .drv_ep(drv_ep),                                       // O
-        .req_ep(req_ep)                                        // O
+        .req_ep(req_ep_i)                                      // O
         );
 
     //-------------------------------------------------------

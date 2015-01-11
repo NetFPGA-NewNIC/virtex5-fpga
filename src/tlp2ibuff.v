@@ -93,6 +93,7 @@ module tlp2ibuff # (
 
     // ibuff2mac
     output       [BW:0]      committed_prod,
+    input        [BW:0]      committed_cons,
 
     // ibuff
     output       [BW-1:0]    wr_addr,

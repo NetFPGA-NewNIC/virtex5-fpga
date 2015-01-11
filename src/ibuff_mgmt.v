@@ -44,6 +44,9 @@
 //`default_nettype none
 
 module ibuf_mgmt # (
+    // GLBL
+    parameter 
+    // LOCL
     parameter MX_OS_RQ = 4,
     // MISC
     parameter BW = 9
@@ -77,6 +80,7 @@ module ibuf_mgmt # (
 
     // ibuff2mac
     output reg   [BW:0]      committed_prod,
+    input        [BW:0]      committed_cons,
 
     // ibuff
     output       [BW-1:0]    wr_addr,
@@ -90,7 +94,7 @@ module ibuf_mgmt # (
     // mem_rd
     output reg   [63:0]      hst_addr,
     output reg               rd,
-    output reg   [8:0]       rd_qw,
+    output       [8:0]       rd_qw,
     input                    rd_ack,
     input        [4:0]       rd_tag,
 
@@ -118,6 +122,9 @@ module ibuf_mgmt # (
     localparam s14 = 15'b010000000000000;
     localparam s15 = 15'b100000000000000;
 
+    localparam LBF1ID = 2'b01;
+    localparam LBF2ID = 2'b10;
+
     //-------------------------------------------------------
     // Local rd_fsm
     //-------------------------------------------------------   
@@ -129,22 +136,71 @@ module ibuf_mgmt # (
     reg          [31:0]      nxt_qw_cnt;
     reg          [4:0]       os_req;
     reg          [4:0]       snt_rq;
-    reg          [4:0]       cpl_rq;
     reg          [4:0]       nxt_snt_rq;
     reg          [2:0]       mx_rdrq_reg;
     reg                      rd256;
     reg                      rd512;
     reg                      rd1k;
-    reg          [8:0]       mx_qw;
-    reg          [8:0]       rd_qw_i;
+    reg          [9:0]       mx_qw;
+    reg          [9:0]       rd_qw_i;
     reg          [BW:0]      ax0_diff;
     reg          [BW:0]      ax1_diff;
     reg          [4:0]       rd_tag_reg;
-    reg          [8:0]       rq_len[0:MX_OS_RQ-1];
+    reg          [9:0]       rq_len[0:31];
     reg          [BW:0]      iprod;
     reg          [BW:0]      iprod_reg;
     reg          [BW:0]      nxt_iprod;
-    reg                      rq2lbuf[0:MX_OS_RQ-1];
+    reg          [1:0]       rq2lbuf[0:31];
+
+    //-------------------------------------------------------
+    // Local ftr_fsm
+    //-------------------------------------------------------   
+    reg          [14:0]      ftr_fsm;
+    reg                      exp_tlp[0:31];
+    interger                 i;
+    reg                      cnsm;
+    reg          [9:0]       tlp_len;
+    reg          [4:0]       tlp_tag;
+
+    //-------------------------------------------------------
+    // Local wr2ibuff
+    //-------------------------------------------------------   
+    reg          [14:0]      wr_fsm;
+    reg          [14:0]      commit_prod_fsm;
+    reg          [4:0]       cpl_rq;
+    reg          [4:0]       nxt_cpl_rq;
+    reg          [63:0]      trn_rd_reg;
+    reg                      trn_reof_n_reg;
+    reg                      trn_rsrc_rdy_n_reg;
+    reg          [4:0]       tlp_tag_reg;
+    reg          [8:0]       tlp_len_qw;
+    reg          [9:0]       tlp_len_dw;
+    reg                      tlp_len_odd;
+    reg          [9:0]       rcv_len[0:31];
+    reg          [9:0]       nxt_rcv_len;
+    reg          [BW:0]      ibuff_addr[0:31];
+    reg          [BW:0]      nxt_ibuff_addr;
+    reg          [BW:0]      nxt_wr_addr;
+    reg          [BW:0]      nxt_wr_addr_p1;
+    reg          [31:0]      saved_dw[0:31];
+    reg                      saved_dw_en[0:31];
+    reg          [31:0]      aux_dw;
+    reg                      eo_cpl;
+    reg          [4:0]       trgt_tag;
+    reg          [4:0]       nxt_trgt_tag;
+    integer                  j;
+    reg                      data_ready[0:31];
+
+    //-------------------------------------------------------
+    // Local ftr_fsm
+    //-------------------------------------------------------   
+    reg          [14:0]      gc_fsm;
+    reg          [4:0]       gc_tlp_tag;
+
+    //-------------------------------------------------------
+    // assigns
+    //-------------------------------------------------------
+    assign rd_qw = rd_qw_i;
 
     ////////////////////////////////////////////////
     // rd_fsm
@@ -162,6 +218,7 @@ module ibuf_mgmt # (
             qw_lft <= lbuf_len_reg + (~qw_cnt) + 1;
             os_req <= snt_rq + (~cpl_rq) + 1;
 
+            diff <= iprod + (~committed_cons) + 1;
             ax0_diff <= diff + qw_lft;
             ax1_diff <= diff + mx_qw;
 
@@ -187,6 +244,7 @@ module ibuf_mgmt # (
 
                 s0 : begin
                     diff <= 'b0;
+                    iprod <= 'b0;
                     lbuf_dn <= 1'b0;
                     rd <= 1'b0;
                     dsc_rdy <= 1'b0;
@@ -258,16 +316,326 @@ module ibuf_mgmt # (
                     qw_cnt <= nxt_qw_cnt;
 
                     if (rd_lbuf1) begin
-                        rq2lbuf[tlp_tag_sent] <= 1'b0;
+                        rq2lbuf[rd_tag_reg] <= LBF1ID;
                     end
                     else begin
-                        tag_to_hp[tlp_tag_sent] <= hp2;
+                        rq2lbuf[rd_tag_reg] <= LBF2ID;
                     end
-                    trigger_rd_tlp_fsm <= s7;
+                    rd_fsm <= s8;
+                end
+
+                s8 : begin
+                    // dealy for qw_lft
+                    rd_fsm <= s9;
+                end
+
+                s9 : begin
+                    if (qw_lft) begin
+                        rd_fsm <= s2;
+                    end
+                    else begin
+                        lbuf_dn <= 1'b1;
+                        dsc_rdy <= 1'b1;
+                        rd_fsm <= s10;
+                    end
+                end
+
+                s10 : begin
+                    if (dsc_rdy_ack) begin
+                        dsc_rdy <= 1'b0;
+                        rd_fsm <= s1;
+                    end
                 end
 
                 default : begin 
                     rd_fsm <= s0;
+                end
+
+            endcase
+        end     // not rst
+    end  //always
+
+    ////////////////////////////////////////////////
+    // ftr_fsm
+    ////////////////////////////////////////////////
+    always @(posedge clk) begin
+
+        if (rst) begin  // rst
+            ftr_fsm <= s0;
+        end
+        
+        else begin  // not rst
+
+            cnsm <= 1'b0;
+
+            if (rd && rd_ack) begin
+                exp_tlp[rd_tag_reg] <= 1'b1;
+            end
+
+            case (ftr_fsm)
+
+                s0 : begin
+                    for (i = 0; i < 31; i=i+1) begin
+                        exp_tlp[i] <= 1'b0;
+                    end
+                    ftr_fsm <= s1;
+                end
+
+                s1 : begin
+                    tlp_len <= trn_rd[41:32];
+                    if ((!trn_rsrc_rdy_n) && (!trn_rsof_n)) begin
+                        if ((trn_rd[62:56] == `CPL_W_DATA_FMT_TYPE) && (trn_rd[15:13] == `SC)) begin
+                            ftr_fsm <= s2;
+                        end
+                    end
+                end
+
+                s2 : begin
+                    tlp_tag <= trn_rd[44:40];
+                    if (!trn_rsrc_rdy_n) begin
+                        cnsm <= exp_tlp[trn_rd[44:40]];
+                        ftr_fsm <= s1;
+                    end
+                end
+
+                default : begin 
+                    ftr_fsm <= s0;
+                end
+
+            endcase
+        end     // not rst
+    end  //always
+
+    ////////////////////////////////////////////////
+    // wr2ibuff
+    ////////////////////////////////////////////////
+    always @(posedge clk) begin
+
+        if (rst) begin  // rst
+            commit_prod_fsm <= s0;
+            wr_fsm <= s0;
+        end
+        
+        else begin  // not rst
+
+            eo_cpl <= 1'b0;
+
+            trn_rd_reg <= trn_rd;
+            trn_reof_n_reg <= trn_reof_n;
+            trn_rsrc_rdy_n_reg <= trn_rsrc_rdy_n;
+
+            if (rd && rd_ack) begin
+                ibuff_addr[rd_tag] <= iprod_reg;
+                rcv_len[rd_tag] <= 'b0;
+                saved_dw_en[rd_tag] <= 1'b0;
+            end
+
+            nxt_trgt_tag <= trgt_tag + 1;
+            nxt_cpl_rq <= cpl_rq + 1;
+            case (commit_prod_fsm)
+
+                s0 : begin
+                    cpl_rq <= 'b0;
+                    trgt_tag <= 'b0;
+                    committed_prod <= 'b0;
+                    for (j = 0; j < 31; j=j+1) begin
+                        data_ready[j] <= 1'b0;
+                    end
+                    commit_prod_fsm <= s1;
+                end
+
+                s1 : begin
+                    if (data_ready[trgt_tag]) begin
+                        committed_prod <= ibuff_addr[trgt_tag];
+                    end
+                    if ((rcv_len[trgt_tag] == rq_len[trgt_tag]) && data_ready[trgt_tag]) begin
+                        commit_prod_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    trgt_tag <= nxt_trgt_tag;
+                    cpl_rq <= nxt_cpl_rq;
+                    data_ready[trgt_tag] <= 1'b0;
+                    commit_prod_fsm <= s1;
+                end
+
+                default : begin //other TLPs
+                    commit_prod_fsm <= s0;
+                end
+
+            endcase
+
+            case (wr_fsm)
+
+                s0 : begin
+                    wr_fsm <= s1;
+                end
+
+                s1 : begin
+                    tlp_len_qw <= tlp_len[9:1];
+                    tlp_len_dw <= tlp_len;
+                    tlp_len_odd <= tlp_len[0];
+                    tlp_tag_reg <= tlp_tag;
+                    if (cnsm) begin
+                        wr_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    nxt_ibuff_addr <= ibuff_addr[tlp_tag_reg] + tlp_len_qw;
+                    nxt_rcv_len <= rcv_len[tlp_tag_reg] + tlp_len_qw;
+
+                    data_ready[tlp_tag_reg] <= 1'b0;
+
+                    nxt_wr_addr <= ibuff_addr[tlp_tag_reg];
+                    nxt_wr_addr_p1 <= ibuff_addr[tlp_tag_reg] + 1;
+
+                    wr_addr <= ibuff_addr[tlp_tag_reg];
+                    wr_data[63:32] <= dw_endian_conv(trn_rd_reg[31:0]);
+                    wr_data[31:0] <= saved_dw[tlp_tag_reg];
+
+                    aux_dw <= trn_rd_reg[31:0];
+                    if (!trn_rsrc_rdy_n_reg) begin
+                        case ({saved_dw_en[tlp_tag_reg], tlp_len_odd})                    // my deco
+                            2'b00 : begin   // P -> P
+                                wr_fsm <= s3;
+                            end
+                            2'b01 : begin   // P -> I
+                                wr_fsm <= s4;
+                            end
+                            2'b10 : begin   // I -> P
+                                wr_fsm <= s5;
+                            end
+                            2'b11 : begin   // I -> I
+                                wr_fsm <= s5;
+                            end
+                        endcase
+                    end
+                end
+
+                s3 : begin   // P -> P
+                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    rcv_len[tlp_tag_reg] <= nxt_rcv_len;
+                    saved_dw_en[tlp_tag_reg] <= 1'b0;
+
+                    wr_addr <= nxt_wr_addr;
+                    wr_data[63:32] <= dw_endian_conv(trn_rd_reg[63:32]);
+                    wr_data[31:0] <= dw_endian_conv(aux_dw);
+                    if (!trn_rsrc_rdy_n_reg) begin
+                        nxt_wr_addr <= nxt_wr_addr + 1;
+                        aux_dw <= trn_rd_reg[31:0];
+                        if (!trn_reof_n_reg) begin
+                            eo_cpl <= 1'b1;
+                            data_ready[tlp_tag_reg] <= 1'b1;
+                            wr_fsm <= s1;
+                        end
+                    end
+                end
+
+                s4 : begin   // P -> I
+                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    rcv_len[tlp_tag_reg] <= nxt_rcv_len;
+
+                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[31:0]);
+                    saved_dw_en[tlp_tag_reg] <= 1'b1;
+
+                    wr_addr <= nxt_wr_addr;
+                    wr_data[63:32] <= dw_endian_conv(trn_rd_reg[63:32]);
+                    wr_data[31:0] <= dw_endian_conv(aux_dw);
+                    if (!trn_rsrc_rdy_n_reg) begin
+                        nxt_wr_addr <= nxt_wr_addr + 1;
+                        aux_dw <= trn_rd_reg[31:0];
+                        if (!trn_reof_n_reg) begin
+                            eo_cpl <= 1'b1;
+                            data_ready[tlp_tag_reg] <= 1'b1;
+                            wr_fsm <= s1;
+                        end
+                    end
+                end
+
+                s5 : begin   // I -> P
+                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr;
+                    rcv_len[tlp_tag_reg] <= nxt_rcv_len;
+
+                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[63:31]);
+                    saved_dw_en[tlp_tag_reg] <= 1'b1;
+
+                    wr_addr <= nxt_wr_addr_p1;
+                    wr_data <= qw_endian_conv(trn_rd_reg);
+                    if (!trn_rsrc_rdy_n_reg) begin
+                        nxt_wr_addr_p1 <= nxt_wr_addr_p1 + 1;
+                        if (!trn_reof_n_reg) begin
+                            eo_cpl <= 1'b1;
+                            data_ready[tlp_tag_reg] <= 1'b1;
+                            wr_fsm <= s1;
+                        end
+                    end
+                end
+
+                s5 : begin   // I -> I
+                    ibuff_addr[tlp_tag_reg] <= nxt_ibuff_addr + 1;
+                    rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
+                    saved_dw_en[tlp_tag_reg] <= 1'b1;
+
+                    wr_addr <= nxt_wr_addr_p1;
+                    wr_data <= qw_endian_conv(trn_rd_reg);
+                    if (!trn_rsrc_rdy_n_reg) begin
+                        nxt_wr_addr_p1 <= nxt_wr_addr_p1 + 1;
+                        if (!trn_reof_n_reg) begin
+                            eo_cpl <= 1'b1;
+                            data_ready[tlp_tag_reg] <= 1'b1;
+                            wr_fsm <= s1;
+                        end
+                    end
+                end
+
+                default : begin 
+                    wr_fsm <= s0;
+                end
+
+            endcase
+        end     // not rst
+    end  //always
+
+    ////////////////////////////////////////////////
+    // gc_fsm
+    ////////////////////////////////////////////////
+    always @(posedge clk) begin
+
+        if (rst) begin  // rst
+            gc_fsm <= s0;
+        end
+        
+        else begin  // not rst
+
+            cpl1_rcved <= 1'b0;
+            cpl2_rcved <= 1'b0;
+
+            case (gc_fsm)
+
+                s0 : begin
+                    gc_fsm <= s1;
+                end
+
+                s1 : begin
+                    cpl_dws <= tlp_len_dw;
+                    gc_tlp_tag <= tlp_tag_reg;
+                    if (eo_cpl) begin
+                        gc_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    case (rq2lbuf[gc_tlp_tag])
+                        LBF1ID : cpl1_rcved <= 1'b1;
+                        LBF2ID : cpl2_rcved <= 1'b1;
+                    endcase
+                    gc_fsm <= s1;
+                end
+
+                default : begin 
+                    gc_fsm <= s0;
                 end
 
             endcase
