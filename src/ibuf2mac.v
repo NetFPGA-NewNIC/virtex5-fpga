@@ -115,7 +115,6 @@ module ibuf2mac # (
         .rd_data(rd_data),                                     // I [63:0]
         // bwd logic
         .committed_cons(committed_cons),                       // O [BW:0]
-        .committed_prod(committed_prod),                       // I [BW:0]
         // frm_sync
         .diff(diff),                                           // I [BW:0]
         .trig(trig),                                           // I

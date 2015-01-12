@@ -121,7 +121,7 @@ module tx_frm_sync # (
 
                 s2 : begin
                     if (len[2:0]) begin
-                        qw_len <= len[12:3] + 1;
+                        qw_len <= len[15:3] + 1;
                     end
 
                     case (len[2:0])                    // my deco

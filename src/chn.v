@@ -294,6 +294,7 @@ module chn # (
         .trn_rsof_n(trn_rsof_n),                               // I
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
+        .trn_rerrfwd_n(trn_rerrfwd_n),                         // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // CFG
         .cfg_interrupt_n(cfg_interrupt_n),                     // O

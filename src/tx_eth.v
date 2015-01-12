@@ -63,7 +63,6 @@ module tx_eth # (
 
     // bwd logic
     output reg   [BW:0]      committed_cons,
-    input        [BW:0]      committed_prod,
 
     // frm_sync
     input        [BW:0]      diff,

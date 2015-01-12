@@ -71,7 +71,6 @@ module tlp2ibuf # (
     input                    trn_rsof_n,
     input                    trn_reof_n,
     input                    trn_rsrc_rdy_n,
-    input                    trn_rerrfwd_n,
     input        [6:0]       trn_rbar_hit_n,
 
     // CFG
@@ -215,8 +214,6 @@ module tlp2ibuf # (
         // lbuf_mgmt
         .rd_lbuf1(rd_lbuf1),                                   // I
         .rd_lbuf2(rd_lbuf2),                                   // I
-        .wt_lbuf1(wt_lbuf1),                                   // I
-        .wt_lbuf2(wt_lbuf2),                                   // I
         .lbuf_addr(lbuf_addr),                                 // I [63:0]
         .lbuf_len(lbuf_len),                                   // I [31:0]
         .lbuf_en(lbuf_en),                                     // I

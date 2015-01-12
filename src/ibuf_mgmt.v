@@ -66,8 +66,6 @@ module ibuf_mgmt # (
     // lbuf_mgmt
     input                    rd_lbuf1,
     input                    rd_lbuf2,
-    input                    wt_lbuf1,
-    input                    wt_lbuf2,
 
     input        [63:0]      lbuf_addr,
     input        [31:0]      lbuf_len,
@@ -176,8 +174,8 @@ module ibuf_mgmt # (
     reg                      tlp_len_odd;
     reg          [9:0]       rcv_len[0:31];
     reg          [9:0]       nxt_rcv_len;
-    reg          [BW:0]      ibuf_addr[0:31];
-    reg          [BW:0]      nxt_ibuf_addr;
+    reg          [BW-1:0]    ibuf_addr[0:31];
+    reg          [BW-1:0]    nxt_ibuf_addr;
     reg          [BW:0]      nxt_wr_addr;
     reg          [BW:0]      nxt_wr_addr_p1;
     reg          [31:0]      saved_dw[0:31];
@@ -516,7 +514,7 @@ module ibuf_mgmt # (
                                 wr_fsm <= s5;
                             end
                             2'b11 : begin   // I -> I
-                                wr_fsm <= s5;
+                                wr_fsm <= s6;
                             end
                         endcase
                     end
@@ -581,7 +579,7 @@ module ibuf_mgmt # (
                     end
                 end
 
-                s5 : begin   // I -> I
+                s6 : begin   // I -> I
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr + 1;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
