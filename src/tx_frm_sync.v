@@ -58,6 +58,7 @@ module tx_frm_sync # (
     input        [BW:0]      committed_prod,
 
     // frm_sync
+    output reg   [BW:0]      diff,
     output reg               trig,
     output reg   [12:0]      qw_len,
     output reg   [7:0]       lst_ben,
@@ -81,7 +82,6 @@ module tx_frm_sync # (
     // Local frm_sync
     //-------------------------------------------------------
     reg          [7:0]       syn_fsm;
-    reg          [BW:0]      diff;
     reg          [15:0]      len;
 
     ////////////////////////////////////////////////

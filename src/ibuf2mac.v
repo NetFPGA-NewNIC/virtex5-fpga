@@ -69,6 +69,7 @@ module ibuf2mac # (
     //-------------------------------------------------------
     // Local frm_sync
     //-------------------------------------------------------
+    wire         [BW:0]      diff;
     wire                     trig;
     wire         [12:0]      qw_len;
     wire         [7:0]       lst_ben;
@@ -88,6 +89,7 @@ module ibuf2mac # (
         // bwd logic
         .committed_prod(committed_prod),                       // I [BW:0]
         // frm_sync
+        .diff(diff),                                           // O [BW:0]
         .trig(trig),                                           // O
         .qw_len(qw_len),                                       // O [12:0]
         .lst_ben(lst_ben),                                     // O [7:0]
@@ -115,6 +117,7 @@ module ibuf2mac # (
         .committed_cons(committed_cons),                       // O [BW:0]
         .committed_prod(committed_prod),                       // I [BW:0]
         // frm_sync
+        .diff(diff),                                           // I [BW:0]
         .trig(trig),                                           // I
         .qw_len(qw_len),                                       // I [12:0]
         .lst_ben(lst_ben),                                     // I [7:0]

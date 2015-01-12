@@ -66,6 +66,7 @@ module tx_eth # (
     input        [BW:0]      committed_prod,
 
     // frm_sync
+    input        [BW:0]      diff,
     input                    trig,
     input        [12:0]      qw_len,
     input        [7:0]       lst_ben,
@@ -185,7 +186,7 @@ module tx_eth # (
                         end
                         else begin
                             rsk_tk <= 1'b1;
-                            tx_frame_fsm <= s2;
+                            snd_fsm <= s2;
                         end
                     end
                     else if (diff == 'h1) begin

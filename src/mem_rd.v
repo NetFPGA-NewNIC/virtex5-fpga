@@ -131,6 +131,7 @@ module mem_rd # (
     reg          [31:0]      dsc_idx;
     reg          [31:0]      nxt_dsc_idx;
     // GC
+    reg          [63:0]      gc_base;
     reg          [63:0]      gc_addr_reg;
 
     ////////////////////////////////////////////////

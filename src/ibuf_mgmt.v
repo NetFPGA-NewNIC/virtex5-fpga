@@ -79,7 +79,7 @@ module ibuf_mgmt # (
     input        [BW:0]      committed_cons,
 
     // ibuf
-    output       [BW-1:0]    wr_addr,
+    output reg   [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
     // gc
@@ -130,6 +130,7 @@ module ibuf_mgmt # (
     reg          [31:0]      lbuf_len_reg;
     reg          [31:0]      qw_cnt;
     reg          [31:0]      nxt_qw_cnt;
+    reg          [31:0]      qw_lft;
     reg          [4:0]       os_req;
     reg          [4:0]       snt_rq;
     reg          [4:0]       nxt_snt_rq;
@@ -154,7 +155,7 @@ module ibuf_mgmt # (
     //-------------------------------------------------------   
     reg          [14:0]      ftr_fsm;
     reg                      exp_tlp[0:31];
-    interger                 i;
+    integer                  i;
     reg                      cnsm;
     reg          [9:0]       tlp_len;
     reg          [4:0]       tlp_tag;
@@ -285,7 +286,7 @@ module ibuf_mgmt # (
                 end
 
                 s5 : begin
-                    rd_qw_i <= remaining_qwords;
+                    rd_qw_i <= qw_lft;
                     if (!ax0_diff[BW]) begin
                         rd <= 1'b1;
                         rd_fsm <= s6;

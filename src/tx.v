@@ -227,11 +227,11 @@ module tx # (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN tx
-        .trn_td(rx_trn_td),                                    // O [63:0]
-        .trn_trem_n(rx_trn_trem_n),                            // O [7:0]
-        .trn_tsof_n(rx_trn_tsof_n),                            // O
-        .trn_teof_n(rx_trn_teof_n),                            // O
-        .trn_tsrc_rdy_n(rx_trn_tsrc_rdy_n),                    // O
+        .trn_td(trn_td),                                       // O [63:0]
+        .trn_trem_n(trn_trem_n),                               // O [7:0]
+        .trn_tsof_n(trn_tsof_n),                               // O
+        .trn_teof_n(trn_teof_n),                               // O
+        .trn_tsrc_rdy_n(trn_tsrc_rdy_n),                       // O
         .trn_tdst_rdy_n(trn_tdst_rdy_n),                       // I
         .trn_tbuf_av(trn_tbuf_av),                             // I [3:0]
         // TRN rx

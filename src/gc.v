@@ -57,7 +57,7 @@ module gc (
     // rcv_cpl
     input                    cpl_rcved,
     input        [9:0]       cpl_dws,
-s
+
     // gc updt
     output reg   [63:0]      gc_addr,
     output reg               gc_updt,
@@ -80,7 +80,6 @@ s
     //-------------------------------------------------------   
     reg          [7:0]       mon_fsm;
     reg          [63:0]      lbuf_addr_reg;
-    reg          [31:0]      lbuf_len_reg;
     reg          [31:0]      lbuf_len_reg;
     reg          [31:0]      dw_cnt;
     reg          [31:0]      nxt_dw_cnt;
