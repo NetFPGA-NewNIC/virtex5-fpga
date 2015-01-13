@@ -45,6 +45,7 @@
 
 module ibuf_mgmt # (
     parameter MX_OS_RQ = 4,
+    parameter MAX_TL_OS_RQ = 4,
     // MISC
     parameter BW = 9
     ) (
@@ -141,18 +142,18 @@ module ibuf_mgmt # (
     reg          [BW:0]      ax0_diff;
     reg          [BW:0]      ax1_diff;
     reg          [4:0]       rd_tag_reg;
-    reg          [9:0]       rq_len[0:31];
+    reg          [9:0]       rq_len[0:MAX_TL_OS_RQ-1];
     reg          [BW:0]      iprod;
     reg          [BW:0]      iprod_reg;
     reg          [BW:0]      nxt_iprod;
-    reg          [1:0]       rq2lbuf[0:31];
+    reg          [1:0]       rq2lbuf[0:MAX_TL_OS_RQ-1];
     reg          [4:0]       trgt_tag_lkup[0:MX_OS_RQ-1];
 
     //-------------------------------------------------------
     // Local ftr_fsm
     //-------------------------------------------------------   
     reg          [14:0]      ftr_fsm;
-    reg                      exp_tlp[0:31];
+    reg                      exp_tlp[0:MAX_TL_OS_RQ-1];
     integer                  i;
     reg                      cnsm;
     reg          [9:0]       tlp_len;
@@ -172,19 +173,19 @@ module ibuf_mgmt # (
     reg          [8:0]       tlp_len_qw;
     reg          [9:0]       tlp_len_dw;
     reg                      tlp_len_odd;
-    reg          [9:0]       rcv_len[0:31];
+    reg          [9:0]       rcv_len[0:MAX_TL_OS_RQ-1];
     reg          [9:0]       nxt_rcv_len;
-    reg          [BW-1:0]    ibuf_addr[0:31];
+    reg          [BW-1:0]    ibuf_addr[0:MAX_TL_OS_RQ-1];
     reg          [BW-1:0]    nxt_ibuf_addr;
     reg          [BW:0]      nxt_wr_addr;
     reg          [BW:0]      nxt_wr_addr_p1;
-    reg          [31:0]      saved_dw[0:31];
-    reg                      saved_dw_en[0:31];
+    reg          [31:0]      saved_dw[0:MAX_TL_OS_RQ-1];
+    reg                      saved_dw_en[0:MAX_TL_OS_RQ-1];
     reg          [31:0]      aux_dw;
     reg                      eo_cpl;
     reg          [4:0]       trgt_tag;
     integer                  j;
-    reg                      data_ready[0:31];
+    reg                      data_ready[0:MAX_TL_OS_RQ-1];
     reg                      rq_dn;
     reg          [4:0]       tag_dn;
 
@@ -377,7 +378,7 @@ module ibuf_mgmt # (
             case (ftr_fsm)
 
                 s0 : begin
-                    for (i = 0; i < 31; i=i+1) begin
+                    for (i = 0; i < MAX_TL_OS_RQ-1; i=i+1) begin
                         exp_tlp[i] <= 1'b0;
                     end
                     ftr_fsm <= s1;
@@ -441,7 +442,7 @@ module ibuf_mgmt # (
                     cpl_rq <= 'b0;
                     trgt_tag <= 'b0;
                     committed_prod <= 'b0;
-                    for (j = 0; j < 31; j=j+1) begin
+                    for (j = 0; j < MAX_TL_OS_RQ-1; j=j+1) begin
                         data_ready[j] <= 1'b0;
                     end
                     commit_prod_fsm <= s1;
