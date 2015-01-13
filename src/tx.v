@@ -51,7 +51,6 @@ module tx # (
     parameter BARMP_LBUF1_EN = 6'b111111,
     parameter BARMP_LBUF2_ADDR = 6'b111111,
     parameter BARMP_LBUF2_EN = 6'b111111,
-    parameter BARMP_CPL_BUFF = 6'b111111,
     parameter BARMP_WRBCK = 6'b111111,
     // MISC
     parameter BW = 9

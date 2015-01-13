@@ -79,20 +79,22 @@ module hst_ctrl # (
 
     `include "includes.v"
     // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
-    localparam s4 = 8'b00001000;
-    localparam s5 = 8'b00010000;
-    localparam s6 = 8'b00100000;
-    localparam s7 = 8'b01000000;
-    localparam s8 = 8'b10000000;
+    localparam s0  = 10'b0000000000;
+    localparam s1  = 10'b0000000001;
+    localparam s2  = 10'b0000000010;
+    localparam s3  = 10'b0000000100;
+    localparam s4  = 10'b0000001000;
+    localparam s5  = 10'b0000010000;
+    localparam s6  = 10'b0000100000;
+    localparam s7  = 10'b0001000000;
+    localparam s8  = 10'b0010000000;
+    localparam s9  = 10'b0100000000;
+    localparam s10 = 10'b1000000000;
 
     //-------------------------------------------------------
     // Local Rx TLP
     //-------------------------------------------------------
-    reg          [7:0]       tlp_rx_fsm;
+    reg          [9:0]       tlp_rx_fsm;
     reg                      lbuf1_en_i;
     reg                      lbuf2_en_i;
     reg          [31:0]      aux_dw;
@@ -206,16 +208,16 @@ module hst_ctrl # (
                 end
 
                 s3 : begin
-                    cpl_addr_i[31:0] <= dw_endian_conv(aux_dw);
-                    cpl_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
+                    lbuf2_addr_i[31:0] <= dw_endian_conv(aux_dw);
+                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
                 end
 
                 s4 : begin
-                    lbuf2_addr_i[31:0] <= dw_endian_conv(aux_dw);
-                    lbuf2_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
+                    cpl_addr_i[31:0] <= dw_endian_conv(aux_dw);
+                    cpl_addr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
                         tlp_rx_fsm <= s0;
                     end
@@ -234,13 +236,11 @@ module hst_ctrl # (
                             end
 
                             BARMP_LBUF1_EN : begin
-                                lbuf1_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
+                                tlp_rx_fsm <= s9;
                             end
 
                             BARMP_LBUF2_EN : begin
-                                lbuf2_en_i <= 1'b1;
-                                tlp_rx_fsm <= s0;
+                                tlp_rx_fsm <= s10;
                             end
 
                             BARMP_CPL_ADDR : begin
@@ -274,6 +274,22 @@ module hst_ctrl # (
                     cpl_addr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
                     cpl_addr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
+                        tlp_rx_fsm <= s0;
+                    end
+                end
+
+                s9 : begin
+                    aux_dw <= trn_rd[63:32];
+                    if (!trn_rsrc_rdy_n) begin
+                        lbuf1_en_i <= 1'b1;
+                        tlp_rx_fsm <= s0;
+                    end
+                end
+
+                s10 : begin
+                    aux_dw <= trn_rd[63:32];
+                    if (!trn_rsrc_rdy_n) begin
+                        lbuf2_en_i <= 1'b1;
                         tlp_rx_fsm <= s0;
                     end
                 end
