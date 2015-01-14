@@ -48,6 +48,7 @@ module tx_ibuf # (
 
     input      [AW-1:0]     a,
     input      [DW-1:0]     d,
+    input                   we,
     input      [AW-1:0]     dpra,
     input                   clk,
     input                   qdpo_clk,
@@ -72,7 +73,9 @@ module tx_ibuf # (
     always @(posedge clk) begin
         a_reg <= a;
         d_reg <= d;
-        dpram[a_reg] <= d_reg;
+        if (we) begin
+            dpram[a_reg] <= d_reg;
+        end
     end  //always
 
     ////////////////////////////////////////////////

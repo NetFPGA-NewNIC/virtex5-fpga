@@ -80,6 +80,7 @@ module ibuf_mgmt # (
     input        [BW:0]      committed_cons,
 
     // ibuf
+    output reg               wr_en,
     output reg   [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
@@ -172,9 +173,7 @@ module ibuf_mgmt # (
     reg                      trn_reof_n_reg;
     reg                      trn_rsrc_rdy_n_reg;
     reg          [OSRW-1:0]  tlp_tag_reg;
-    reg          [8:0]       tlp_len_qw;
     reg          [9:0]       tlp_len_dw;
-    reg                      tlp_len_odd;
     reg          [9:0]       rcv_len[0:MX_OS_RQ-1];
     reg          [9:0]       nxt_rcv_len;
     reg          [BW:0]      ibuf_addr[0:MX_OS_RQ-1];
@@ -379,7 +378,7 @@ module ibuf_mgmt # (
                         if (trn_rd[44:40+OSRW] == RQTB[4:OSRW]) begin
                             cnsm <= 1'b1;
                         end
-                        ftr_fsm <= s2;
+                        ftr_fsm <= s0;
                     end
                 end
 
@@ -404,6 +403,7 @@ module ibuf_mgmt # (
         else begin  // not rst
 
             eo_cpl <= 1'b0;
+            wr_en <= 1'b0;
 
             trn_rd_reg <= trn_rd;
             trn_reof_n_reg <= trn_reof_n;
@@ -457,53 +457,47 @@ module ibuf_mgmt # (
                     wr_fsm <= s1;
                 end
 
-                s1 : begin
-                    tlp_len_qw <= tlp_len[9:1];
+                s1 : begin  
                     tlp_len_dw <= tlp_len;
-                    tlp_len_odd <= tlp_len[0];
                     tlp_tag_reg <= tlp_tag;
-                    if (cnsm) begin
-                        wr_fsm <= s2;
-                    end
-                end
+                    nxt_ibuf_addr <= ibuf_addr[tlp_tag] + tlp_len[9:1];
+                    nxt_rcv_len <= rcv_len[tlp_tag] + tlp_len[9:1];
 
-                s2 : begin
-                    nxt_ibuf_addr <= ibuf_addr[tlp_tag_reg] + tlp_len_qw;
-                    nxt_rcv_len <= rcv_len[tlp_tag_reg] + tlp_len_qw;
+                    data_ready[tlp_tag] <= 1'b0;
 
-                    data_ready[tlp_tag_reg] <= 1'b0;
+                    nxt_wr_addr <= ibuf_addr[tlp_tag];
+                    nxt_wr_addr_p1 <= ibuf_addr[tlp_tag] + 1;
 
-                    nxt_wr_addr <= ibuf_addr[tlp_tag_reg];
-                    nxt_wr_addr_p1 <= ibuf_addr[tlp_tag_reg] + 1;
-
-                    wr_addr <= ibuf_addr[tlp_tag_reg];
+                    wr_addr <= ibuf_addr[tlp_tag];
                     wr_data[63:32] <= dw_endian_conv(trn_rd_reg[31:0]);
-                    wr_data[31:0] <= saved_dw[tlp_tag_reg];
+                    wr_data[31:0] <= saved_dw[tlp_tag];
 
                     aux_dw <= trn_rd_reg[31:0];
-                    if (!trn_rsrc_rdy_n_reg) begin
-                        case ({saved_dw_en[tlp_tag_reg], tlp_len_odd})                    // my deco
+                    if (!trn_rsrc_rdy_n_reg && cnsm) begin
+                        wr_en <= 1'b1;
+                        case ({saved_dw_en[tlp_tag], tlp_len[0]})                    // my deco
                             2'b00 : begin   // P -> P
-                                wr_fsm <= s3;
+                                wr_fsm <= s2;
                             end
                             2'b01 : begin   // P -> I
-                                wr_fsm <= s4;
+                                wr_fsm <= s3;
                             end
                             2'b10 : begin   // I -> P
-                                wr_fsm <= s5;
+                                wr_fsm <= s4;
                             end
                             2'b11 : begin   // I -> I
-                                wr_fsm <= s6;
+                                wr_fsm <= s5;
                             end
                         endcase
                     end
                 end
 
-                s3 : begin   // P -> P
+                s2 : begin   // P -> P
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
                     saved_dw_en[tlp_tag_reg] <= 1'b0;
 
+                    wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr;
                     wr_data[63:32] <= dw_endian_conv(trn_rd_reg[63:32]);
                     wr_data[31:0] <= dw_endian_conv(aux_dw);
@@ -518,13 +512,14 @@ module ibuf_mgmt # (
                     end
                 end
 
-                s4 : begin   // P -> I
+                s3 : begin   // P -> I
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
 
-                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[31:0]);
+                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd_reg[31:0]);
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
 
+                    wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr;
                     wr_data[63:32] <= dw_endian_conv(trn_rd_reg[63:32]);
                     wr_data[31:0] <= dw_endian_conv(aux_dw);
@@ -539,13 +534,14 @@ module ibuf_mgmt # (
                     end
                 end
 
-                s5 : begin   // I -> P
+                s4 : begin   // I -> P
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
 
-                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd[63:31]);
+                    saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd_reg[63:31]);
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
 
+                    wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr_p1;
                     wr_data <= qw_endian_conv(trn_rd_reg);
                     if (!trn_rsrc_rdy_n_reg) begin
@@ -558,11 +554,12 @@ module ibuf_mgmt # (
                     end
                 end
 
-                s6 : begin   // I -> I
+                s5 : begin   // I -> I
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr + 1;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
                     saved_dw_en[tlp_tag_reg] <= 1'b0;
 
+                    wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr_p1;
                     wr_data <= qw_endian_conv(trn_rd_reg);
                     if (!trn_rsrc_rdy_n_reg) begin

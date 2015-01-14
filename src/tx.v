@@ -114,6 +114,7 @@ module tx # (
     wire         [63:0]      wr_data;
     wire         [BW-1:0]    rd_addr;
     wire         [63:0]      rd_data;
+    wire                     wr_en;
 
     //-------------------------------------------------------
     // Local prod_sync
@@ -183,6 +184,7 @@ module tx # (
     tx_ibuf #(.AW(BW), .DW(64)) ibuf_mod (
         .a(wr_addr),                                           // I [BW-1:0]
         .d(wr_data),                                           // I [63:0]
+        .we(wr_en),                                            // I
         .dpra(rd_addr),                                        // I [BW-1:0]
         .clk(pcie_clk),                                        // I 
         .qdpo_clk(mac_clk),                                    // I
@@ -264,6 +266,7 @@ module tx # (
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons_sync),                  // I [BW:0]
         // ibuf
+        .wr_en(wr_en),                                         // O
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // irq_gen

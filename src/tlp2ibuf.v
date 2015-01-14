@@ -99,6 +99,7 @@ module tlp2ibuf # (
     input        [BW:0]      committed_cons,
 
     // ibuf
+    output                   wr_en,
     output       [BW-1:0]    wr_addr,
     output       [63:0]      wr_data,
 
@@ -229,6 +230,7 @@ module tlp2ibuf # (
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons),                       // I [BW:0]
         // ibuf
+        .wr_en(wr_en),                                         // O
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // gc
