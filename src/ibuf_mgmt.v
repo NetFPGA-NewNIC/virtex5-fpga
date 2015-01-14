@@ -463,8 +463,6 @@ module ibuf_mgmt # (
                     nxt_ibuf_addr <= ibuf_addr[tlp_tag] + tlp_len[9:1];
                     nxt_rcv_len <= rcv_len[tlp_tag] + tlp_len[9:1];
 
-                    data_ready[tlp_tag] <= 1'b0;
-
                     nxt_wr_addr <= ibuf_addr[tlp_tag];
                     nxt_wr_addr_p1 <= ibuf_addr[tlp_tag] + 1;
 
@@ -473,7 +471,7 @@ module ibuf_mgmt # (
                     wr_data[31:0] <= saved_dw[tlp_tag];
 
                     aux_dw <= trn_rd_reg[31:0];
-                    if (!trn_rsrc_rdy_n_reg && cnsm) begin
+                    if (cnsm) begin
                         wr_en <= 1'b1;
                         case ({saved_dw_en[tlp_tag], tlp_len[0]})                    // my deco
                             2'b00 : begin   // P -> P
@@ -497,6 +495,8 @@ module ibuf_mgmt # (
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len;
                     saved_dw_en[tlp_tag_reg] <= 1'b0;
 
+                    data_ready[tlp_tag_reg] <= 1'b0;
+
                     wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr;
                     wr_data[63:32] <= dw_endian_conv(trn_rd_reg[63:32]);
@@ -518,6 +518,8 @@ module ibuf_mgmt # (
 
                     saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd_reg[31:0]);
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
+
+                    data_ready[tlp_tag_reg] <= 1'b0;
 
                     wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr;
@@ -541,6 +543,8 @@ module ibuf_mgmt # (
                     saved_dw[tlp_tag_reg] <= dw_endian_conv(trn_rd_reg[63:31]);
                     saved_dw_en[tlp_tag_reg] <= 1'b1;
 
+                    data_ready[tlp_tag_reg] <= 1'b0;
+
                     wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr_p1;
                     wr_data <= qw_endian_conv(trn_rd_reg);
@@ -558,6 +562,8 @@ module ibuf_mgmt # (
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr + 1;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
                     saved_dw_en[tlp_tag_reg] <= 1'b0;
+
+                    data_ready[tlp_tag_reg] <= 1'b0;
 
                     wr_en <= 1'b1;
                     wr_addr <= nxt_wr_addr_p1;
