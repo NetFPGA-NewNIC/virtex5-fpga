@@ -416,7 +416,7 @@ module ibuf_mgmt # (
             end
 
             nxt_cpl_rq <= cpl_rq + 1;
-            nxt_trgt_tag <= trgt_tag;
+            nxt_trgt_tag <= trgt_tag + 1;
             case (commit_prod_fsm)
 
                 s0 : begin
