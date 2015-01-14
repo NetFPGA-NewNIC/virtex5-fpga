@@ -177,10 +177,10 @@ module ibuf_mgmt # (
     reg                      tlp_len_odd;
     reg          [9:0]       rcv_len[0:MX_OS_RQ-1];
     reg          [9:0]       nxt_rcv_len;
-    reg          [BW-1:0]    ibuf_addr[0:MX_OS_RQ-1];
-    reg          [BW-1:0]    nxt_ibuf_addr;
-    reg          [BW-1:0]    nxt_wr_addr;
-    reg          [BW-1:0]    nxt_wr_addr_p1;
+    reg          [BW:0]      ibuf_addr[0:MX_OS_RQ-1];
+    reg          [BW:0]      nxt_ibuf_addr;
+    reg          [BW:0]      nxt_wr_addr;
+    reg          [BW:0]      nxt_wr_addr_p1;
     reg          [31:0]      saved_dw[0:MX_OS_RQ-1];
     reg                      saved_dw_en[0:MX_OS_RQ-1];
     reg          [31:0]      aux_dw;
