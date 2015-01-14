@@ -100,6 +100,7 @@ module ibuf2mac # (
     reg          [BW:0]      rd_addr_prev0;
     reg          [63:0]      aux_rd_data;
     reg                      eof;
+    reg                      sync;
 
     //-------------------------------------------------------
     // assigns

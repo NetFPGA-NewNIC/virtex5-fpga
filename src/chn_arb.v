@@ -87,38 +87,38 @@ module chn_arb (
         
         else begin  // not rst
 
-            chn0_trn <= 1'b0;
+            chn0_trn <= 1'b1;
             chn1_trn <= 1'b0;
 
-            case (chn_arb_fsm)
-
-                s0 : begin
-                    chn0_trn <= 1'b0;
-                    chn1_trn <= 1'b0;
-                    tag_trn <= 'b0;
-                    chn_arb_fsm <= s1;
-                end
-
-                s1 : begin
-                    if (!chn0_drvn && !chn1_drvn) begin
-                        if (chn1_reqep && turn_bit) begin
-                            chn1_trn <= 1'b1;
-                        end
-                        else if (chn0_reqep) begin
-                            chn0_trn <= 1'b1;
-                        end
-                        turn_bit <= ~turn_bit;
-                        chn_arb_fsm <= s2;
-                    end
-                end
-
-                s2 : chn_arb_fsm <= s1;
-
-                default : begin 
-                    chn_arb_fsm <= s0;
-                end
-
-            endcase
+            //case (chn_arb_fsm)
+//
+            //    s0 : begin
+            //        chn0_trn <= 1'b0;
+            //        chn1_trn <= 1'b0;
+            //        tag_trn <= 'b0;
+            //        chn_arb_fsm <= s1;
+            //    end
+//
+            //    s1 : begin
+            //        if (!chn0_drvn && !chn1_drvn) begin
+            //            if (chn1_reqep && turn_bit) begin
+            //                chn1_trn <= 1'b1;
+            //            end
+            //            else if (chn0_reqep) begin
+            //                chn0_trn <= 1'b1;
+            //            end
+            //            turn_bit <= ~turn_bit;
+            //            chn_arb_fsm <= s2;
+            //        end
+            //    end
+//
+            //    s2 : chn_arb_fsm <= s1;
+//
+            //    default : begin 
+            //        chn_arb_fsm <= s0;
+            //    end
+//
+            //endcase
         end     // not rst
     end  //always
 
