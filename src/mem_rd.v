@@ -265,7 +265,7 @@ module mem_rd # (
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_teof_n <= 1'b1;
                         drv_ep <= 1'b0;
-                        send_fsm <= s0;
+                        send_fsm <= s1;
                     end
                 end
 

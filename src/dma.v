@@ -43,9 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module dma # (
-    parameter GOSRQW = 2      // global outstanding req width
-    ) (
+module dma (
 
     // PCIe
     input                    sys_clk_p,
