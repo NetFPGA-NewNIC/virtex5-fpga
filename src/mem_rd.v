@@ -47,7 +47,11 @@ module mem_rd # (
     parameter DSCW = 1,
     parameter DSC_CPL_MSG = 32'hCACABEEF,
     parameter DSC_BASE_QW = 0,
-    parameter GC_BASE_QW = 1
+    parameter GC_BASE_QW = 1,
+    // RQ_TAG_BASE
+    parameter RQTB = 5'b00000,
+    // Outstanding request width
+    parameter OSRW = 4
     ) (
 
     input                    clk,
@@ -74,7 +78,7 @@ module mem_rd # (
     input                    rd,
     input        [8:0]       rd_qw,
     output reg               rd_ack,
-    output reg   [4:0]       rd_tag,
+    output reg   [OSRW-1:0]  rd_tag,
 
     // dsc_mgmt
     input                    dsc_rdy,
@@ -87,8 +91,6 @@ module mem_rd # (
     output reg   [63:0]      hw_ptr,
 
     // ep arb
-    input        [4:0]       tag_trn,
-    output reg               tag_inc,
     input                    my_trn,
     output reg               drv_ep,
     output reg               req_ep
@@ -125,6 +127,7 @@ module mem_rd # (
     reg          [63:0]      hst_addr_reg1;
     reg                      lbuf64b_reg;
     reg          [8:0]       rd_qw_reg;
+    reg          [OSRW-1:0]  nxt_rd_tag;
     // DSC
     reg          [63:0]      dsc_base;
     reg          [63:0]      dsc_cpl_addr;
@@ -152,7 +155,6 @@ module mem_rd # (
             dsc_rdy_ack <= 1'b0;
             gc_updt_ack <= 1'b0;
 
-            tag_inc <= 1'b0;
             req_ep <= 1'b0;
 
             lbuf64b_reg <= lbuf64b;
@@ -174,6 +176,7 @@ module mem_rd # (
                     trn_trem_n <= 8'hFF;
                     drv_ep <= 1'b0;
                     dsc_idx <= 'b0;
+                    rd_tag <= 'b0;
                     send_fsm <= s1;
                 end
 
@@ -187,7 +190,6 @@ module mem_rd # (
                     dsc_cpl_addr <= dsc_base + {dsc_idx[DSCW-1:0], 2'b0};
                     // RD
                     rd_qw_reg <= rd_qw;
-                    rd_tag <= tag_trn;
                     hst_addr_reg0 <= hst_addr;
                     //
                     if (gc_updt || dsc_rdy || rd) begin
@@ -214,7 +216,6 @@ module mem_rd # (
                 end
 
                 s2 : begin
-                    tag_inc <= 1'b1;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
                                 lbuf64b_reg ? `MEM_RD64_FMT_TYPE : `MEM_RD32_FMT_TYPE,
@@ -229,12 +230,14 @@ module mem_rd # (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id_reg,   //Requester ID
-                                {3'b0, rd_tag },   //Tag
+                                {3'b0, RQTB[4:OSRW], rd_tag },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+
+                    nxt_rd_tag <= rd_tag + 1;
 
                     if (lbuf64b_reg) begin
                         trn_trem_n <= 8'h0;
@@ -248,6 +251,7 @@ module mem_rd # (
                 end
 
                 s3 : begin
+                    rd_tag <= nxt_rd_tag;
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_teof_n <= 1'b0;

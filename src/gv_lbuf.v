@@ -93,11 +93,6 @@ module gv_lbuf (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            lbuf1_dn <= 1'b0;
-            lbuf2_dn <= 1'b0;
-            lbuf_en <= 1'b0;
-            rd_lbuf1 <= 1'b0;
-            rd_lbuf2 <= 1'b0;
             giv_lbuf_fsm <= s0;
         end
 
@@ -109,42 +104,49 @@ module gv_lbuf (
             case (giv_lbuf_fsm)
 
                 s0 : begin
+                    lbuf_en <= 1'b0;
+                    rd_lbuf1 <= 1'b0;
+                    rd_lbuf2 <= 1'b0;
+                    giv_lbuf_fsm <= s1;
+                end
+
+                s1 : begin
                     lbuf_addr <= lbuf1_addr;
                     lbuf_len <= lbuf1_len;
                     lbuf64b <= | lbuf1_addr[63:32];
                     if (lbuf1_en && !wt_lbuf1) begin
                         lbuf_en <= 1'b1;
                         rd_lbuf1 <= 1'b1;
-                        giv_lbuf_fsm <= s1;
-                    end
-                end
-
-                s1 : begin
-                    if (lbuf_dn) begin
-                        lbuf_en <= 1'b0;
-                        rd_lbuf1 <= 1'b0;
-                        lbuf1_dn <= 1'b1;
                         giv_lbuf_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    if (lbuf_dn) begin
+                        lbuf_en <= 1'b0;
+                        rd_lbuf1 <= 1'b0;
+                        lbuf1_dn <= 1'b1;
+                        giv_lbuf_fsm <= s3;
+                    end
+                end
+
+                s3 : begin
                     lbuf_addr <= lbuf2_addr;
                     lbuf_len <= lbuf2_len;
                     lbuf64b <= | lbuf2_addr[63:32];
                     if (lbuf2_en && !wt_lbuf2) begin
                         lbuf_en <= 1'b1;
                         rd_lbuf2 <= 1'b1;
-                        giv_lbuf_fsm <= s3;
+                        giv_lbuf_fsm <= s4;
                     end
                 end
 
-                s3 : begin
+                s4 : begin
                     if (lbuf_dn) begin
                         lbuf_en <= 1'b0;
                         rd_lbuf2 <= 1'b0;
                         lbuf2_dn <= 1'b1;
-                        giv_lbuf_fsm <= s0;
+                        giv_lbuf_fsm <= s1;
                     end
                 end
 

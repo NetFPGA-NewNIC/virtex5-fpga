@@ -85,6 +85,7 @@ module arb (
     // Local ARB
     //-------------------------------------------------------   
     reg          [7:0]       arb_fsm;
+    reg                      turn_bit;
 
     ////////////////////////////////////////////////
     // ARB
@@ -115,12 +116,13 @@ module arb (
                         if (irq_reqep) begin
                             irq_trn <= 1'b1;
                         end
-                        else if (tx_reqep) begin
+                        else if (tx_reqep && turn_bit) begin
                             tx_trn <= 1'b1;
                         end
                         else begin
                             rx_trn <= 1'b1;
                         end
+                        turn_bit <= ~turn_bit;
                         arb_fsm <= s2;
                     end
                 end

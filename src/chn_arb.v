@@ -48,20 +48,15 @@ module chn_arb (
     input                    clk,
     input                    rst,
 
-    // TAG mgmt
-    output reg   [4:0]       tag_trn,
-
     // CHN0 trn
     output reg               chn0_trn,
     input                    chn0_drvn,
     input                    chn0_reqep,
-    input                    chn0_tag_inc,
 
     // CHN1 trn
     output reg               chn1_trn,
     input                    chn1_drvn,
-    input                    chn1_reqep,
-    input                    chn1_tag_inc
+    input                    chn1_reqep
     );
 
     // localparam
@@ -79,7 +74,7 @@ module chn_arb (
     // Local chn_arb
     //-------------------------------------------------------   
     reg          [7:0]       chn_arb_fsm;
-    reg          [7:0]       nxt_tag;
+    reg                      turn_bit;
 
     ////////////////////////////////////////////////
     // chn_arb
@@ -95,11 +90,6 @@ module chn_arb (
             chn0_trn <= 1'b0;
             chn1_trn <= 1'b0;
 
-            nxt_tag <= tag_trn + 1;
-            if (chn0_tag_inc || chn1_tag_inc) begin
-                tag_trn <= nxt_tag;
-            end
-
             case (chn_arb_fsm)
 
                 s0 : begin
@@ -110,34 +100,19 @@ module chn_arb (
                 end
 
                 s1 : begin
-                    if (!chn0_drvn) begin
-                        if (chn1_reqep) begin
+                    if (!chn0_drvn && !chn1_drvn) begin
+                        if (chn1_reqep && turn_bit) begin
                             chn1_trn <= 1'b1;
-                            chn_arb_fsm <= s3;
                         end
                         else if (chn0_reqep) begin
                             chn0_trn <= 1'b1;
-                            chn_arb_fsm <= s2;
                         end
+                        turn_bit <= ~turn_bit;
+                        chn_arb_fsm <= s2;
                     end
                 end
 
                 s2 : chn_arb_fsm <= s1;
-
-                s3 : chn_arb_fsm <= s4;
-
-                s4 : begin
-                    if (!chn1_drvn) begin
-                        if (chn0_reqep) begin
-                            chn0_trn <= 1'b1;
-                            chn_arb_fsm <= s2;
-                        end
-                        else if (chn1_reqep) begin
-                            chn1_trn <= 1'b1;
-                            chn_arb_fsm <= s3;
-                        end
-                    end
-                end
 
                 default : begin 
                     chn_arb_fsm <= s0;

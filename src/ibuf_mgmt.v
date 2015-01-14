@@ -44,10 +44,12 @@
 //`default_nettype none
 
 module ibuf_mgmt # (
-    parameter MX_OS_RQ = 4,
-    parameter MAX_TL_OS_RQ = 4,
     // MISC
-    parameter BW = 9
+    parameter BW = 9,
+    // RQ_TAG_BASE
+    parameter RQTB = 5'b00000,
+    // Outstanding request width
+    parameter OSRW = 3
     ) (
 
     input                    clk,
@@ -91,7 +93,7 @@ module ibuf_mgmt # (
     output reg               rd,
     output       [8:0]       rd_qw,
     input                    rd_ack,
-    input        [4:0]       rd_tag,
+    input        [OSRW-1:0]  rd_tag,
 
     // dsc_mgmt
     output reg               dsc_rdy,
@@ -117,8 +119,10 @@ module ibuf_mgmt # (
     localparam s14 = 15'b010000000000000;
     localparam s15 = 15'b100000000000000;
 
-    localparam LBF1ID = 2'b01;
-    localparam LBF2ID = 2'b10;
+    localparam MX_OS_RQ = 2**OSRW;
+
+    localparam LBF1ID = 1'b1;
+    localparam LBF2ID = 1'b0;
 
     //-------------------------------------------------------
     // Local rd_fsm
@@ -130,9 +134,9 @@ module ibuf_mgmt # (
     reg          [31:0]      qw_cnt;
     reg          [31:0]      nxt_qw_cnt;
     reg          [31:0]      qw_lft;
-    reg          [4:0]       os_req;
-    reg          [4:0]       snt_rq;
-    reg          [4:0]       nxt_snt_rq;
+    reg          [OSRW:0]    os_req;
+    reg          [OSRW:0]    snt_rq;
+    reg          [OSRW:0]    nxt_snt_rq;
     reg          [2:0]       mx_rdrq_reg;
     reg                      rd256;
     reg                      rd512;
@@ -141,20 +145,18 @@ module ibuf_mgmt # (
     reg          [9:0]       rd_qw_i;
     reg          [BW:0]      ax0_diff;
     reg          [BW:0]      ax1_diff;
-    reg          [4:0]       rd_tag_reg;
-    reg          [9:0]       rq_len[0:MAX_TL_OS_RQ-1];
+    reg          [OSRW-1:0]  rd_tag_reg;
+    reg          [9:0]       rq_len[0:MX_OS_RQ-1];
     reg          [BW:0]      iprod;
     reg          [BW:0]      iprod_reg;
     reg          [BW:0]      nxt_iprod;
-    reg          [1:0]       rq2lbuf[0:MAX_TL_OS_RQ-1];
-    reg          [4:0]       trgt_tag_lkup[0:MX_OS_RQ-1];
+    reg          [0:0]       rq_id[0:MX_OS_RQ-1];
+    reg                      new_rq;
 
     //-------------------------------------------------------
     // Local ftr_fsm
     //-------------------------------------------------------   
     reg          [14:0]      ftr_fsm;
-    reg                      exp_tlp[0:MAX_TL_OS_RQ-1];
-    integer                  i;
     reg                      cnsm;
     reg          [9:0]       tlp_len;
     reg          [4:0]       tlp_tag;
@@ -164,36 +166,36 @@ module ibuf_mgmt # (
     //-------------------------------------------------------   
     reg          [14:0]      wr_fsm;
     reg          [14:0]      commit_prod_fsm;
-    reg          [4:0]       cpl_rq;
-    reg          [4:0]       nxt_cpl_rq;
+    reg          [OSRW:0]    cpl_rq;
+    reg          [OSRW:0]    nxt_cpl_rq;
     reg          [63:0]      trn_rd_reg;
     reg                      trn_reof_n_reg;
     reg                      trn_rsrc_rdy_n_reg;
-    reg          [4:0]       tlp_tag_reg;
+    reg          [OSRW-1:0]  tlp_tag_reg;
     reg          [8:0]       tlp_len_qw;
     reg          [9:0]       tlp_len_dw;
     reg                      tlp_len_odd;
-    reg          [9:0]       rcv_len[0:MAX_TL_OS_RQ-1];
+    reg          [9:0]       rcv_len[0:MX_OS_RQ-1];
     reg          [9:0]       nxt_rcv_len;
-    reg          [BW-1:0]    ibuf_addr[0:MAX_TL_OS_RQ-1];
+    reg          [BW-1:0]    ibuf_addr[0:MX_OS_RQ-1];
     reg          [BW-1:0]    nxt_ibuf_addr;
-    reg          [BW:0]      nxt_wr_addr;
-    reg          [BW:0]      nxt_wr_addr_p1;
-    reg          [31:0]      saved_dw[0:MAX_TL_OS_RQ-1];
-    reg                      saved_dw_en[0:MAX_TL_OS_RQ-1];
+    reg          [BW-1:0]    nxt_wr_addr;
+    reg          [BW-1:0]    nxt_wr_addr_p1;
+    reg          [31:0]      saved_dw[0:MX_OS_RQ-1];
+    reg                      saved_dw_en[0:MX_OS_RQ-1];
     reg          [31:0]      aux_dw;
     reg                      eo_cpl;
-    reg          [4:0]       trgt_tag;
+    reg          [OSRW-1:0]  trgt_tag;
+    reg          [OSRW-1:0]  nxt_trgt_tag;
     integer                  j;
-    reg                      data_ready[0:MAX_TL_OS_RQ-1];
-    reg                      rq_dn;
-    reg          [4:0]       tag_dn;
+    reg                      data_ready[0:MX_OS_RQ-1];
+
 
     //-------------------------------------------------------
     // Local ftr_fsm
     //-------------------------------------------------------   
     reg          [14:0]      gc_fsm;
-    reg          [4:0]       gc_tlp_tag;
+    reg          [OSRW-1:0]  gc_tlp_tag;
 
     //-------------------------------------------------------
     // assigns
@@ -212,6 +214,7 @@ module ibuf_mgmt # (
         else begin  // not rst
 
             lbuf_dn <= 1'b0;
+            new_rq <= 1'b0;
 
             qw_lft <= lbuf_len_reg + (~qw_cnt) + 1;
             os_req <= snt_rq + (~cpl_rq) + 1;
@@ -241,9 +244,7 @@ module ibuf_mgmt # (
             case (rd_fsm)
 
                 s0 : begin
-                    diff <= 'b0;
                     iprod <= 'b0;
-                    lbuf_dn <= 1'b0;
                     rd <= 1'b0;
                     dsc_rdy <= 1'b0;
                     snt_rq <= 'b0;
@@ -260,7 +261,7 @@ module ibuf_mgmt # (
                 end
 
                 s2 : begin
-                    // dealy for qw_cnt
+                    // dealy for qw_lft
                     if (os_req < MX_OS_RQ) begin
                         rd_fsm <= s3;
                     end
@@ -298,9 +299,7 @@ module ibuf_mgmt # (
                     nxt_qw_cnt <= qw_cnt + rd_qw_i;
 
                     iprod_reg <= iprod;
-                    rq_len[rd_tag] <= rd_qw_i;
                     snt_rq <= nxt_snt_rq;
-                    trgt_tag_lkup[snt_rq] <= rd_tag;
 
                     rd_tag_reg <= rd_tag;
                     if (rd_ack) begin
@@ -313,13 +312,9 @@ module ibuf_mgmt # (
                     iprod <= nxt_iprod;
                     hst_addr <= ntx_hst_addr;
                     qw_cnt <= nxt_qw_cnt;
-
-                    if (rd_lbuf1) begin
-                        rq2lbuf[rd_tag_reg] <= LBF1ID;
-                    end
-                    else begin
-                        rq2lbuf[rd_tag_reg] <= LBF2ID;
-                    end
+                    new_rq <= 1'b1;
+                    rq_len[rd_tag_reg] <= rd_qw_i;
+                    rq_id[rd_tag_reg] <= rd_lbuf1 ? LBF1ID : LBF2ID;
                     rd_fsm <= s8;
                 end
 
@@ -367,37 +362,24 @@ module ibuf_mgmt # (
 
             cnsm <= 1'b0;
 
-            if (rd && rd_ack) begin
-                exp_tlp[rd_tag_reg] <= 1'b1;
-            end
-
-            if (rq_dn) begin
-                exp_tlp[tag_dn] <= 1'b0;
-            end
-
             case (ftr_fsm)
 
                 s0 : begin
-                    for (i = 0; i < MAX_TL_OS_RQ-1; i=i+1) begin
-                        exp_tlp[i] <= 1'b0;
-                    end
-                    ftr_fsm <= s1;
-                end
-
-                s1 : begin
                     tlp_len <= trn_rd[41:32];
                     if ((!trn_rsrc_rdy_n) && (!trn_rsof_n)) begin
                         if ((trn_rd[62:56] == `CPL_W_DATA_FMT_TYPE) && (trn_rd[15:13] == `SC)) begin
-                            ftr_fsm <= s2;
+                            ftr_fsm <= s1;
                         end
                     end
                 end
 
-                s2 : begin
+                s1 : begin
                     tlp_tag <= trn_rd[44:40];
                     if (!trn_rsrc_rdy_n) begin
-                        cnsm <= exp_tlp[trn_rd[44:40]];
-                        ftr_fsm <= s1;
+                        if (trn_rd[44:40+OSRW] == RQTB[4:OSRW]) begin
+                            cnsm <= 1'b1;
+                        end
+                        ftr_fsm <= s2;
                     end
                 end
 
@@ -422,48 +404,44 @@ module ibuf_mgmt # (
         else begin  // not rst
 
             eo_cpl <= 1'b0;
-            rq_dn <= 1'b0;
 
             trn_rd_reg <= trn_rd;
             trn_reof_n_reg <= trn_reof_n;
             trn_rsrc_rdy_n_reg <= trn_rsrc_rdy_n;
 
-            if (rd && rd_ack) begin
-                ibuf_addr[rd_tag] <= iprod_reg;
-                rcv_len[rd_tag] <= 'b0;
-                saved_dw_en[rd_tag] <= 1'b0;
+            if (new_rq) begin
+                ibuf_addr[rd_tag_reg] <= iprod_reg;
+                rcv_len[rd_tag_reg] <= 'b0;
+                saved_dw_en[rd_tag_reg] <= 1'b0;
             end
 
             nxt_cpl_rq <= cpl_rq + 1;
-            trgt_tag <= trgt_tag_lkup[cpl_rq];
+            nxt_trgt_tag <= trgt_tag;
             case (commit_prod_fsm)
 
                 s0 : begin
                     cpl_rq <= 'b0;
                     trgt_tag <= 'b0;
                     committed_prod <= 'b0;
-                    for (j = 0; j < MAX_TL_OS_RQ-1; j=j+1) begin
+                    for (j = 0; j < MX_OS_RQ-1; j=j+1) begin
                         data_ready[j] <= 1'b0;
                     end
                     commit_prod_fsm <= s1;
                 end
 
-                s1 : commit_prod_fsm <= s2; // delay for trgt_tag
-
-                s2 : begin
+                s1 : begin
                     if (data_ready[trgt_tag]) begin
                         committed_prod <= ibuf_addr[trgt_tag];
                     end
                     if ((rcv_len[trgt_tag] == rq_len[trgt_tag]) && data_ready[trgt_tag]) begin
-                        commit_prod_fsm <= s3;
+                        commit_prod_fsm <= s2;
                     end
                 end
 
-                s3 : begin
+                s2 : begin
                     cpl_rq <= nxt_cpl_rq;
                     data_ready[trgt_tag] <= 1'b0;
-                    rq_dn <= 1'b1;
-                    tag_dn <= trgt_tag;
+                    trgt_tag <= nxt_trgt_tag;
                     commit_prod_fsm <= s1;
                 end
 
@@ -583,7 +561,7 @@ module ibuf_mgmt # (
                 s6 : begin   // I -> I
                     ibuf_addr[tlp_tag_reg] <= nxt_ibuf_addr + 1;
                     rcv_len[tlp_tag_reg] <= nxt_rcv_len + 1;
-                    saved_dw_en[tlp_tag_reg] <= 1'b1;
+                    saved_dw_en[tlp_tag_reg] <= 1'b0;
 
                     wr_addr <= nxt_wr_addr_p1;
                     wr_data <= qw_endian_conv(trn_rd_reg);
@@ -634,7 +612,7 @@ module ibuf_mgmt # (
                 end
 
                 s2 : begin
-                    case (rq2lbuf[gc_tlp_tag])
+                    case (rq_id[gc_tlp_tag])
                         LBF1ID : cpl1_rcved <= 1'b1;
                         LBF2ID : cpl2_rcved <= 1'b1;
                     endcase

@@ -50,7 +50,11 @@ module tlp2ibuf # (
     parameter DSC_BASE_QW = 0,
     parameter GC_BASE_QW = 1,
     // MISC
-    parameter BW = 9
+    parameter BW = 9,
+    // RQ_TAG_BASE
+    parameter RQTB = 5'b00000,
+    // Outstanding request width
+    parameter OSRW = 4
     ) (
 
     input                    clk,
@@ -103,8 +107,6 @@ module tlp2ibuf # (
     output       [63:0]      hw_ptr,
 
     // EP arb
-    input        [4:0]       tag_trn,
-    output                   tag_inc,
     input                    my_trn,
     output                   drv_ep,
     output                   req_ep
@@ -118,7 +120,7 @@ module tlp2ibuf # (
     wire                     rd;
     wire         [8:0]       rd_qw;
     wire                     rd_ack;
-    wire         [4:0]       rd_tag;
+    wire         [OSRW-1:0]  rd_tag;
     // dsc_mgmt
     wire                     dsc_rdy;
     wire                     dsc_rdy_ack;
@@ -154,7 +156,11 @@ module tlp2ibuf # (
         .DSCW(DSCW),
         .DSC_CPL_MSG(DSC_CPL_MSG),
         .DSC_BASE_QW(DSC_BASE_QW),
-        .GC_BASE_QW(GC_BASE_QW)
+        .GC_BASE_QW(GC_BASE_QW),
+        // RQ_TAG_BASE
+        .RQTB(RQTB),
+        // Outstanding request width
+        .OSRW(OSRW)
     ) mem_rd_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
@@ -176,7 +182,7 @@ module tlp2ibuf # (
         .rd(rd),                                               // I
         .rd_qw(rd_qw),                                         // I [8:0]
         .rd_ack(rd_ack),                                       // O
-        .rd_tag(rd_tag),                                       // O [4:0]
+        .rd_tag(rd_tag),                                       // O [OSRW-1:0]
         // dsc_mgmt
         .dsc_rdy(dsc_rdy),                                     // I
         .dsc_rdy_ack(dsc_rdy_ack),                             // O
@@ -186,8 +192,6 @@ module tlp2ibuf # (
         .gc_updt_ack(gc_updt_ack),                             // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
-        .tag_trn(tag_trn),                                     // I [4:0]
-        .tag_inc(tag_inc),                                     // O
         .my_trn(my_trn),                                       // I
         .drv_ep(drv_ep),                                       // O
         .req_ep(req_ep)                                        // O
@@ -197,8 +201,11 @@ module tlp2ibuf # (
     // ibuf_mgmt
     //-------------------------------------------------------
     ibuf_mgmt #(
-        .MX_OS_RQ(4),
-        .BW(BW)
+        .BW(BW),
+        // RQ_TAG_BASE
+        .RQTB(RQTB),
+        // Outstanding request width
+        .OSRW(OSRW)
     ) ibuf_mgmt_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
@@ -233,7 +240,7 @@ module tlp2ibuf # (
         .rd(rd),                                               // O
         .rd_qw(rd_qw),                                         // O [8:0]
         .rd_ack(rd_ack),                                       // I
-        .rd_tag(rd_tag),                                       // I [4:0]
+        .rd_tag(rd_tag),                                       // I [OSRW-1:0]
         // dsc_mgmt
         .dsc_rdy(dsc_rdy),                                     // O
         .dsc_rdy_ack(dsc_rdy_ack)                              // I
@@ -274,9 +281,9 @@ module tlp2ibuf # (
         .cpl_rcved(cpl1_rcved),                                // I
         .cpl_dws(cpl_dws),                                     // I [9:0]
         // gc updt
-        .gc_addr(gc1_addr),                                   // O [63:0]
-        .gc_updt(gc1_updt),                                   // O
-        .gc_updt_ack(gc1_updt_ack)                            // I
+        .gc_addr(gc1_addr),                                    // O [63:0]
+        .gc_updt(gc1_updt),                                    // O
+        .gc_updt_ack(gc1_updt_ack)                             // I
         );
 
     //-------------------------------------------------------
@@ -294,9 +301,9 @@ module tlp2ibuf # (
         .cpl_rcved(cpl2_rcved),                                // I
         .cpl_dws(cpl_dws),                                     // I [9:0]
         // gc updt
-        .gc_addr(gc2_addr),                                   // O [63:0]
-        .gc_updt(gc2_updt),                                   // O
-        .gc_updt_ack(gc2_updt_ack)                            // I
+        .gc_addr(gc2_addr),                                    // O [63:0]
+        .gc_updt(gc2_updt),                                    // O
+        .gc_updt_ack(gc2_updt_ack)                             // I
         );
 
     //-------------------------------------------------------

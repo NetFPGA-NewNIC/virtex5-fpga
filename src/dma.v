@@ -43,7 +43,9 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module dma ( 
+module dma # (
+    parameter GOSRQW = 2      // global outstanding req width
+    ) (
 
     // PCIe
     input                    sys_clk_p,
@@ -163,12 +165,10 @@ module dma (
     //-------------------------------------------------------
     // Local CHN ARB
     //-------------------------------------------------------
-    wire         [4:0]       tag_trn;
     // CHN0 trn
     wire                     chn0_trn;
     wire                     chn0_drvn;
     wire                     chn0_reqep;
-    wire                     chn0_tag_inc;
 
     //-------------------------------------------------------
     // Local CHN0
@@ -322,13 +322,10 @@ module dma (
     chn_arb chn_arb_mod (
         .clk(trn_clk_c),                                       // I
         .rst(pcie_rst),                                        // I
-        // TAG mgmt
-        .tag_trn(tag_trn),                                     // I [4:0]
         // CHN0 trn
         .chn0_trn(chn0_trn),                                   // O
         .chn0_drvn(chn0_drvn),                                 // I
-        .chn0_reqep(chn0_reqep),                               // I
-        .chn0_tag_inc(chn0_tag_inc)                            // I
+        .chn0_reqep(chn0_reqep)                                // I
         );
 
     //-------------------------------------------------------
@@ -352,7 +349,11 @@ module dma (
         // IRQ
         .IRQ_BARMP_EN (6'b001000),
         .IRQ_BARMP_DIS(6'b001001),
-        .IRQ_BARMP_THR(6'b001010)
+        .IRQ_BARMP_THR(6'b001010),
+        // RQ_TAG_BASE
+        .RQTB(5'b11100),
+        // Outstanding request width
+        .OSRW(2)
     ) chn0 (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
@@ -393,8 +394,6 @@ module dma (
         .cfg_function_number(cfg_function_number_c),           // I [2:0]
         .cfg_dcommand(cfg_dcommand_c),                         // I [15:0]
         // EP arb
-        .tag_trn(tag_trn),                                     // I [4:0]
-        .tag_inc(chn0_tag_inc),                                // O
         .chn_trn(chn0_trn),                                    // I
         .chn_drvn(chn0_drvn),                                  // O
         .chn_reqep(chn0_reqep)                                 // O

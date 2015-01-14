@@ -53,7 +53,11 @@ module tx # (
     parameter BARMP_LBUF2_EN = 6'b111111,
     parameter BARMP_WRBCK = 6'b111111,
     // MISC
-    parameter BW = 9
+    parameter BW = 9,
+    // RQ_TAG_BASE
+    parameter RQTB = 5'b00000,
+    // Outstanding request width
+    parameter OSRW = 4
     ) (
 
     input                    mac_clk,
@@ -93,8 +97,6 @@ module tx # (
     output                   send_irq,
 
     // EP arb
-    input        [4:0]       tag_trn,
-    output                   tag_inc,
     input                    my_trn,
     output                   drv_ep,
     output                   req_ep
@@ -182,8 +184,8 @@ module tx # (
         .a(wr_addr),                                           // I [BW-1:0]
         .d(wr_data),                                           // I [63:0]
         .dpra(rd_addr),                                        // I [BW-1:0]
-        .clk(mac_clk),                                         // I 
-        .qdpo_clk(pcie_clk),                                   // I
+        .clk(pcie_clk),                                        // I 
+        .qdpo_clk(mac_clk),                                    // I
         .qdpo(rd_data)                                         // O [63:0]
         );
 
@@ -221,7 +223,11 @@ module tx # (
         .DSC_BASE_QW(0),
         .GC_BASE_QW(1),
         // MISC
-        .BW(BW)
+        .BW(BW),
+        // RQ_TAG_BASE
+        .RQTB(RQTB),
+        // Outstanding request width
+        .OSRW(OSRW)
     ) tlp2ibuf_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
@@ -264,8 +270,6 @@ module tx # (
         .send_irq(dta_rdy),                                    // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
-        .tag_trn(tag_trn),                                     // I [4:0]
-        .tag_inc(tag_inc),                                     // O
         .my_trn(my_trn),                                       // I
         .drv_ep(drv_ep),                                       // O
         .req_ep(req_ep_i)                                      // O

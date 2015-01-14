@@ -61,7 +61,11 @@ module chn # (
     // IRQ
     parameter IRQ_BARMP_EN = 6'b111111,
     parameter IRQ_BARMP_DIS = 6'b111111,
-    parameter IRQ_BARMP_THR = 6'b111111
+    parameter IRQ_BARMP_THR = 6'b111111,
+    // RQ_TAG_BASE
+    parameter RQTB = 5'b00000,
+    // Outstanding request width
+    parameter OSRW = 4
     ) (
 
     input                    mac_clk,
@@ -110,8 +114,6 @@ module chn # (
     input        [15:0]      cfg_dcommand,
 
     // EP arb
-    input        [4:0]       tag_trn,
-    output                   tag_inc,
     input                    chn_trn,
     output                   chn_drvn,
     output                   chn_reqep
@@ -189,7 +191,11 @@ module chn # (
         .BARMP_LBUF2_EN(TX_BARMP_LBUF2_EN),
         .BARMP_WRBCK(TX_BARMP_WRBCK),
         // MISC
-        .BW(9)
+        .BW(9),
+        // RQ_TAG_BASE
+        .RQTB(RQTB),
+        // Outstanding request width
+        .OSRW(OSRW)
     ) tx_mod (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
@@ -222,8 +228,6 @@ module chn # (
         .cfg_max_rd_req_size(cfg_max_rd_req_size),             // I [2:0]
         .send_irq(tx_send_irq),                                // O
         // EP arb
-        .tag_trn(tag_trn),                                     // I [4:0]
-        .tag_inc(tag_inc),                                     // O
         .my_trn(tx_trn),                                       // I
         .drv_ep(tx_drvn),                                      // O
         .req_ep(tx_reqep)                                      // O
