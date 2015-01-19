@@ -197,9 +197,57 @@ module ibuf_mgmt # (
     reg          [OSRW-1:0]  gc_tlp_tag;
 
     //-------------------------------------------------------
+    // Local health_mon
+    //-------------------------------------------------------
+    reg          [14:0]      health_mon_fsm;
+    reg          [BW:0]      diff_mon_reg;
+    (* KEEP = "TRUE" *)reg     [31:0]   counter_mon;
+
+    //-------------------------------------------------------
     // assigns
     //-------------------------------------------------------
     assign rd_qw = rd_qw_i;
+
+    ////////////////////////////////////////////////
+    // health_mon
+    ////////////////////////////////////////////////
+    always @(posedge clk) begin
+
+        if (rst) begin  // rst
+            health_mon_fsm <= s0;
+        end
+        
+        else begin  // not rst
+
+            case (health_mon_fsm)
+
+                s0 : begin
+                    counter_mon <= 'b0;
+                    health_mon_fsm <= s1;
+                end
+
+                s1 : begin
+                    diff_mon_reg <= diff;
+                    counter_mon <= 'b0;
+                    if (diff) begin
+                        health_mon_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    counter_mon <= counter_mon + 1;
+                    if ((diff != diff_mon_reg) || !diff) begin
+                        health_mon_fsm <= s1;
+                    end
+                end
+
+                default : begin 
+                    health_mon_fsm <= s0;
+                end
+
+            endcase
+        end     // not rst
+    end  //always
 
     ////////////////////////////////////////////////
     // rd_fsm
