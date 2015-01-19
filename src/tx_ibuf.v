@@ -60,6 +60,7 @@ module tx_ibuf # (
     //-------------------------------------------------------
     reg     [AW-1:0]     a_reg;
     reg     [DW-1:0]     d_reg;
+    reg                  we_reg;
     reg     [DW-1:0]     dpram[(2**AW)-1:0];
 
     //-------------------------------------------------------
@@ -73,7 +74,8 @@ module tx_ibuf # (
     always @(posedge clk) begin
         a_reg <= a;
         d_reg <= d;
-        if (we) begin
+        we_reg <= we;
+        if (we_reg) begin
             dpram[a_reg] <= d_reg;
         end
     end  //always
