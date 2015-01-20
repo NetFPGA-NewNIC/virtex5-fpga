@@ -349,9 +349,9 @@ module dma (
         .IRQ_BARMP_DIS(6'b001001),
         .IRQ_BARMP_THR(6'b001010),
         // RQ_TAG_BASE
-        .RQTB(5'b11000),
+        .RQTB(5'b11100),
         // Outstanding request width
-        .OSRW(3)
+        .OSRW(2)
     ) chn0 (
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
