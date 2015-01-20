@@ -308,6 +308,8 @@ module rx # (
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // lbuf_mgmt
+        .wt_lbuf1(1'b0),                                       // I
+        .wt_lbuf2(1'b0),                                       // I
         .lbuf_addr(lbuf_addr),                                 // O [63:0]
         .lbuf_en(lbuf_en),                                     // O
         .lbuf64b(lbuf64b),                                     // O

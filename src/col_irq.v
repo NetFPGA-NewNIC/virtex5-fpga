@@ -51,7 +51,7 @@ module col_irq (
     input                    wt_lbuf1,
     input                    wt_lbuf2,
 
-    output reg               send_irq
+    output reg               data_rdy
     );
 
     // localparam
@@ -81,7 +81,7 @@ module col_irq (
         
         else begin  // not rst
 
-            send_irq <= 1'b0;
+            data_rdy <= 1'b0;
 
             case (col_fsm)
 
@@ -97,7 +97,7 @@ module col_irq (
 
                 s2 : begin
                     if (!wt_lbuf1 && !wt_lbuf2) begin
-                        send_irq <= 1'b1;
+                        data_rdy <= 1'b1;
                         col_fsm <= s1;
                     end
                 end

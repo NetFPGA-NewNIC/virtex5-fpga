@@ -134,25 +134,24 @@ module ibuf2tlp # (
     //-------------------------------------------------------   
     reg          [27:0]      send_fsm;
     reg          [8:0]       tlp_qw_cnt;
-    reg          [4:0]       tlp_nmb;
-    reg          [4:0]       look_ahead_tlp_nmb;
-    reg          [8:0]       qw_in_tlp;
-    reg          [63:0]      host_mem_addr;
-    reg          [63:0]      look_ahead_host_mem_addr;
-    reg          [63:0]      aux1_host_mem_addr;
+    reg          [8:0]       qw_cnt_reg;
+    reg          [63:0]      hst_addr;
+    reg          [63:0]      hst_base_addr;
+    reg          [63:0]      aux0_hst_addr;
+    reg          [63:0]      aux1_hst_addr;
     reg          [31:0]      lbuf_qw_cnt;
     reg          [31:0]      aux_qw_cnt;
     reg          [31:0]      nxt_qw_cnt;
-    reg          [31:0]      look_ahead_lbuf_qw_cnt;
+    reg          [31:0]      nxt_lbuf_qw_cnt;
     reg          [BW-1:0]    rd_addr_prev1;
     reg          [BW-1:0]    rd_addr_prev2;
-    reg          [BW-1:0]    look_ahead_committed_cons;
+    reg          [BW-1:0]    nxt_committed_cons;
     reg          [31:0]      aux_rd_data;
     reg                      close_lbuf;
     reg          [15:0]      dropped_pkts_reg;
     reg          [15:0]      cfg_completer_id_reg;
     
-    assign hw_ptr = host_mem_addr;
+    assign hw_ptr = hst_addr;
 
     ////////////////////////////////////////////////
     // send_fsm
@@ -163,28 +162,15 @@ module ibuf2tlp # (
             trn_tsof_n <= 1'b1;
             trn_teof_n <= 1'b1;
             trn_tsrc_rdy_n <= 1'b1;
-
-            lbuf_dn <= 1'b0;
-            drv_ep <= 1'b0;
-
-            trig_tlp_ack <= 1'b0;
-            chng_lbuf_ack <= 1'b0;
-            send_qws_ack <= 1'b0;
-
-            committed_cons <= 'b0;
-            rd_addr <= 'b0;
-
-            tlp_nmb <= 'b0;
-
             send_fsm <= s0;
         end
         
         else begin  // not rst
 
+            lbuf_dn <= 1'b0;
             trig_tlp_ack <= 1'b0;
             chng_lbuf_ack <= 1'b0;
             send_qws_ack <= 1'b0;
-            lbuf_dn <= 1'b0;
 
             rd_addr_prev1 <= rd_addr;
             rd_addr_prev2 <= rd_addr_prev1;
@@ -199,12 +185,22 @@ module ibuf2tlp # (
                     drv_ep <= 1'b0;
                     trn_td <= 64'b0;
                     trn_trem_n <= 8'hFF;
+                    committed_cons <= 'b0;
+                    rd_addr <= 'b0;
+                    send_fsm <= s1;
+                end
 
-                    host_mem_addr <= lbuf_addr + 'h80;
+                s1 : begin
+                    drv_ep <= 1'b0;
+                    trn_td <= 64'b0;
+                    trn_trem_n <= 8'hFF;
+
+                    hst_base_addr <= lbuf_addr;
+                    hst_addr <= lbuf_addr + 'h80;
                     lbuf_qw_cnt <= 'b0;
                     if (lbuf_en) begin
                         if (lbuf64b) begin
-                            send_fsm <= s1;
+                            send_fsm <= s2;
                         end
                         else begin
                             send_fsm <= s14;
@@ -212,8 +208,8 @@ module ibuf2tlp # (
                     end
                 end
 
-                s1 : begin
-                    qw_in_tlp <= {3'b0, qw_cnt};
+                s2 : begin
+                    qw_cnt_reg <= {3'b0, qw_cnt};
 
                     drv_ep <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;
@@ -226,9 +222,9 @@ module ibuf2tlp # (
                             send_fsm <= s10;
                         end
                         else if (trig_tlp) begin
-                            drv_ep <= 1'b1;
                             trig_tlp_ack <= 1'b1;
-                            send_fsm <= s2;
+                            drv_ep <= 1'b1;
+                            send_fsm <= s3;
                         end
                         else if (send_qws) begin
                             close_lbuf <= 1'b0;
@@ -239,11 +235,10 @@ module ibuf2tlp # (
                     end
                 end
 
-                s2 : begin
-                    trn_trem_n <= 8'b0;
+                s3 : begin
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `MEM_WR64_FMT_TYPE, //memory write request 64bit addressing
+                                `MEM_WR64_FMT_TYPE,
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -251,60 +246,59 @@ module ibuf2tlp # (
                                 1'b0,   //EP (poisoned data)
                                 2'b00,  //Relaxed ordering, No snoop in processor cache
                                 2'b0,   //reserved
-                                {qw_in_tlp, 1'b0}  //lenght in DWs. 10-bit field    // QWs x2 equals DWs
+                                {qw_cnt_reg, 1'b0}
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id_reg,   //Requester ID
-                                {3'b0, tlp_nmb },   //Tag
+                                {3'b0, 5'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    trn_trem_n <= 8'b0;
                     rd_addr <= rd_addr +1;
 
-                    look_ahead_host_mem_addr <= host_mem_addr + {qw_in_tlp, 3'b0};
-                    look_ahead_lbuf_qw_cnt <= lbuf_qw_cnt + qw_in_tlp;
-                    look_ahead_tlp_nmb <= tlp_nmb +1;
-                    look_ahead_committed_cons <= committed_cons + qw_in_tlp;
+                    aux0_hst_addr <= hst_addr + {qw_cnt_reg, 3'b0};
+                    nxt_lbuf_qw_cnt <= lbuf_qw_cnt + qw_cnt_reg;
+                    nxt_committed_cons <= committed_cons + qw_cnt_reg;
 
-                    send_fsm <= s3;
+                    send_fsm <= s4;
                 end
 
-                s3 : begin
-                    tlp_qw_cnt <= 9'b1;
+                s4 : begin
+                    tlp_qw_cnt <= 'b1;
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td <= host_mem_addr;
+                        trn_td <= hst_addr;
                         rd_addr <= rd_addr +1;
                         send_fsm <= s6;
                     end
                     else begin
                         rd_addr <= rd_addr_prev1;
-                        send_fsm <= s4;
+                        send_fsm <= s5;
                     end
                 end
 
-                s4 : begin
+                s5 : begin
                     if (!trn_tdst_rdy_n) begin
                         rd_addr <= rd_addr +1;
                         trn_tsrc_rdy_n <= 1'b1;
                         trn_tsof_n <= 1'b1;
-                        send_fsm <= s3;
+                        send_fsm <= s4;
                     end
                 end
 
                 s6 : begin
-                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
+                    aux1_hst_addr <= aux0_hst_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         trn_td <= qw_endian_conv(rd_data);
 
                         rd_addr <= rd_addr +1;
-
                         tlp_qw_cnt <= tlp_qw_cnt +1;
-                        if (tlp_qw_cnt == qw_in_tlp) begin
+                        if (tlp_qw_cnt == qw_cnt_reg) begin
                             trn_teof_n <= 1'b0;
                             send_fsm <= s9;
                         end
@@ -330,23 +324,21 @@ module ibuf2tlp # (
                 end
 
                 s9 : begin
-                    committed_cons <= look_ahead_committed_cons;
-                    rd_addr <= look_ahead_committed_cons;
-                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
-                    lbuf_qw_cnt <= look_ahead_lbuf_qw_cnt;
-                    tlp_nmb <= look_ahead_tlp_nmb;
+                    committed_cons <= nxt_committed_cons;
+                    rd_addr <= nxt_committed_cons;
+                    hst_addr <= {aux1_hst_addr[63:7], 7'b0};
+                    lbuf_qw_cnt <= nxt_lbuf_qw_cnt;
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
-                        send_fsm <= s1;
+                        send_fsm <= s2;
                     end
                 end
 
                 s10 : begin
-                    trn_trem_n <= 8'b0;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `MEM_WR64_FMT_TYPE, //memory write request 64bit addressing
+                                `MEM_WR64_FMT_TYPE,
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -358,12 +350,14 @@ module ibuf2tlp # (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id_reg,   //Requester ID
-                                {4'b0, 4'b0 },   //Tag
+                                {3'b0, 5'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    trn_trem_n <= 8'b0;
+
                     aux_qw_cnt <= lbuf_qw_cnt;
                     nxt_qw_cnt <= lbuf_qw_cnt + 'hF;
                     send_fsm <= s11;
@@ -373,7 +367,7 @@ module ibuf2tlp # (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         lbuf_dn <= close_lbuf;
-                        trn_td <= lbuf_addr;
+                        trn_td <= hst_base_addr;
                         send_fsm <= s12;
                     end
                 end
@@ -398,16 +392,16 @@ module ibuf2tlp # (
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
                         if (close_lbuf) begin
-                            send_fsm <= s0;
+                            send_fsm <= s1;
                         end
                         else begin
-                            send_fsm <= s1;
+                            send_fsm <= s2;
                         end
                     end
                 end
 
                 s14 : begin
-                    qw_in_tlp <= {3'b0, qw_cnt};
+                    qw_cnt_reg <= {3'b0, qw_cnt};
 
                     drv_ep <= 1'b0;                                              // we're taking the risk of starving the tx process
                     trn_td <= 64'b0;
@@ -420,8 +414,8 @@ module ibuf2tlp # (
                             send_fsm <= s24;
                         end
                         else if (trig_tlp) begin
-                            drv_ep <= 1'b1;
                             trig_tlp_ack <= 1'b1;
+                            drv_ep <= 1'b1;
                             send_fsm <= s15;
                         end
                         else if (send_qws) begin
@@ -439,10 +433,9 @@ module ibuf2tlp # (
                 end
 
                 s16 : begin
-                    trn_trem_n <= 8'h0F;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `MEM_WR32_FMT_TYPE, //memory write request 32bit addressing
+                                `MEM_WR32_FMT_TYPE,
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -450,35 +443,34 @@ module ibuf2tlp # (
                                 1'b0,   //EP (poisoned data)
                                 2'b00,  //Relaxed ordering, No snoop in processor cache
                                 2'b0,   //reserved
-                                {qw_in_tlp, 1'b0}  //lenght in DWs. 10-bit field    // QWs x2 equals DWs
+                                {qw_cnt_reg, 1'b0}
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id_reg,   //Requester ID
-                                {3'b0, tlp_nmb },   //Tag
+                                {3'b0, 5'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    trn_trem_n <= 8'h0F;
                     rd_addr <= rd_addr +1;
 
-                    look_ahead_host_mem_addr <= host_mem_addr + {qw_in_tlp, 3'b0};
-                    look_ahead_lbuf_qw_cnt <= lbuf_qw_cnt + qw_in_tlp;
-                    look_ahead_tlp_nmb <= tlp_nmb +1;
-                    look_ahead_committed_cons <= committed_cons + qw_in_tlp;
+                    aux0_hst_addr <= hst_addr + {qw_cnt_reg, 3'b0};
+                    nxt_lbuf_qw_cnt <= lbuf_qw_cnt + qw_cnt_reg;
+                    nxt_committed_cons <= committed_cons + qw_cnt_reg;
 
                     send_fsm <= s17;
                 end
 
                 s17 : begin
                     aux_rd_data <= rd_data[63:32];
-                    tlp_qw_cnt <= 9'b1;
+                    tlp_qw_cnt <= 'b1;
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b0;
-                        trn_td[63:32] <= host_mem_addr[31:0];
+                        trn_td[63:32] <= hst_addr[31:0];
                         trn_td[31:0] <= dw_endian_conv(rd_data[31:0]);
-
                         rd_addr <= rd_addr +1;
                         send_fsm <= s20;
                     end
@@ -504,7 +496,7 @@ module ibuf2tlp # (
                 end
 
                 s20 : begin
-                    aux1_host_mem_addr <= look_ahead_host_mem_addr + 'h7F;  // align 128
+                    aux1_hst_addr <= aux0_hst_addr + 'h7F;  // align 128
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b0;
                         aux_rd_data <= rd_data[63:32];
@@ -513,7 +505,7 @@ module ibuf2tlp # (
 
                         rd_addr <= rd_addr +1;
                         tlp_qw_cnt <= tlp_qw_cnt +1;
-                        if (tlp_qw_cnt == qw_in_tlp) begin
+                        if (tlp_qw_cnt == qw_cnt_reg) begin
                             trn_teof_n <= 1'b0;
                             send_fsm <= s23;
                         end
@@ -539,11 +531,10 @@ module ibuf2tlp # (
                 end
 
                 s23 : begin
-                    committed_cons <= look_ahead_committed_cons;
-                    rd_addr <= look_ahead_committed_cons;
-                    host_mem_addr <= {aux1_host_mem_addr[63:7], 7'b0};
-                    lbuf_qw_cnt <= look_ahead_lbuf_qw_cnt;
-                    tlp_nmb <= look_ahead_tlp_nmb;
+                    committed_cons <= nxt_committed_cons;
+                    rd_addr <= nxt_committed_cons;
+                    hst_addr <= {aux1_hst_addr[63:7], 7'b0};
+                    lbuf_qw_cnt <= nxt_lbuf_qw_cnt;
                     if (!trn_tdst_rdy_n) begin
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
@@ -552,10 +543,9 @@ module ibuf2tlp # (
                 end
 
                 s24 : begin
-                    trn_trem_n <= 8'h0F;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
-                                `MEM_WR32_FMT_TYPE, //memory write request 32bit addressing
+                                `MEM_WR32_FMT_TYPE,
                                 1'b0,   //reserved
                                 3'b0,   //TC (traffic class)
                                 4'b0,   //reserved
@@ -567,12 +557,14 @@ module ibuf2tlp # (
                             };
                     trn_td[31:0] <= {
                                 cfg_completer_id_reg,   //Requester ID
-                                {4'b0, 4'b0 },   //Tag
+                                {3'b0, 5'b0 },   //Tag
                                 4'hF,   //last DW byte enable
                                 4'hF    //1st DW byte enable
                             };
                     trn_tsof_n <= 1'b0;
                     trn_tsrc_rdy_n <= 1'b0;
+                    trn_trem_n <= 8'h0F;
+
                     aux_qw_cnt <= lbuf_qw_cnt;
                     nxt_qw_cnt <= lbuf_qw_cnt + 'hF;
                     send_fsm <= s25;
@@ -582,7 +574,7 @@ module ibuf2tlp # (
                     if (!trn_tdst_rdy_n) begin
                         trn_tsof_n <= 1'b1;
                         lbuf_dn <= close_lbuf;
-                        trn_td[63:32] <= lbuf_addr[31:0];
+                        trn_td[63:32] <= hst_base_addr[31:0];
                         trn_td[31:0] <= dw_endian_conv(aux_qw_cnt);
                         send_fsm <= s26;
                     end
@@ -607,7 +599,7 @@ module ibuf2tlp # (
                         trn_teof_n <= 1'b1;
                         trn_tsrc_rdy_n <= 1'b1;
                         if (close_lbuf) begin
-                            send_fsm <= s0;
+                            send_fsm <= s1;
                         end
                         else begin
                             send_fsm <= s14;

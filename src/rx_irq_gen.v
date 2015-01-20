@@ -80,8 +80,6 @@ module rx_irq_gen (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            mac_activity_reg0 <= 1'b0;
-            mac_activity_reg1 <= 1'b0;
             send_irq <= 1'b0;
             irq_gen_fsm <= s0;
         end
@@ -94,19 +92,25 @@ module rx_irq_gen (
             case (irq_gen_fsm)
 
                 s0 : begin
-                    if (hst_rdy) begin
-                        irq_gen_fsm <= s1;
-                    end
+                    mac_activity_reg0 <= 1'b0;
+                    mac_activity_reg1 <= 1'b0;
+                    irq_gen_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (mac_activity_reg1) begin
-                        send_irq <= 1'b1;
+                    if (hst_rdy) begin
                         irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    if (mac_activity_reg1) begin
+                        send_irq <= 1'b1;
+                        irq_gen_fsm <= s3;
+                    end
+                end
+
+                s3 : begin
                     if (mac_activity_reg1 || (hw_ptr != sw_ptr)) begin
                         send_irq <= 1'b1;
                     end

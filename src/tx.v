@@ -149,7 +149,7 @@ module tx # (
     //-------------------------------------------------------
     // Local irq_gen
     //-------------------------------------------------------
-    wire                     dta_rdy;
+    wire                     data_rdy;
     wire         [63:0]      hw_ptr;
     wire         [63:0]      sw_ptr;
 
@@ -270,7 +270,7 @@ module tx # (
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // irq_gen
-        .send_irq(dta_rdy),                                    // O
+        .data_rdy(data_rdy),                                   // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
         .my_trn(my_trn),                                       // I
@@ -335,7 +335,7 @@ module tx # (
     tx_irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
-        .dta_rdy(dta_rdy),                                     // I
+        .data_rdy(data_rdy),                                   // I
         .hw_ptr(hw_ptr),                                       // I [63:0]
         .sw_ptr(sw_ptr),                                       // I [63:0]
         .send_irq(send_irq)                                    // O
