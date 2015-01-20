@@ -78,7 +78,7 @@ module mac2ibuf # (
     localparam s7 = 8'b01000000;
     localparam s8 = 8'b10000000;
 
-    localparam MAX_DIFF = (2**BW) - 6;
+    localparam MAX_DIFF = (2**BW) - 10;
 
     //-------------------------------------------------------
     // Local mac2ibuf
@@ -128,9 +128,9 @@ module mac2ibuf # (
                     rx_good_frame_reg <= rx_good_frame;
                     rx_bad_frame_reg <= rx_bad_frame;
                     
-                    case (rx_data_valid)     // increment len accordingly
+                    case (rx_data_valid)
                         8'b00000000 : begin
-                            len <= len;       // don't increment
+                            len <= len;
                             aux_wr_addr <= aux_wr_addr;
                         end
                         8'b00000001 : begin
