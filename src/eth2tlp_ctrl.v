@@ -101,25 +101,23 @@ module eth2tlp_ctrl # (
     // Local trigger-logic
     //-------------------------------------------------------
     reg          [17:0]      trigger_fsm;
-    reg          [BW-1:0]    diff;
-    reg          [BW-1:0]    diff_reg;
-    reg          [BW-1:0]    commited_rd_addr;
-    reg          [BW-1:0]    aux_commited_rd_addr;
+    reg          [BW:0]      diff;
+    reg          [BW:0]      diff_reg;
+    reg          [BW:0]      cons_i;
+    reg          [BW:0]      nxt_cons_i;
     reg                      huge_page_dirty;
-    reg          [18:0]      huge_page_qw_offset;
-    reg          [18:0]      aux0_huge_page_qw_offset;
-    reg          [18:0]      aux1_huge_page_qw_offset;
-    reg          [18:0]      aux_ethframe_endaddr;
-    reg          [3:0]       qwords_remaining;
-    reg          [BW-5:0]    number_of_tlp_sent;
-    reg          [BW-5:0]    aux0_number_of_tlp_sent;
-    reg          [BW-5:0]    aux1_number_of_tlp_sent;
-    reg          [BW-5:0]    number_of_tlp_to_send;
-    reg          [BW-4:0]    diff_tlp;
+    reg          [18:0]      lbuf_qw_offst;
+    reg          [18:0]      nxt_lbuf_qw_offst;
+    reg          [18:0]      eolbuf_chk;
+    reg          [3:0]       qw_lft;
+    reg          [BW-4:0]    tlp_snt;
+    reg          [BW-4:0]    nxt_tlp_snt128;
+    reg          [BW-4:0]    nxt_tlp_snt256;
+    reg          [BW-4:0]    tlp2snd;
+    reg          [BW-3:0]    diff_tlp;
     reg                      rx_idle;
     reg                      double_inc;
-    reg                      max_tlp_size256;
-    reg                      aux_max_tlp_size256;
+    reg                      mx256;
     reg          [2:0]       cfg_max_payload_size_reg;
 
     ////////////////////////////////////////////////
@@ -127,16 +125,9 @@ module eth2tlp_ctrl # (
     ////////////////////////////////////////////////
     always @(posedge clk) begin
         if (rst) begin  // rst
-            timeout <= 1'b0;
-            mac_activity_reg0 <= 1'b0;
-            mac_activity_reg1 <= 1'b0;
-            free_running <= 'b0;
         end
         
         else begin  // not rst
-
-            timeout <= 1'b0;
-            free_running <= 'b0;
 
             mac_activity_reg0 <= mac_activity;
             mac_activity_reg1 <= mac_activity_reg0;
@@ -146,6 +137,10 @@ module eth2tlp_ctrl # (
                 if (free_running == 'h3F) begin
                     timeout <= 1'b1;
                 end
+            end
+            else begin
+                timeout <= 1'b0;
+                free_running <= 'b0;
             end
 
         end     // not rst
@@ -157,228 +152,225 @@ module eth2tlp_ctrl # (
     always @(posedge clk) begin
         
         if (rst) begin  // rst
-            trig_tlp <= 1'b0;
-            chng_lbuf <= 1'b0;
-            send_qws <= 1'b0;
-
-            rx_idle <= 1'b0;
-            trigger_fsm <= s18;
+            trigger_fsm <= s0;
         end
 
         else begin  // not rst
 
             rx_idle <= 1'b0;
 
-            diff <= committed_prod + (~commited_rd_addr) +1;
-            diff_tlp <= number_of_tlp_to_send + (~number_of_tlp_sent) +1;
+            diff <= committed_prod + (~cons_i) +1;
+            diff_tlp <= tlp2snd + (~tlp_snt) +1;
 
             cfg_max_payload_size_reg <= cfg_max_payload_size;
-            aux_max_tlp_size256 <= | cfg_max_payload_size_reg;
-            max_tlp_size256 <= aux_max_tlp_size256;
+            mx256 <= | cfg_max_payload_size_reg;
             
             case (trigger_fsm)
 
                 s0 : begin
-                    rx_idle <= 1'b1;
-                    aux_ethframe_endaddr <= huge_page_qw_offset + diff;
-                    diff_reg <= diff;
-                    number_of_tlp_to_send <= diff[BW-1:4];
-                    double_inc <= 1'b0;
-
-                    if (diff >= 'h10) begin
-                        trigger_fsm <= s1;
-                    end
-                    else if ( (huge_page_dirty) && (timeout) ) begin
-                        trigger_fsm <= s12;
-                    end
-                    else if ( (diff) && (timeout) ) begin
-                        trigger_fsm <= s17;
-                    end
+                    trig_tlp <= 1'b0;
+                    chng_lbuf <= 1'b0;
+                    send_qws <= 1'b0;
+                    diff <= 'b0;
+                    cons_i <= 'b0;
+                    lbuf_qw_offst <= 'h10;
+                    huge_page_dirty <= 1'b0;
+                    qw_lft <= 'b0;
+                    trigger_fsm <= s1;
                 end
 
                 s1 : begin
-                    huge_page_dirty <= 1'b1;
-                    number_of_tlp_sent <= 'b0;
-                    qw_cnt <= 'h10;
-                    if (aux_ethframe_endaddr[18]) begin       // 2MB
-                        trigger_fsm <= s7;
-                    end
-                    else begin
-                        trig_tlp <= 1'b1;
-                        qwords_remaining <= diff_reg[3:0];
+                    rx_idle <= 1'b1;
+                    eolbuf_chk <= lbuf_qw_offst + diff;
+                    diff_reg <= diff;
+                    tlp2snd <= diff[BW:4];
+                    double_inc <= 1'b0;
+
+                    if (diff >= 'h10) begin
                         trigger_fsm <= s2;
+                    end
+                    else if ((huge_page_dirty) && (timeout)) begin
+                        trigger_fsm <= s13;
+                    end
+                    else if ((diff) && (timeout)) begin
+                        trigger_fsm <= s18;
                     end
                 end
 
                 s2 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
-                    aux0_number_of_tlp_sent <= number_of_tlp_sent +1;
-                    aux1_number_of_tlp_sent <= number_of_tlp_sent +2;
-                    aux0_huge_page_qw_offset <= huge_page_qw_offset + qw_cnt;
-                    if (trig_tlp_ack) begin
-                        trig_tlp <= 1'b0;
+                    huge_page_dirty <= 1'b1;
+                    tlp_snt <= 'b0;
+                    qw_cnt <= 'h10;
+                    if (eolbuf_chk[18]) begin       // 2MB
+                        trigger_fsm <= s8;
+                    end
+                    else begin
+                        trig_tlp <= 1'b1;
+                        qw_lft <= diff_reg[3:0];
                         trigger_fsm <= s3;
                     end
                 end
 
                 s3 : begin
-                    commited_rd_addr <= aux_commited_rd_addr;
-                    number_of_tlp_sent <= double_inc ? aux1_number_of_tlp_sent : aux0_number_of_tlp_sent;
-                    huge_page_qw_offset <= aux0_huge_page_qw_offset;
-                    trigger_fsm <= s4;
+                    nxt_cons_i <= cons_i + qw_cnt;
+                    nxt_tlp_snt128 <= tlp_snt +1;
+                    nxt_tlp_snt256 <= tlp_snt +2;
+                    nxt_lbuf_qw_offst <= lbuf_qw_offst + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
+                        trigger_fsm <= s4;
+                    end
                 end
 
                 s4 : begin
-                    //delay: diff_tlp
-                    if (max_tlp_size256 && (huge_page_qw_offset[8:4] != 5'h1F)) begin                 // not the last in a 4kpage
-                        trigger_fsm <= s5;
-                    end
-                    else begin
-                        trigger_fsm <= s6;
-                    end
+                    cons_i <= nxt_cons_i;
+                    tlp_snt <= double_inc ? nxt_tlp_snt256 : nxt_tlp_snt128;
+                    lbuf_qw_offst <= nxt_lbuf_qw_offst;
+                    trigger_fsm <= s5;
                 end
 
                 s5 : begin
-                    qw_cnt <= 'h20;
-                    double_inc <= 1'b1;
-                    if (diff_tlp > 'h1) begin
-                        trig_tlp <= 1'b1;
-                        trigger_fsm <= s2;
+                    //delay: diff_tlp
+                    if (mx256 && (lbuf_qw_offst[8:4] != 5'h1F)) begin                 // not the last in a 4kpage
+                        trigger_fsm <= s6;
                     end
                     else begin
-                        trigger_fsm <= s6;
+                        trigger_fsm <= s7;
                     end
                 end
 
                 s6 : begin
-                    double_inc <= 1'b0;
-                    qw_cnt <= 'h10;
-                    if (diff_tlp) begin
+                    qw_cnt <= 'h20;
+                    double_inc <= 1'b1;
+                    if (diff_tlp > 'h1) begin
                         trig_tlp <= 1'b1;
-                        trigger_fsm <= s2;
+                        trigger_fsm <= s3;
                     end
                     else begin
-                        trigger_fsm <= s0;
+                        trigger_fsm <= s7;
                     end
                 end
 
                 s7 : begin
-                    if (!qwords_remaining) begin
-                        chng_lbuf <= 1'b1;
-                        trigger_fsm <= s8;
+                    double_inc <= 1'b0;
+                    qw_cnt <= 'h10;
+                    if (diff_tlp) begin
+                        trig_tlp <= 1'b1;
+                        trigger_fsm <= s3;
                     end
                     else begin
-                        qw_cnt <= {2'b0, qwords_remaining};
-                        trig_tlp <= 1'b1;
-                        trigger_fsm <= s9;
+                        trigger_fsm <= s1;
                     end
                 end
 
                 s8 : begin
-                    huge_page_dirty <= 1'b0;
-                    huge_page_qw_offset <= 'h10;
-                    if (chng_lbuf_ack) begin
-                        chng_lbuf <= 1'b0;
-                        trigger_fsm <= s0;
-                    end
-                end
-
-                s9 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
-                    if (trig_tlp_ack) begin
-                        trig_tlp <= 1'b0;
+                    if (!qw_lft) begin
                         chng_lbuf <= 1'b1;
+                        trigger_fsm <= s9;
+                    end
+                    else begin
+                        qw_cnt <= {2'b0, qw_lft};
+                        trig_tlp <= 1'b1;
                         trigger_fsm <= s10;
                     end
                 end
 
-                s10 : begin
-                    commited_rd_addr <= aux_commited_rd_addr;
-                    huge_page_qw_offset <= 'h10;
-                    qwords_remaining <= 'b0;
+                s9 : begin
                     huge_page_dirty <= 1'b0;
+                    lbuf_qw_offst <= 'h10;
                     if (chng_lbuf_ack) begin
                         chng_lbuf <= 1'b0;
+                        trigger_fsm <= s1;
+                    end
+                end
+
+                s10 : begin
+                    nxt_cons_i <= cons_i + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
+                        chng_lbuf <= 1'b1;
                         trigger_fsm <= s11;
                     end
                 end
 
                 s11 : begin
-                    // delay: diff
-                    trigger_fsm <= s0;
+                    cons_i <= nxt_cons_i;
+                    lbuf_qw_offst <= 'h10;
+                    qw_lft <= 'b0;
+                    huge_page_dirty <= 1'b0;
+                    if (chng_lbuf_ack) begin
+                        chng_lbuf <= 1'b0;
+                        trigger_fsm <= s12;
+                    end
                 end
 
                 s12 : begin
-                    if (!qwords_remaining) begin
-                        send_qws <= 1'b1;
-                        trigger_fsm <= s13;
-                    end
-                    else begin
-                        trigger_fsm <= s14;
-                    end
+                    // delay: diff
+                    trigger_fsm <= s1;
                 end
 
                 s13 : begin
-                    huge_page_dirty <= 1'b0;
-                    if (send_qws_ack) begin
-                        send_qws <= 1'b0;
-                        trigger_fsm <= s0;
-                    end
-                end
-
-                s14 : begin
-                    aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
-                    qw_cnt <= {2'b0, qwords_remaining};
-                    trig_tlp <= 1'b1;
-                    if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
-                        trigger_fsm <= s9;
+                    if (!qw_lft) begin
+                        send_qws <= 1'b1;
+                        trigger_fsm <= s14;
                     end
                     else begin
                         trigger_fsm <= s15;
                     end
                 end
 
+                s14 : begin
+                    huge_page_dirty <= 1'b0;
+                    if (send_qws_ack) begin
+                        send_qws <= 1'b0;
+                        trigger_fsm <= s1;
+                    end
+                end
+
                 s15 : begin
-                    aux_commited_rd_addr <= commited_rd_addr + qw_cnt;
-                    if (trig_tlp_ack) begin
-                        trig_tlp <= 1'b0;
-                        send_qws <= 1'b1;
+                    nxt_lbuf_qw_offst <= lbuf_qw_offst + 'h10;
+                    qw_cnt <= {2'b0, qw_lft};
+                    trig_tlp <= 1'b1;
+                    if (lbuf_qw_offst[17:4] == 'h3FFF) begin      // the last in the 2MB hp
+                        trigger_fsm <= s10;
+                    end
+                    else begin
                         trigger_fsm <= s16;
                     end
                 end
 
                 s16 : begin
-                    commited_rd_addr <= aux_commited_rd_addr;
-                    huge_page_qw_offset <= aux1_huge_page_qw_offset;
-                    qwords_remaining <= 'b0;
-                    huge_page_dirty <= 1'b0;
-                    if (send_qws_ack) begin
-                        send_qws <= 1'b0;
-                        trigger_fsm <= s11;
+                    nxt_cons_i <= cons_i + qw_cnt;
+                    if (trig_tlp_ack) begin
+                        trig_tlp <= 1'b0;
+                        send_qws <= 1'b1;
+                        trigger_fsm <= s17;
                     end
                 end
 
                 s17 : begin
-                    aux1_huge_page_qw_offset <= huge_page_qw_offset + 'h10;
-                    qw_cnt <= diff_reg;
-                    trig_tlp <= 1'b1;
-                    if (huge_page_qw_offset[17:4] == 'h3FFF) begin      // not the last in the 2MB hp
-                        trigger_fsm <= s9;
-                    end
-                    else begin
-                        trigger_fsm <= s15;
+                    cons_i <= nxt_cons_i;
+                    lbuf_qw_offst <= nxt_lbuf_qw_offst;
+                    qw_lft <= 'b0;
+                    huge_page_dirty <= 1'b0;
+                    if (send_qws_ack) begin
+                        send_qws <= 1'b0;
+                        trigger_fsm <= s12;
                     end
                 end
 
-                s18 : begin      // simplify rst logic
-                    diff <= 'b0;
-                    commited_rd_addr <= 'b0;
-                    huge_page_qw_offset <= 'h10;
-                    huge_page_dirty <= 1'b0;
-                    qwords_remaining <= 'b0;
-                    trigger_fsm <= s0;
+                s18 : begin
+                    nxt_lbuf_qw_offst <= lbuf_qw_offst + 'h10;
+                    qw_cnt <= diff_reg;
+                    trig_tlp <= 1'b1;
+                    if (lbuf_qw_offst[17:4] == 'h3FFF) begin      // the last in the 2MB hp
+                        trigger_fsm <= s10;
+                    end
+                    else begin
+                        trigger_fsm <= s16;
+                    end
                 end
-                
+
                 default : begin
                     trigger_fsm <= s0;
                 end

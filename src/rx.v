@@ -99,7 +99,7 @@ module rx # (
     // Local mac2ibuf
     //-------------------------------------------------------
     wire                     mac_activity;
-    wire         [BW-1:0]    committed_prod;
+    wire         [BW:0]      committed_prod;
     wire         [15:0]      dropped_pkts_cnt;
 
     //-------------------------------------------------------
@@ -113,12 +113,12 @@ module rx # (
     //-------------------------------------------------------
     // Local prod_sync
     //-------------------------------------------------------
-    wire         [BW-1:0]    committed_prod_sync;
+    wire         [BW:0]      committed_prod_sync;
 
     //-------------------------------------------------------
     // Local cons_sync
     //-------------------------------------------------------
-    wire         [BW-1:0]    committed_cons_sync;
+    wire         [BW:0]      committed_cons_sync;
 
     //-------------------------------------------------------
     // Local dropped_pkts_cnt_sync
@@ -139,7 +139,7 @@ module rx # (
     //-------------------------------------------------------
     // Local ibuf2tlp
     //-------------------------------------------------------
-    wire         [BW-1:0]    committed_cons;
+    wire         [BW:0]      committed_cons;
 
     //-------------------------------------------------------
     // Local lbuf_mgmt
@@ -171,8 +171,8 @@ module rx # (
         .wr_data(wr_data),                                     // O [63:0]
         // fwd logic
         .activity(mac_activity),                               // O
-        .committed_prod(committed_prod),                       // O [BW-1:0]
-        .committed_cons(committed_cons_sync),                  // I [BW-1:0]
+        .committed_prod(committed_prod),                       // O [BW:0]
+        .committed_cons(committed_cons_sync),                  // I [BW:0]
         .dropped_pkts(dropped_pkts_cnt)                        // O [15:0]
         );
 
@@ -191,25 +191,25 @@ module rx # (
     //-------------------------------------------------------
     // prod_sync
     //-------------------------------------------------------
-    sync_type1 #(.W(BW)) prod_sync_mod (
+    sync_type1 #(.W(BW+1)) prod_sync_mod (
         .clk_out(pcie_clk),                                    // I
         .rst_out(pcie_rst),                                    // I
         .clk_in(mac_clk),                                      // I
         .rst_in(mac_rst),                                      // I
-        .in(committed_prod),                                   // I [BW-1:0]
-        .out(committed_prod_sync)                              // O [BW-1:0]
+        .in(committed_prod),                                   // I [BW:0]
+        .out(committed_prod_sync)                              // O [BW:0]
         );
 
     //-------------------------------------------------------
     // cons_sync
     //-------------------------------------------------------
-    sync_type0 #(.W(BW)) cons_sync_mod (
+    sync_type0 #(.W(BW+1)) cons_sync_mod (
         .clk_out(mac_clk),                                     // I
         .rst_out(mac_rst),                                     // I
         .clk_in(pcie_clk),                                     // I
         .rst_in(pcie_rst),                                     // I
-        .in(committed_cons),                                   // I [BW-1:0]
-        .out(committed_cons_sync)                              // O [BW-1:0]
+        .in(committed_cons),                                   // I [BW:0]
+        .out(committed_cons_sync)                              // O [BW:0]
         );
 
     //-------------------------------------------------------
@@ -233,7 +233,7 @@ module rx # (
         // CFG
         .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
         // mac2ibuf
-        .committed_prod(committed_prod_sync),                  // I [BW-1:0]
+        .committed_prod(committed_prod_sync),                  // I [BW:0]
         .mac_activity(mac_activity),                           // I
         // eth2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // O
@@ -275,7 +275,7 @@ module rx # (
         .send_qws_ack(send_qws_ack),                           // O
         .qw_cnt(qw_cnt),                                       // I [5:0]
         // mac2ibuf
-        .committed_cons(committed_cons),                       // O [BW-1:0]
+        .committed_cons(committed_cons),                       // O [BW:0]
         // ibuf
         .rd_addr(rd_addr),                                     // O [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]

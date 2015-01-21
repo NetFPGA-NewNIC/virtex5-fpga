@@ -80,7 +80,7 @@ module ibuf2tlp # (
     input        [5:0]       qw_cnt,
 
     // mac2ibuf
-    output reg   [BW-1:0]    committed_cons,
+    output reg   [BW:0]      committed_cons,
 
     // ibuf
     output reg   [BW-1:0]    rd_addr,
@@ -145,7 +145,7 @@ module ibuf2tlp # (
     reg          [31:0]      nxt_lbuf_qw_cnt;
     reg          [BW-1:0]    rd_addr_prev1;
     reg          [BW-1:0]    rd_addr_prev2;
-    reg          [BW-1:0]    nxt_committed_cons;
+    reg          [BW:0]      nxt_committed_cons;
     reg          [31:0]      aux_rd_data;
     reg                      close_lbuf;
     reg          [15:0]      dropped_pkts_reg;
