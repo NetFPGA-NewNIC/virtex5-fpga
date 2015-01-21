@@ -88,7 +88,7 @@ void rx_wq_function(struct work_struct *wk)
     polling = 0;
     if (my_drv_data->rx.current_pkt_dw_index < HUGE_PAGE_SIZE_DW)
     {
-        do {
+        //do {
             current_pkt_len = current_hp_addr[my_drv_data->rx.current_pkt_dw_index+1];
             rmb();
             if (current_pkt_len)
@@ -119,7 +119,7 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));     // some number
+       // } while (timeout < (RX_HW_TIMEOUT + 100));     // some number
 
         // send rx synch
         last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index << 2));
@@ -131,6 +131,13 @@ void rx_wq_function(struct work_struct *wk)
         if (current_pkt_len > MAX_ETH_SIZE)
         {
             printk(KERN_ERR "Myd: A invalid current_pkt_len: 0x%08x\n", current_pkt_len);
+                printk(KERN_ERR "Myd: B huge_page_status: 0x%08x %08x\n", (u32)(huge_page_status >>32), (u32)huge_page_status);
+                printk(KERN_ERR "Myd: current_pkt_dw_index: 0x%08x\n", my_drv_data->rx.current_pkt_dw_index);
+                
+            int cc = 0;
+            for (cc=-200;cc<1000;cc++){
+                printk(KERN_ERR "DW %03d: 0x%08x\n", cc, current_hp_addr[my_drv_data->rx.current_pkt_dw_index+cc]);
+            }
             return;
         }
 
@@ -152,7 +159,7 @@ void rx_wq_function(struct work_struct *wk)
         }
 
         polling = 0;
-        do {
+        //do {
             next_pkt_len = current_hp_addr[next_pkt_dw_index+1];
             rmb();
             if (next_pkt_len)
@@ -196,7 +203,7 @@ void rx_wq_function(struct work_struct *wk)
             tstamp_b = ktime_get();
 
             timeout = ktime_to_ns(ktime_sub(tstamp_b, tstamp_a));
-        } while (timeout < (RX_HW_TIMEOUT + my_drv_data->rtt*10));
+        //} while (timeout < (RX_HW_TIMEOUT + 100));
 
         // send rx synch
         last_addr = (u64)virt_to_phys(my_drv_data->rx.huge_page_kern_addr[my_drv_data->rx.huge_page_index] + (my_drv_data->rx.current_pkt_dw_index << 2));
@@ -397,18 +404,18 @@ my_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     }
 
     // AEL2005 MDIO configuration
-    ret = request_irq(pdev->irq, mdio_access_interrupt_handler, 0, DRV_NAME, pdev);
-    if (ret)
-    {
-        printk(KERN_ERR "Myd: request_irq\n");
-        goto err_07;
-    }
-    ret = configure_ael2005_phy_chips(my_drv_data);
-    if (ret)
-    {
-        printk(KERN_ERR "Myd: warning, AEL2005 not configured\n");
-    }
-    free_irq(pdev->irq, pdev);
+    //ret = request_irq(pdev->irq, mdio_access_interrupt_handler, 0, DRV_NAME, pdev);
+    //if (ret)
+    //{
+    //    printk(KERN_ERR "Myd: request_irq\n");
+    //    goto err_07;
+    //}
+    //ret = configure_ael2005_phy_chips(my_drv_data);
+    //if (ret)
+    //{
+    //    printk(KERN_ERR "Myd: warning, AEL2005 not configured\n");
+    //}
+    //free_irq(pdev->irq, pdev);
     // AEL2005 MDIO configuration ready
 
     my_drv_data->rx_wq = alloc_workqueue("rx_wq", WQ_HIGHPRI, 0);
