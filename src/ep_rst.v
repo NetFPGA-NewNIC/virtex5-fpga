@@ -80,6 +80,7 @@ module ep_rst (
     always @(posedge clk250) begin
 
         if (!trn_reset_n) begin  // reset
+            rst250 <= 1'b1;
             reset_fsm <= s0;
         end
         

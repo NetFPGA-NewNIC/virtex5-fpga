@@ -79,6 +79,7 @@ module mac_reset (
     always @(posedge clk156_25) begin
 
         if (xaui_reset) begin  // reset
+            reset156_25 <= 1'b1;
             reset_fsm <= s0;
         end
         

@@ -90,6 +90,7 @@ module sync_type0 # (
     always @(posedge clk_in) begin
 
         if (rst_in) begin  // rst
+            sync <= 1'b0;
             fsm_a <= s0;
         end
         
