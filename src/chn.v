@@ -63,9 +63,9 @@ module chn # (
     parameter IRQ_BARMP_DIS = 6'b111111,
     parameter IRQ_BARMP_THR = 6'b111111,
     // RQ_TAG_BASE
-    parameter RQTB = 5'b00000,
+    parameter RQTB = 5'b11000,
     // Outstanding request width
-    parameter OSRW = 4
+    parameter OSRW = 3
     ) (
 
     input                    mac_clk,

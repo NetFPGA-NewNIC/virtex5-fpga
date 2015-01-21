@@ -142,6 +142,7 @@ module ibuf_mgmt # (
     reg                      rd256;
     reg                      rd512;
     reg                      rd1k;
+    reg                      rd2k;
     reg          [9:0]       mx_qw;
     reg          [9:0]       rd_qw_i;
     reg          [BW:0]      ax0_diff;
@@ -273,9 +274,13 @@ module ibuf_mgmt # (
             mx_rdrq_reg <= cfg_max_rd_req_size;
             rd256 <= mx_rdrq_reg[0];
             rd512 <= mx_rdrq_reg[1];
-            rd1k <= mx_rdrq_reg[2] | (& mx_rdrq_reg[1:0]);
+            rd1k <= & mx_rdrq_reg[1:0];
+            rd2k <= mx_rdrq_reg[2];
 
-            if (rd1k) begin
+            if (rd2k) begin
+                mx_qw <= 'h100;
+            end
+            else if (rd1k) begin
                 mx_qw <= 'h80;
             end
             else if (rd512) begin

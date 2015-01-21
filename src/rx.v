@@ -320,6 +320,7 @@ module rx # (
     // sw_wrbck
     //-------------------------------------------------------
     sw_wrbck #(
+        .BARHIT(BARHIT),
         .BARMP(BARMP_WRBCK)
     ) sw_wrbck_mod (
         .clk(pcie_clk),                                        // I
