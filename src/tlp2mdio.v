@@ -61,7 +61,8 @@ module tlp2mdio # (
 
     // tlp2mdio
     output reg   [31:0]      acc_data,
-    output reg               acc_en
+    output reg               acc_en,
+    input                    acc_en_ack
     );
 
     `include "includes.v"
@@ -83,6 +84,8 @@ module tlp2mdio # (
     reg          [31:0]      aux_dw;
     reg          [31:0]      acc_data_i;
     reg                      rdy;
+    reg                      acc_en_ack_reg0;
+    reg                      acc_en_ack_reg1;
 
     //-------------------------------------------------------
     // Local Output driver
@@ -101,9 +104,14 @@ module tlp2mdio # (
         
         else begin  // not rst
 
+            acc_en_ack_reg0 <= acc_en_ack;
+            acc_en_ack_reg1 <= acc_en_ack_reg0;
+
             case (odr_fsm)
 
                 s0 : begin
+                    acc_en_ack_reg0 <= 1'b0;
+                    acc_en_ack_reg1 <= 1'b0;
                     acc_data <= acc_data_i;
                     if (rdy) begin
                         odr_fsm <= s1;
@@ -115,14 +123,11 @@ module tlp2mdio # (
                     odr_fsm <= s2;
                 end
 
-                s2 : odr_fsm <= s3;
-                s3 : odr_fsm <= s4;
-                s4 : odr_fsm <= s5;
-                s5 : odr_fsm <= s6;
-
-                s6 : begin
-                    acc_en <= 1'b0;
-                    odr_fsm <= s0;
+                s2 : begin
+                    if (acc_en_ack_reg1) begin
+                        acc_en <= 1'b0;
+                        odr_fsm <= s0;
+                    end
                 end
 
                 default : begin
@@ -199,8 +204,10 @@ module tlp2mdio # (
 
                 s4 : begin
                     acc_data_i <= dw_endian_conv(trn_rd[63:32]);
-                    rdy <= 1'b1;
-                    tlp_rx_fsm <= s0;
+                    if (!trn_rsrc_rdy_n) begin
+                        rdy <= 1'b1;
+                        tlp_rx_fsm <= s0;
+                    end
                 end
 
                 default : begin //other TLPs

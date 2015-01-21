@@ -89,6 +89,7 @@ module mdioconf # (
     //-------------------------------------------------------
     wire         [31:0]      acc_data;
     wire                     acc_en;
+    wire                     acc_en_ack;
 
     //-------------------------------------------------------
     // MDIO conf
@@ -108,6 +109,7 @@ module mdioconf # (
         // tlp2mdio
         .acc_data(acc_data),                                   // I [31:0]
         .acc_en(acc_en),                                       // I
+        .acc_en_ack(acc_en_ack),                               // O
         // irq_gen
         .send_irq(send_irq)                                    // O
         );
@@ -130,7 +132,8 @@ module mdioconf # (
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
         // tlp2mdio
         .acc_data(acc_data),                                   // O [31:0]
-        .acc_en(acc_en)                                        // O
+        .acc_en(acc_en),                                       // O
+        .acc_en_ack(acc_en_ack)                                // I
         );
 
     //-------------------------------------------------------

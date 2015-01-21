@@ -61,6 +61,7 @@ module mac2ibuf # (
     output reg   [63:0]      wr_data,
 
     // fwd logic
+    input                    hst_rdy,
     output reg               activity,
     output reg   [BW:0]      committed_prod,
     input        [BW:0]      committed_cons,
@@ -90,6 +91,8 @@ module mac2ibuf # (
     reg          [7:0]       rx_data_valid_reg;
     reg                      rx_good_frame_reg;
     reg                      rx_bad_frame_reg;
+    reg                      hst_rdy_reg0;
+    reg                      hst_rdy_reg1;
 
     ////////////////////////////////////////////////
     // Inbound ethernet frame to ibuf
@@ -105,23 +108,40 @@ module mac2ibuf # (
             diff <= aux_wr_addr + (~committed_cons) +1;
             activity <= 1'b0;
 
+            hst_rdy_reg0 <= hst_rdy;
+            hst_rdy_reg1 <= hst_rdy_reg0;
+
             case (rx_fsm)
 
                 s0 : begin
                     committed_prod <= 'b0;
                     dropped_pkts <= 'b0;
+                    hst_rdy_reg0 <= 1'b0;
+                    hst_rdy_reg1 <= 1'b0;
                     rx_fsm <= s1;
                 end
 
-                s1 : begin                                  // configure mac core to present preamble and save the packet timestamp
-                    len <= 'b0;
-                    aux_wr_addr <= committed_prod +1;
-                    if (rx_data_valid) begin      // wait for sof (preamble)
+                s1 : begin
+                    if (hst_rdy_reg1) begin
                         rx_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    if (!rx_data_valid) begin      // wait eof if any ongoing
+                        rx_fsm <= s3;
+                    end
+                end
+
+                s3 : begin                                  // configure mac core to present preamble and save the packet timestamp
+                    len <= 'b0;
+                    aux_wr_addr <= committed_prod +1;
+                    if (rx_data_valid) begin      // wait for sof (preamble)
+                        rx_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
                     wr_data <= rx_data;
                     wr_addr <= aux_wr_addr;
                     aux_wr_addr <= aux_wr_addr +1;
@@ -163,17 +183,17 @@ module mac2ibuf # (
                     endcase
 
                     if (diff > MAX_DIFF) begin           // ibufer is almost full
-                        rx_fsm <= s4;
+                        rx_fsm <= s6;
                     end
                     else if (rx_good_frame) begin        // eof (good frame)
-                        rx_fsm <= s3;
+                        rx_fsm <= s5;
                     end
                     else if (rx_bad_frame) begin
-                        rx_fsm <= s1;
+                        rx_fsm <= s3;
                     end
                 end
 
-                s3 : begin
+                s5 : begin
                     wr_data <= {1'b0, 15'b0, len, 32'b0};
                     wr_addr <= committed_prod;
                     activity <= 1'b1;
@@ -183,17 +203,17 @@ module mac2ibuf # (
                     len <= 'b0;
 
                     if (rx_data_valid) begin        // sof (preamble)
-                        rx_fsm <= s2;
+                        rx_fsm <= s4;
                     end
                     else begin
-                        rx_fsm <= s1;
+                        rx_fsm <= s3;
                     end
                 end
                 
-                s4 : begin                                  // drop current frame
+                s6 : begin                                  // drop current frame
                     if (rx_good_frame || rx_good_frame_reg || rx_bad_frame  || rx_bad_frame_reg) begin
                         dropped_pkts <= dropped_pkts +1; 
-                        rx_fsm <= s1;
+                        rx_fsm <= s3;
                     end
                 end
 

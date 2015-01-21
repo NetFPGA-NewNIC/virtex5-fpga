@@ -61,6 +61,7 @@ module mdioconf_hst_if (
     // tlp2mdio
     input        [31:0]      acc_data,
     input                    acc_en,
+    output reg               acc_en_ack,
 
     // irq_gen
     output reg               send_irq
@@ -102,6 +103,7 @@ module mdioconf_hst_if (
 
         if (host_reset) begin  // rst
             send_irq <= 1'b0;
+            acc_en_ack <= 1'b0;
             hst_if_fsm <= s0;
         end
         
@@ -114,6 +116,7 @@ module mdioconf_hst_if (
             acc_en_reg1 <= acc_en_reg0;
 
             send_irq <= 1'b0;
+            acc_en_ack <= 1'b0;
 
             case (hst_if_fsm)
 
@@ -217,6 +220,7 @@ module mdioconf_hst_if (
                     host_miim_sel <= 1'b1;
                     acc_data_reg <= acc_data;
                     if (acc_en_reg1) begin
+                        acc_en_ack <= 1'b1;
                         hst_if_fsm <= s10;
                     end
                 end

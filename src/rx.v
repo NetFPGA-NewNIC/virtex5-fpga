@@ -170,6 +170,7 @@ module rx # (
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // fwd logic
+        .hst_rdy(lbuf_en),                                     // I
         .activity(mac_activity),                               // O
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons_sync),                  // I [BW:0]
