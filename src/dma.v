@@ -171,9 +171,6 @@ module dma (
     //-------------------------------------------------------
     // Local CHN0
     //-------------------------------------------------------
-    wire         [15:0]      cfg_completer_id;
-    wire         [2:0]       cfg_max_rd_req_size;
-    wire         [2:0]       cfg_max_payload_size;
     wire                     chn0_cfg_interrupt_n;
 
     //-------------------------------------------------------
@@ -228,7 +225,9 @@ module dma (
     //-------------------------------------------------------
     // PCIe ep
     //-------------------------------------------------------
-    endpoint_blk_plus_v1_15 ep (
+    endpoint_blk_plus_v1_15 #(
+        .XROM_BAR(32'h00000000)     // MF: disable f*k rom
+    ) ep (
         // PCIe //
         .pci_exp_txp(pci_exp_txp),                             // O [7:0]
         .pci_exp_txn(pci_exp_txn),                             // O [7:0]
