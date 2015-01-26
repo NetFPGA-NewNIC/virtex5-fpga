@@ -105,6 +105,7 @@ module tlp2ibuf # (
 
     // irq_gen
     output                   data_rdy,
+    input                    data_rdy_ack,
     output       [63:0]      hw_ptr,
 
     // EP arb
@@ -316,7 +317,8 @@ module tlp2ibuf # (
         .rst(rst),                                             // I
         .wt_lbuf1(wt_lbuf1),                                   // I
         .wt_lbuf2(wt_lbuf2),                                   // I
-        .data_rdy(data_rdy)                                    // O
+        .data_rdy(data_rdy),                                   // O
+        .data_rdy_ack(data_rdy_ack)                            // I
         );
 
 endmodule // tlp2ibuf

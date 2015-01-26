@@ -49,7 +49,10 @@ module tx_irq_gen (
     input                    rst,
 
     input                    data_rdy,
+    output reg               data_rdy_ack,
+
     input        [63:0]      hw_ptr,
+    input                    sw_ptr_update,
     input        [63:0]      sw_ptr,
 
     output reg               send_irq
@@ -70,7 +73,6 @@ module tx_irq_gen (
     // Local irq_gen
     //-------------------------------------------------------  
     reg          [7:0]       irq_gen_fsm;
-    reg                      data_rdy_reg;
 
     ////////////////////////////////////////////////
     // irq_gen
@@ -84,24 +86,31 @@ module tx_irq_gen (
         
         else begin  // not rst
 
-            data_rdy_reg <= data_rdy;
+            data_rdy_ack <= 1'b0;
 
             case (irq_gen_fsm)
 
                 s0 : begin
                     send_irq <= 1'b0;
-                    data_rdy_reg <= 1'b0;
                     irq_gen_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (data_rdy || data_rdy_reg) begin
+                    if (data_rdy) begin
+                        data_rdy_ack <= 1'b1;
                         send_irq <= 1'b1;
                         irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    data_rdy_ack <= 1'b1;
+                    if (sw_ptr_update) begin
+                        irq_gen_fsm <= s3;
+                    end
+                end
+
+                s3 : begin
                     if (hw_ptr == sw_ptr) begin
                         send_irq <= 1'b0;
                         irq_gen_fsm <= s1;
