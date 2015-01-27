@@ -191,7 +191,7 @@ module tlp2ibuf # (
         .gc_addr(gc_addr),                                     // I [63:0]
         .gc_updt(gc_updt),                                     // I
         .gc_updt_ack(gc_updt_ack),                             // O
-        // col_irq
+        // irq_gen
         .hw_ptr_update(hw_ptr_update),                         // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
