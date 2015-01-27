@@ -126,6 +126,8 @@ module tlp2ibuf # (
     // dsc_mgmt
     wire                     dsc_rdy;
     wire                     dsc_rdy_ack;
+    // col_irq
+    wire                     hw_ptr_update;
 
     //-------------------------------------------------------
     // Local gc_mxr
@@ -192,6 +194,8 @@ module tlp2ibuf # (
         .gc_addr(gc_addr),                                     // I [63:0]
         .gc_updt(gc_updt),                                     // I
         .gc_updt_ack(gc_updt_ack),                             // O
+        // col_irq
+        .hw_ptr_update(hw_ptr_update),                         // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
         .my_trn(my_trn),                                       // I
@@ -317,6 +321,7 @@ module tlp2ibuf # (
         .rst(rst),                                             // I
         .wt_lbuf1(wt_lbuf1),                                   // I
         .wt_lbuf2(wt_lbuf2),                                   // I
+        .hw_ptr_update(hw_ptr_update),                         // I
         .data_rdy(data_rdy),                                   // O
         .data_rdy_ack(data_rdy_ack)                            // I
         );

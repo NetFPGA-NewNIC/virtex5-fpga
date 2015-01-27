@@ -50,6 +50,7 @@ module col_irq (
 
     input                    wt_lbuf1,
     input                    wt_lbuf2,
+    input                    hw_ptr_update,
 
     output reg               data_rdy,
     input                    data_rdy_ack
@@ -98,12 +99,18 @@ module col_irq (
 
                 s2 : begin
                     if (!wt_lbuf1 && !wt_lbuf2) begin
-                        data_rdy <= 1'b1;
                         col_fsm <= s3;
                     end
                 end
 
                 s3 : begin
+                    if (hw_ptr_update) begin
+                        data_rdy <= 1'b1;
+                        col_fsm <= s4;
+                    end
+                end
+
+                s4 : begin
                     if (data_rdy_ack) begin
                         data_rdy <= 1'b0;
                         col_fsm <= s1;

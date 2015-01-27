@@ -81,6 +81,7 @@ module sw_wrbck # (
     reg          [7:0]       tlp_rx_fsm;
     reg          [31:0]      aux_dw;
     reg          [63:0]      sw_ptr_i;
+    reg                      sw_ptr_update_i;
 
     ////////////////////////////////////////////////
     // rcv sw_ptr_i
@@ -94,7 +95,8 @@ module sw_wrbck # (
         else begin  // not rst
 
             sw_ptr <= sw_ptr_i;
-            sw_ptr_update <= 1'b0;
+            sw_ptr_update_i <= 1'b0;
+            sw_ptr_update <= sw_ptr_update_i;
 
             case (tlp_rx_fsm)
 
@@ -129,7 +131,7 @@ module sw_wrbck # (
                     sw_ptr_i[31:0] <= dw_endian_conv(aux_dw);
                     sw_ptr_i[63:32] <= dw_endian_conv(trn_rd[63:32]);
                     if (!trn_rsrc_rdy_n) begin
-                        sw_ptr_update <= 1'b1;
+                        sw_ptr_update_i <= 1'b1;
                         tlp_rx_fsm <= s0;
                     end
                 end
@@ -153,7 +155,7 @@ module sw_wrbck # (
                     sw_ptr_i[31:0] <= dw_endian_conv(trn_rd[63:32]);
                     sw_ptr_i[63:32] <= dw_endian_conv(trn_rd[31:0]);
                     if (!trn_rsrc_rdy_n) begin
-                        sw_ptr_update <= 1'b1;
+                        sw_ptr_update_i <= 1'b1;
                         tlp_rx_fsm <= s0;
                     end
                 end

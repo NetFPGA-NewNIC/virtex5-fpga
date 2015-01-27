@@ -88,6 +88,9 @@ module mem_rd # (
     input        [63:0]      gc_addr,
     input                    gc_updt,
     output reg               gc_updt_ack,
+
+    // col_irq
+    output reg               hw_ptr_update,
     output reg   [63:0]      hw_ptr,
 
     // ep arb
@@ -154,6 +157,8 @@ module mem_rd # (
             rd_ack <= 1'b0;
             dsc_rdy_ack <= 1'b0;
             gc_updt_ack <= 1'b0;
+
+            hw_ptr_update <= 1'b0;
 
             req_ep <= 1'b0;
 
@@ -330,6 +335,7 @@ module mem_rd # (
 
                 s9 : begin
                     hw_ptr <= gc_addr_reg;
+                    hw_ptr_update <= 1'b1;
                     trn_td[63:32] <= {
                                 1'b0,   //reserved
                                 cpl_addr64b ? `MEM_WR64_FMT_TYPE : `MEM_WR32_FMT_TYPE,
