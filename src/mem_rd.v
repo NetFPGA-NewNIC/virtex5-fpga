@@ -89,7 +89,7 @@ module mem_rd # (
     input                    gc_updt,
     output reg               gc_updt_ack,
 
-    // col_irq
+    // irq_gen
     output reg               hw_ptr_update,
     output reg   [63:0]      hw_ptr,
 

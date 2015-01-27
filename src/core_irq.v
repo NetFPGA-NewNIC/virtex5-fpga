@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        irq.v
+*        core_irq.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module irq # (
+module core_irq # (
     parameter BARHIT = 2,
     parameter BARMP_EN = 6'bxxxxxx,
     parameter BARMP_DIS = 6'bxxxxxx,
@@ -84,7 +84,7 @@ module irq # (
     //-------------------------------------------------------
     // irq_gen
     //-------------------------------------------------------
-    irq_gen irq_gen_mod (
+    core_irq_gen core_irq_gen_mod (
         .clk(clk),                                             // I
         .rst(rst),                                             // I
         // hst_ctrl
@@ -126,7 +126,7 @@ module irq # (
         .irq_thr(irq_thr)                                      // O [31:0]
         );
 
-endmodule // irq
+endmodule // core_irq
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

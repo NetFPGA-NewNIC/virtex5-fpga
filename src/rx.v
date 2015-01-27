@@ -339,10 +339,10 @@ module rx # (
     //-------------------------------------------------------
     // irq_gen
     //-------------------------------------------------------
-    rx_irq_gen irq_gen_mod (
+    irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
-        .mac_activity(mac_activity),                           // I
+        .hw_ptr_update(mac_activity),                          // I
         .hst_rdy(lbuf_en),                                     // I
         .hw_ptr(hw_ptr),                                       // I [63:0]
         .sw_ptr(sw_ptr),                                       // I [63:0]

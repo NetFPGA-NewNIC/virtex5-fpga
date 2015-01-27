@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Gen IRQs.
+*        Rx interrupt generation.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -48,21 +48,12 @@ module irq_gen (
     input                    clk,
     input                    rst,
 
-    // hst_ctrl
-    input                    irq_en,
-    input                    irq_dis,
-    input        [31:0]      irq_thr,
+    input                    hw_ptr_update,
+    input                    hst_rdy,
+    input        [63:0]      hw_ptr,
+    input        [63:0]      sw_ptr,
 
-    // CFG
-    output reg               cfg_interrupt_n,
-    input                    cfg_interrupt_rdy_n,
-    input        [3:0]       trn_tbuf_av,
-    input                    send_irq,
-
-    // EP arb
-    input                    my_trn,
-    output reg               drv_ep,
-    output reg               req_ep
+    output reg               send_irq
     );
 
     // localparam
@@ -77,83 +68,58 @@ module irq_gen (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local IRQ gen
-    //-------------------------------------------------------
+    // Local irq_gen
+    //-------------------------------------------------------  
     reg          [7:0]       irq_gen_fsm;
-    reg          [29:0]      counter;
+    reg                      update_reg0;
+    reg                      update_reg1;
 
     ////////////////////////////////////////////////
-    // IRQ gen
+    // irq_gen
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            req_ep <= 1'b0;
-            drv_ep <= 1'b0;
-            cfg_interrupt_n <= 1'b1;
+            send_irq <= 1'b0;
             irq_gen_fsm <= s0;
         end
         
         else begin  // not rst
 
+            update_reg0 <= hw_ptr_update;
+            update_reg1 <= update_reg0;
+
             case (irq_gen_fsm)
 
                 s0 : begin
-                    if (send_irq && !irq_dis) begin
-                        req_ep <= 1'b1;
-                        irq_gen_fsm <= s1;
-                    end
+                    update_reg0 <= 1'b0;
+                    update_reg1 <= 1'b0;
+                    irq_gen_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (my_trn) begin
-                        req_ep <= 1'b0;
-                        drv_ep <= 1'b1;
+                    if (hst_rdy) begin
                         irq_gen_fsm <= s2;
                     end
                 end
 
                 s2 : begin
-                    if (trn_tbuf_av[1]) begin
-                        cfg_interrupt_n <= 1'b0;
+                    if (update_reg1) begin
+                        send_irq <= 1'b1;
                         irq_gen_fsm <= s3;
-                    end
-                    else begin
-                        drv_ep <= 1'b0;
-                        irq_gen_fsm <= s5;
                     end
                 end
 
                 s3 : begin
-                    if (!cfg_interrupt_rdy_n) begin
-                        cfg_interrupt_n <= 1'b1;
-                        drv_ep <= 1'b0;
-                        irq_gen_fsm <= s4;
+                    if (update_reg1 || (hw_ptr != sw_ptr)) begin
+                        send_irq <= 1'b1;
+                    end
+                    else begin
+                        send_irq <= 1'b0;
                     end
                 end
 
-                s4 : begin
-                    counter <= 'b0;
-                    if (irq_en) begin
-                        irq_gen_fsm <= s6;
-                    end
-                end
-
-                s5 : begin
-                    if (trn_tbuf_av[1]) begin
-                        req_ep <= 1'b1;
-                        irq_gen_fsm <= s1;
-                    end
-                end
-
-                s6 : begin
-                    counter <= counter + 1;
-                    if (irq_thr == counter) begin
-                        irq_gen_fsm <= s0;
-                    end
-                end
-
-                default : begin //other TLPs
+                default : begin
                     irq_gen_fsm <= s0;
                 end
 

@@ -284,12 +284,12 @@ module chn # (
     //-------------------------------------------------------
     // IRQ
     //-------------------------------------------------------
-    irq #(
+    core_irq #(
         .BARHIT(BARHIT),
         .BARMP_EN(IRQ_BARMP_EN),
         .BARMP_DIS(IRQ_BARMP_DIS),
         .BARMP_THR(IRQ_BARMP_THR)
-    ) irq_mod (
+    ) core_irq_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // TRN rx

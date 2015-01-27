@@ -149,11 +149,9 @@ module tx # (
     //-------------------------------------------------------
     // Local irq_gen
     //-------------------------------------------------------
-    wire                     data_rdy;
-    wire                     data_rdy_ack;
+    wire                     hw_ptr_update;
     wire         [63:0]      hw_ptr;
     wire         [63:0]      sw_ptr;
-    wire                     sw_ptr_update;
 
     //-------------------------------------------------------
     // assigns
@@ -272,8 +270,7 @@ module tx # (
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // irq_gen
-        .data_rdy(data_rdy),                                   // O
-        .data_rdy_ack(data_rdy_ack),                           // I
+        .hw_ptr_update(hw_ptr_update),                         // O
         .hw_ptr(hw_ptr),                                       // O [63:0]
         // EP arb
         .my_trn(my_trn),                                       // I
@@ -330,20 +327,18 @@ module tx # (
         .trn_reof_n(trn_reof_n),                               // I
         .trn_rsrc_rdy_n(trn_rsrc_rdy_n),                       // I
         .trn_rbar_hit_n(trn_rbar_hit_n),                       // I [6:0]
-        .sw_ptr_update(sw_ptr_update),                         // O
         .sw_ptr(sw_ptr)                                        // O [63:0]
         );
 
     //-------------------------------------------------------
     // irq_gen
     //-------------------------------------------------------
-    tx_irq_gen irq_gen_mod (
+    irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
-        .data_rdy(data_rdy),                                   // I
-        .data_rdy_ack(data_rdy_ack),                           // O
+        .hw_ptr_update(hw_ptr_update),                         // I
+        .hst_rdy(1'b1),                                        // I
         .hw_ptr(hw_ptr),                                       // I [63:0]
-        .sw_ptr_update(sw_ptr_update),                         // I
         .sw_ptr(sw_ptr),                                       // I [63:0]
         .send_irq(send_irq)                                    // O
         );
