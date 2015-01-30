@@ -43,7 +43,9 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module xge_intf ( 
+module xge_intf # ( 
+    parameter XAUI_REVERSE_LANES = 0
+    ) (
 
     // XAUI
     input                    refclk_p,
@@ -162,7 +164,9 @@ module xge_intf (
     //-------------------------------------------------------
     assign xaui_reset = ~dcm_for_xaui_locked;
 
-    xaui_v10_4_example_design xaui_mod (
+    xaui_example_design # (
+        .REVERSE_LANES(XAUI_REVERSE_LANES)
+    ) xaui_mod (
         .dclk(clk50),                                          // I
         .reset(xaui_reset),                                    // I
         .clk156_out(clk156_25),                                // O
