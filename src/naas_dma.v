@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        dma.v
+*        naas_dma.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module dma (
+module naas_dma (
 
     // PCIe
     input                    sys_clk_p,
@@ -52,24 +52,46 @@ module dma (
     output       [7:0]       pci_exp_txn,
     input        [7:0]       pci_exp_rxp,
     input        [7:0]       pci_exp_rxn,
+    output                   pcie_clk,
 
-    output                   pcie_rst,
+    // BKD
+    input                    bkd_clk,
+    input                    bkd_rst,
 
-    input                    mac_clk,
-    input                    mac_rst,
+    // BKD tx
+    output       [63:0]      m_axis_tdata,
+    output       [7:0]       m_axis_tstrb,
+    output       [127:0]     m_axis_tuser,
+    output                   m_axis_tvalid,
+    output                   m_axis_tlast,
+    input                    m_axis_tready,
 
-    // MAC tx
-    output                   mac_tx_underrun,
-    output       [63:0]      mac_tx_data,
-    output       [7:0]       mac_tx_data_valid,
-    output                   mac_tx_start,
-    input                    mac_tx_ack,
+    // BKD rx
+    input        [63:0]      s_axis_tdata,
+    input        [7:0]       s_axis_tstrb,
+    input        [127:0]     s_axis_tuser,
+    input                    s_axis_tvalid,
+    input                    s_axis_tlast,
+    output                   s_axis_tready,
 
-    // MAC rx
-    input        [63:0]      mac_rx_data,
-    input        [7:0]       mac_rx_data_valid,
-    input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame,
+    // REGIF
+    input                    reg_int_clk,
+    input                    reg_int_reset_n,
+    output                   IP2Bus_MstRd_Req,
+    output                   IP2Bus_MstWr_Req,
+    output       [31:0]      IP2Bus_Mst_Addr,
+    output       [3:0]       IP2Bus_Mst_BE,
+    output                   IP2Bus_Mst_Lock,
+    output                   IP2Bus_Mst_Reset,
+    input                    Bus2IP_Mst_CmdAck,
+    input                    Bus2IP_Mst_Cmplt,
+    input                    Bus2IP_Mst_Error,
+    input                    Bus2IP_Mst_Rearbitrate,
+    input                    Bus2IP_Mst_Timeout,
+    input        [31:0]      Bus2IP_MstRd_d,
+    input                    Bus2IP_MstRd_src_rdy_n,
+    output       [31:0]      IP2Bus_MstWr_d,
+    input                    Bus2IP_MstWr_dst_rdy_n,
 
     // MDIO conf
     input                    mac_host_clk,
@@ -167,16 +189,34 @@ module dma (
     wire                     chn0_trn;
     wire                     chn0_drvn;
     wire                     chn0_reqep;
+    // REGIF trn
+    wire                     regif_trn;
+    wire                     regif_drvn;
+    wire                     regif_reqep;
 
     //-------------------------------------------------------
     // Local CHN0
     //-------------------------------------------------------
+    wire         [63:0]      chn0_trn_td;
+    wire         [7:0]       chn0_trn_trem_n;
+    wire                     chn0_trn_tsof_n;
+    wire                     chn0_trn_teof_n;
+    wire                     chn0_trn_tsrc_rdy_n;
     wire                     chn0_cfg_interrupt_n;
 
     //-------------------------------------------------------
     // Local MDIO conf
     //-------------------------------------------------------
     wire                     mdio_cfg_interrupt_n;
+
+    //-------------------------------------------------------
+    // Local REGIF
+    //-------------------------------------------------------
+    wire         [63:0]      regif_trn_td;
+    wire         [7:0]       regif_trn_trem_n;
+    wire                     regif_trn_tsof_n;
+    wire                     regif_trn_teof_n;
+    wire                     regif_trn_tsrc_rdy_n;
 
     //-------------------------------------------------------
     // Virtex5-FX Global Clock Buffer
@@ -187,7 +227,7 @@ module dma (
     // ep_rst
     //-------------------------------------------------------
     ep_rst ep_rst_mod (
-        .clk250(trn_clk_c),                                    // I
+        .clk250(pcie_clk),                                     // I
         .trn_reset_n(trn_reset_n_c),                           // I
         .trn_lnk_up_n(trn_lnk_up_n_c),                         // I
         .rst250(pcie_rst)                                      // O
@@ -220,6 +260,13 @@ module dma (
     assign cfg_di_c = 'b0;
     assign cfg_byte_en_n_c = 'hF;
     assign cfg_wr_en_n_c = 1'b1;
+    assign pcie_clk = trn_clk_c;
+
+    assign trn_td_c = chn0_trn_td | regif_trn_td;
+    assign trn_trem_n_c = chn0_trn_trem_n & regif_trn_trem_n;
+    assign trn_tsof_n_c = chn0_trn_tsof_n & regif_trn_tsof_n;
+    assign trn_teof_n_c = chn0_trn_teof_n & regif_trn_teof_n;
+    assign trn_tsrc_rdy_n_c = chn0_trn_tsrc_rdy_n & regif_trn_tsrc_rdy_n;
     assign cfg_interrupt_n_c = chn0_cfg_interrupt_n & mdio_cfg_interrupt_n;
 
     //-------------------------------------------------------
@@ -317,12 +364,16 @@ module dma (
     // CHN ARB
     //-------------------------------------------------------
     chn_arb chn_arb_mod (
-        .clk(trn_clk_c),                                       // I
+        .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // CHN0 trn
         .chn0_trn(chn0_trn),                                   // O
         .chn0_drvn(chn0_drvn),                                 // I
-        .chn0_reqep(chn0_reqep)                                // I
+        .chn0_reqep(chn0_reqep),                               // I
+        // REGIF trn
+        .regif_trn(regif_trn),                                 // O
+        .regif_drvn(regif_drvn),                               // I
+        .regif_reqep(regif_reqep)                              // I
         );
 
     //-------------------------------------------------------
@@ -352,27 +403,30 @@ module dma (
         // Outstanding request width
         .OSRW(2)
     ) chn0 (
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
-        .pcie_clk(trn_clk_c),                                  // I
+        .bkd_clk(bkd_clk),                                     // I
+        .bkd_rst(bkd_rst),                                     // I
+        .pcie_clk(pcie_clk),                                   // I
         .pcie_rst(pcie_rst),                                   // I
-        // MAC tx
-        .mac_tx_underrun(mac_tx_underrun),                     // O
-        .mac_tx_data(mac_tx_data),                             // O [63:0]
-        .mac_tx_data_valid(mac_tx_data_valid),                 // O [7:0]
-        .mac_tx_start(mac_tx_start),                           // O
-        .mac_tx_ack(mac_tx_ack),                               // I
-        // MAC rx
-        .mac_rx_data(mac_rx_data),                             // O [63:0]
-        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
-        .mac_rx_good_frame(mac_rx_good_frame),                 // O
-        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // BKD tx
+        .m_axis_tdata(m_axis_tdata),                           // O [63:0]
+        .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
+        .m_axis_tuser(m_axis_tuser),                           // O [127:0]
+        .m_axis_tvalid(m_axis_tvalid),                         // O
+        .m_axis_tlast(m_axis_tlast),                           // O
+        .m_axis_tready(m_axis_tready),                         // I
+        // BKD rx
+        .s_axis_tdata(s_axis_tdata),                           // I [63:0]
+        .s_axis_tstrb(s_axis_tstrb),                           // I [7:0]
+        .s_axis_tuser(s_axis_tuser),                           // I [127:0]
+        .s_axis_tvalid(s_axis_tvalid),                         // I
+        .s_axis_tlast(s_axis_tlast),                           // I
+        .s_axis_tready(s_axis_tready),                         // O
         // TRN tx
-        .trn_td(trn_td_c),                                     // O [63:0]
-        .trn_trem_n(trn_trem_n_c),                             // O [7:0]
-        .trn_tsof_n(trn_tsof_n_c),                             // O
-        .trn_teof_n(trn_teof_n_c),                             // O
-        .trn_tsrc_rdy_n(trn_tsrc_rdy_n_c),                     // O
+        .trn_td(chn0_trn_td),                                  // O [63:0]
+        .trn_trem_n(chn0_trn_trem_n),                          // O [7:0]
+        .trn_tsof_n(chn0_trn_tsof_n),                          // O
+        .trn_teof_n(chn0_trn_teof_n),                          // O
+        .trn_tsrc_rdy_n(chn0_trn_tsrc_rdy_n),                  // O
         .trn_tdst_rdy_n(trn_tdst_rdy_n_c),                     // I
         .trn_tbuf_av(trn_tbuf_av_c),                           // I [3:0]
         // TRN rx
@@ -403,8 +457,8 @@ module dma (
         .BARHIT(0),
         .BARMP_WRREG(6'b000100)
     ) mdioconf_mod (
-        .mac_rst(mac_rst),                                     // I
-        .pcie_clk(trn_clk_c),                                  // I
+        .bkd_rst(bkd_rst),                                     // I
+        .pcie_clk(pcie_clk),                                   // I
         .pcie_rst(pcie_rst),                                   // I
         // TRN rx
         .trn_rd(trn_rd_c),                                     // I [63:0]
@@ -429,7 +483,65 @@ module dma (
         .host_miim_rdy(mac_host_miim_rdy)                      // I
         );
 
-endmodule // dma
+    //-------------------------------------------------------
+    // REGIF
+    //-------------------------------------------------------
+    regif #(
+        .BARHIT(0),
+        // WRIF
+        .WR_BARMP_CPL_ADDR(6'b101100),
+        .WR_BARMP_OP      (6'b100000),
+        // RDIF
+        .RD_BARMP_CPL_ADDR(6'b011100),
+        .RD_BARMP_OP      (6'b010000)
+    ) regif_mod (
+        .reg_int_clk(reg_int_clk),                             // I
+        .reg_int_reset_n(reg_int_reset_n),                     // I
+        .pcie_clk(pcie_clk),                                   // I
+        .pcie_rst(pcie_rst),                                   // I
+        // TRN tx
+        .trn_td(regif_trn_td),                                 // O [63:0]
+        .trn_trem_n(regif_trn_trem_n),                         // O [7:0]
+        .trn_tsof_n(regif_trn_tsof_n),                         // O
+        .trn_teof_n(regif_trn_teof_n),                         // O
+        .trn_tsrc_rdy_n(regif_trn_tsrc_rdy_n),                 // O
+        .trn_tdst_rdy_n(trn_tdst_rdy_n_c),                     // I
+        .trn_tbuf_av(trn_tbuf_av_c),                           // I [3:0]
+        // TRN rx
+        .trn_rd(trn_rd_c),                                     // I [63:0]
+        .trn_rrem_n(trn_rrem_n_c),                             // I [7:0]
+        .trn_rsof_n(trn_rsof_n_c),                             // I
+        .trn_reof_n(trn_reof_n_c),                             // I
+        .trn_rsrc_rdy_n(trn_rsrc_rdy_n_c),                     // I
+        .trn_rerrfwd_n(trn_rerrfwd_n_c),                       // I
+        .trn_rbar_hit_n(trn_rbar_hit_n_c),                     // I [6:0]
+        // CFG
+        .cfg_bus_number(cfg_bus_number_c),                     // I [7:0]
+        .cfg_device_number(cfg_device_number_c),               // I [4:0]
+        .cfg_function_number(cfg_function_number_c),           // I [2:0]
+        // REGIF
+        .IP2Bus_MstRd_Req(IP2Bus_MstRd_Req),                   // O
+        .IP2Bus_MstWr_Req(IP2Bus_MstWr_Req),                   // O
+        .IP2Bus_Mst_Addr(IP2Bus_Mst_Addr),                     // O [31:0]
+        .IP2Bus_Mst_BE(IP2Bus_Mst_BE),                         // O [3:0]
+        .IP2Bus_Mst_Lock(IP2Bus_Mst_Lock),                     // O
+        .IP2Bus_Mst_Reset(IP2Bus_Mst_Reset),                   // O
+        .Bus2IP_Mst_CmdAck(Bus2IP_Mst_CmdAck),                 // I
+        .Bus2IP_Mst_Cmplt(Bus2IP_Mst_Cmplt),                   // I
+        .Bus2IP_Mst_Error(Bus2IP_Mst_Error),                   // I
+        .Bus2IP_Mst_Rearbitrate(Bus2IP_Mst_Rearbitrate),       // I
+        .Bus2IP_Mst_Timeout(Bus2IP_Mst_Timeout),               // I
+        .Bus2IP_MstRd_d(Bus2IP_MstRd_d),                       // I [31:0]
+        .Bus2IP_MstRd_src_rdy_n(Bus2IP_MstRd_src_rdy_n),       // I
+        .IP2Bus_MstWr_d(IP2Bus_MstWr_d),                       // O [31:0]
+        .Bus2IP_MstWr_dst_rdy_n(Bus2IP_MstWr_dst_rdy_n),       // I
+        // EP arb
+        .chn_trn(regif_trn),                                   // I
+        .chn_drvn(regif_drvn),                                 // O
+        .chn_reqep(regif_reqep)                                // O
+        );
+
+endmodule // naas_dma
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

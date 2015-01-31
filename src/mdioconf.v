@@ -49,7 +49,7 @@ module mdioconf # (
     parameter BARMP_WRREG = 6'bxxxxxx
     ) (
 
-    input                    mac_rst,
+    input                    bkd_rst,
 
     input                    pcie_clk,
     input                    pcie_rst,
@@ -95,7 +95,7 @@ module mdioconf # (
     // MDIO conf
     //-------------------------------------------------------
     mdioconf_hst_if hst_if_mod (
-        .mac_rst(mac_rst),                                     // I
+        .bkd_rst(bkd_rst),                                     // I
         // Host Conf Intf
         .host_clk(host_clk),                                   // I
         .host_reset(host_reset),                               // I

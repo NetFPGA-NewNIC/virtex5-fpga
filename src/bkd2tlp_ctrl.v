@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        eth2tlp_ctrl.v
+*        bkd2tlp_ctrl.v
 *
 *  Project:
 *
@@ -13,7 +13,7 @@
 *
 *  Description:
 *        When enough (good) data is in the internal buffer, a TLP is sent.
-*        Ethernet frame boundaries are not taken in consideration.
+*        Backend packet boundaries are not taken in consideration.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -44,7 +44,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module eth2tlp_ctrl # (
+module bkd2tlp_ctrl # (
     parameter BW = 10
     ) (
 
@@ -54,11 +54,11 @@ module eth2tlp_ctrl # (
     // CFG
     input        [2:0]       cfg_max_payload_size,
 
-    // mac2ibuf
+    // bkd2ibuf
     input        [BW:0]      committed_prod,
-    input                    mac_activity,
+    input                    bkd_activity,
 
-    // eth2tlp_ctrl
+    // bkd2tlp_ctrl
     output reg               trig_tlp,
     input                    trig_tlp_ack,
     output reg               chng_lbuf,
@@ -94,8 +94,8 @@ module eth2tlp_ctrl # (
     //-------------------------------------------------------
     reg          [5:0]       free_running;
     reg                      timeout;
-    reg                      mac_activity_reg0;
-    reg                      mac_activity_reg1;
+    reg                      bkd_activity_reg0;
+    reg                      bkd_activity_reg1;
 
     //-------------------------------------------------------
     // Local trigger-logic
@@ -129,10 +129,10 @@ module eth2tlp_ctrl # (
         
         else begin  // not rst
 
-            mac_activity_reg0 <= mac_activity;
-            mac_activity_reg1 <= mac_activity_reg0;
+            bkd_activity_reg0 <= bkd_activity;
+            bkd_activity_reg1 <= bkd_activity_reg0;
 
-            if (rx_idle && !mac_activity_reg1) begin
+            if (rx_idle && !bkd_activity_reg1) begin
                 free_running <= free_running +1;
                 if (free_running == 'h3F) begin
                     timeout <= 1'b1;
@@ -380,7 +380,7 @@ module eth2tlp_ctrl # (
         end     // not rst
     end  //always
 
-endmodule // eth2tlp_ctrl
+endmodule // bkd2tlp_ctrl
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -45,7 +45,7 @@
 
 module mdioconf_hst_if (
 
-    input                    mac_rst,
+    input                    bkd_rst,
 
     // Host Conf Intf
     input                    host_clk,
@@ -89,8 +89,8 @@ module mdioconf_hst_if (
     // Local hst_if
     //-------------------------------------------------------  
     reg          [14:0]      hst_if_fsm;
-    reg                      mac_rst_reg0;
-    reg                      mac_rst_reg1;
+    reg                      bkd_rst_reg0;
+    reg                      bkd_rst_reg1;
     reg          [2:0]       wait_counter;
     reg                      acc_en_reg0;
     reg                      acc_en_reg1;
@@ -109,8 +109,8 @@ module mdioconf_hst_if (
         
         else begin  // not rst
 
-            mac_rst_reg0 <= mac_rst;
-            mac_rst_reg1 <= mac_rst_reg0;
+            bkd_rst_reg0 <= bkd_rst;
+            bkd_rst_reg1 <= bkd_rst_reg0;
 
             acc_en_reg0 <= acc_en;
             acc_en_reg1 <= acc_en_reg0;
@@ -121,8 +121,8 @@ module mdioconf_hst_if (
             case (hst_if_fsm)
 
                 s0 : begin
-                    mac_rst_reg0 <= 1'b0;
-                    mac_rst_reg1 <= 1'b0;
+                    bkd_rst_reg0 <= 1'b0;
+                    bkd_rst_reg1 <= 1'b0;
                     host_opcode <= 2'b11;
                     host_addr <= 10'b0;
                     host_wr_data <= 32'b0;
@@ -133,7 +133,7 @@ module mdioconf_hst_if (
                 end
 
                 s1 : begin
-                    if (!mac_rst_reg1) begin
+                    if (!bkd_rst_reg1) begin
                         hst_if_fsm <= s2;
                     end
                 end

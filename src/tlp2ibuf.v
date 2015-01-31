@@ -94,7 +94,7 @@ module tlp2ibuf # (
     input                    lbuf64b,
     output                   lbuf_dn,
 
-    // ibuf2mac
+    // ibuf2bkd
     output       [BW:0]      committed_prod,
     input        [BW:0]      committed_cons,
 
@@ -228,7 +228,7 @@ module tlp2ibuf # (
         .lbuf_len(lbuf_len),                                   // I [31:0]
         .lbuf_en(lbuf_en),                                     // I
         .lbuf_dn(lbuf_dn),                                     // O
-        // ibuf2mac
+        // ibuf2bkd
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons),                       // I [BW:0]
         // ibuf

@@ -60,18 +60,19 @@ module tx # (
     parameter OSRW = 4
     ) (
 
-    input                    mac_clk,
-    input                    mac_rst,
+    input                    bkd_clk,
+    input                    bkd_rst,
 
     input                    pcie_clk,
     input                    pcie_rst,
 
-    // MAC tx
-    output                   mac_tx_underrun,
-    output       [63:0]      mac_tx_data,
-    output       [7:0]       mac_tx_data_valid,
-    output                   mac_tx_start,
-    input                    mac_tx_ack,
+    // BKD tx
+    output       [63:0]      m_axis_tdata,
+    output       [7:0]       m_axis_tstrb,
+    output       [127:0]     m_axis_tuser,
+    output                   m_axis_tvalid,
+    output                   m_axis_tlast,
+    input                    m_axis_tready,
 
     // TRN tx
     output       [63:0]      trn_td,
@@ -103,7 +104,7 @@ module tx # (
     );
 
     //-------------------------------------------------------
-    // Local ibuf2mac
+    // Local ibuf2bkd
     //-------------------------------------------------------
     wire         [BW:0]      committed_cons;
 
@@ -159,17 +160,18 @@ module tx # (
     assign req_ep = req_ep_i | lbuf_en;
 
     //-------------------------------------------------------
-    // ibuf2mac
+    // ibuf2bkd
     //-------------------------------------------------------
-    ibuf2mac #(.BW(BW)) ibuf2mac_mod (
-        .clk(mac_clk),                                         // I
-        .rst(mac_rst),                                         // I
-        // MAC tx
-        .tx_underrun(mac_tx_underrun),                         // O
-        .tx_data(mac_tx_data),                                 // O [63:0]
-        .tx_data_valid(mac_tx_data_valid),                     // O [7:0]
-        .tx_start(mac_tx_start),                               // O
-        .tx_ack(mac_tx_ack),                                   // I
+    ibuf2bkd #(.BW(BW)) ibuf2bkd_mod (
+        .clk(bkd_clk),                                         // I
+        .rst(bkd_rst),                                         // I
+        // BKD tx
+        .m_axis_tdata(m_axis_tdata),                           // O [63:0]
+        .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
+        .m_axis_tuser(m_axis_tuser),                           // O [127:0]
+        .m_axis_tvalid(m_axis_tvalid),                         // O
+        .m_axis_tlast(m_axis_tlast),                           // O
+        .m_axis_tready(m_axis_tready),                         // I
         // ibuf
         .rd_addr(rd_addr),                                     // O [BW-1:0]
         .rd_data(rd_data),                                     // I [63:0]
@@ -187,7 +189,7 @@ module tx # (
         .we(wr_en),                                            // I
         .dpra(rd_addr),                                        // I [BW-1:0]
         .clk(pcie_clk),                                        // I 
-        .qdpo_clk(mac_clk),                                    // I
+        .qdpo_clk(bkd_clk),                                    // I
         .qdpo(rd_data)                                         // O [63:0]
         );
 
@@ -195,8 +197,8 @@ module tx # (
     // prod_sync
     //-------------------------------------------------------
     sync_type0 #(.W(BW+1)) prod_sync_mod (
-        .clk_out(mac_clk),                                     // I
-        .rst_out(mac_rst),                                     // I
+        .clk_out(bkd_clk),                                     // I
+        .rst_out(bkd_rst),                                     // I
         .clk_in(pcie_clk),                                     // I
         .rst_in(pcie_rst),                                     // I
         .in(committed_prod),                                   // I [BW:0]
@@ -209,8 +211,8 @@ module tx # (
     sync_type1 #(.W(BW+1)) cons_sync_mod (
         .clk_out(pcie_clk),                                    // I
         .rst_out(pcie_rst),                                    // I
-        .clk_in(mac_clk),                                      // I
-        .rst_in(mac_rst),                                      // I
+        .clk_in(bkd_clk),                                      // I
+        .rst_in(bkd_rst),                                      // I
         .in(committed_cons),                                   // I [BW:0]
         .out(committed_cons_sync)                              // O [BW:0]
         );
@@ -262,7 +264,7 @@ module tx # (
         .lbuf_en(lbuf_en),                                     // I
         .lbuf64b(lbuf64b),                                     // I
         .lbuf_dn(lbuf_dn),                                     // O
-        // ibuf2mac
+        // ibuf2bkd
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons_sync),                  // I [BW:0]
         // ibuf

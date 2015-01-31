@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        rx_ibuf.v
+*        xge_ibuf.v
 *
 *  Project:
 *
@@ -42,7 +42,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module rx_ibuf # (
+module xge_ibuf # (
     parameter  AW = 10,
     parameter  DW = 64
     ) ( 
@@ -65,7 +65,7 @@ module rx_ibuf # (
     //-------------------------------------------------------
     // Local port b
     //-------------------------------------------------------
-    reg     [AW-1:0]     dpra_reg;
+    //reg     [AW-1:0]     dpra_reg;
 
     ////////////////////////////////////////////////
     // port a
@@ -80,11 +80,10 @@ module rx_ibuf # (
     // port b
     ////////////////////////////////////////////////
     always @(posedge qdpo_clk) begin
-        dpra_reg <= dpra;
-        qdpo <= dpram[dpra_reg];
+        qdpo <= dpram[dpra];
     end  //always
 
-endmodule // rx_ibuf
+endmodule // xge_ibuf
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

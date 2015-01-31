@@ -13,8 +13,7 @@
 *
 *  Description:
 *        Sends TLP when a trigger is received. TLPs with maximum payload size
-*        are normally sent. Ethernet frames boundaries are not taken into
-*        consideration.
+*        are normally sent.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -70,7 +69,7 @@ module ibuf2tlp # (
     input                    lbuf64b,
     output reg               lbuf_dn,
 
-    // eth2tlp_ctrl
+    // bkd2tlp_ctrl
     input                    trig_tlp,
     output reg               trig_tlp_ack,
     input                    chng_lbuf,
@@ -79,7 +78,7 @@ module ibuf2tlp # (
     output reg               send_qws_ack,
     input        [5:0]       qw_cnt,
 
-    // mac2ibuf
+    // bkd2ibuf
     output reg   [BW:0]      committed_cons,
 
     // ibuf

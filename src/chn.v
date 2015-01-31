@@ -68,24 +68,27 @@ module chn # (
     parameter OSRW = 3
     ) (
 
-    input                    mac_clk,
-    input                    mac_rst,
+    input                    bkd_clk,
+    input                    bkd_rst,
 
     input                    pcie_clk,
     input                    pcie_rst,
 
-    // MAC tx
-    output                   mac_tx_underrun,
-    output       [63:0]      mac_tx_data,
-    output       [7:0]       mac_tx_data_valid,
-    output                   mac_tx_start,
-    input                    mac_tx_ack,
+    // BKD tx
+    output       [63:0]      m_axis_tdata,
+    output       [7:0]       m_axis_tstrb,
+    output       [127:0]     m_axis_tuser,
+    output                   m_axis_tvalid,
+    output                   m_axis_tlast,
+    input                    m_axis_tready,
 
-    // MAC rx
-    input        [63:0]      mac_rx_data,
-    input        [7:0]       mac_rx_data_valid,
-    input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame,
+    // BKD rx
+    input        [63:0]      s_axis_tdata,
+    input        [7:0]       s_axis_tstrb,
+    input        [127:0]     s_axis_tuser,
+    input                    s_axis_tvalid,
+    input                    s_axis_tlast,
+    output                   s_axis_tready,
 
     // TRN tx
     output       [63:0]      trn_td,
@@ -197,16 +200,17 @@ module chn # (
         // Outstanding request width
         .OSRW(OSRW)
     ) tx_mod (
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
+        .bkd_clk(bkd_clk),                                     // I
+        .bkd_rst(bkd_rst),                                     // I
         .pcie_clk(pcie_clk),                                   // I
         .pcie_rst(pcie_rst),                                   // I
-        // MAC tx
-        .mac_tx_underrun(mac_tx_underrun),                     // I
-        .mac_tx_data(mac_tx_data),                             // I [63:0]
-        .mac_tx_data_valid(mac_tx_data_valid),                 // I [7:0]
-        .mac_tx_start(mac_tx_start),                           // I
-        .mac_tx_ack(mac_tx_ack),                               // O
+        // BKD tx
+        .m_axis_tdata(m_axis_tdata),                           // O [63:0]
+        .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
+        .m_axis_tuser(m_axis_tuser),                           // O [127:0]
+        .m_axis_tvalid(m_axis_tvalid),                         // O
+        .m_axis_tlast(m_axis_tlast),                           // O
+        .m_axis_tready(m_axis_tready),                         // I
         // TRN tx
         .trn_td(tx_trn_td),                                    // O [63:0]
         .trn_trem_n(tx_trn_trem_n),                            // O [7:0]
@@ -245,17 +249,19 @@ module chn # (
         .BARMP_LBUF2_EN(RX_BARMP_LBUF2_EN),
         .BARMP_WRBCK(RX_BARMP_WRBCK),
         // MISC
-        .BW(10)
+        .BW(9)
     ) rx_mod (
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
+        .bkd_clk(bkd_clk),                                     // I
+        .bkd_rst(bkd_rst),                                     // I
         .pcie_clk(pcie_clk),                                   // I
         .pcie_rst(pcie_rst),                                   // I
-        // MAC rx
-        .mac_rx_data(mac_rx_data),                             // O [63:0]
-        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
-        .mac_rx_good_frame(mac_rx_good_frame),                 // O
-        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // BKD rx
+        .s_axis_tdata(s_axis_tdata),                           // I [63:0]
+        .s_axis_tstrb(s_axis_tstrb),                           // I [7:0]
+        .s_axis_tuser(s_axis_tuser),                           // I [127:0]
+        .s_axis_tvalid(s_axis_tvalid),                         // I
+        .s_axis_tlast(s_axis_tlast),                           // I
+        .s_axis_tready(s_axis_tready),                         // O
         // TRN tx
         .trn_td(rx_trn_td),                                    // O [63:0]
         .trn_trem_n(rx_trn_trem_n),                            // O [7:0]

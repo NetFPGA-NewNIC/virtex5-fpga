@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        xge_intf.v
+*        xge_intf_master.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Interconnects MAC and XAUI blocks
+*        Interconnects MAC and XAUI blocks. Configures MDIO.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module xge_intf # ( 
+module xge_intf_master # ( 
     parameter XAUI_REVERSE_LANES = 0
     ) (
 
@@ -57,22 +57,25 @@ module xge_intf # (
 
     input                    clk100,
     input                    dcm_rst_in,
-
-    output                   clk156_25,
+    output                   clk50,
+    input                    clk250,
     output                   reset156_25,
 
     // MAC tx
-    input                    mac_tx_underrun,
-    input        [63:0]      mac_tx_data,
-    input        [7:0]       mac_tx_data_valid,
-    input                    mac_tx_start,
-    output                   mac_tx_ack,
+    input        [63:0]      s_axis_tdata,
+    input        [7:0]       s_axis_tstrb,
+    input        [127:0]     s_axis_tuser,
+    input                    s_axis_tvalid,
+    input                    s_axis_tlast,
+    output                   s_axis_tready,
 
     // MAC rx
-    output       [63:0]      mac_rx_data,
-    output       [7:0]       mac_rx_data_valid,
-    output                   mac_rx_good_frame,
-    output                   mac_rx_bad_frame,
+    output       [63:0]      m_axis_tdata,
+    output       [7:0]       m_axis_tstrb,
+    output       [127:0]     m_axis_tuser,
+    output                   m_axis_tvalid,
+    output                   m_axis_tlast,
+    input                    m_axis_tready,
 
     // MDIO
     output                   phy_mdc,
@@ -93,9 +96,13 @@ module xge_intf # (
     //-------------------------------------------------------
     // Local DCM for XAUI
     //-------------------------------------------------------
-    wire                     clk50;
+    //wire                     clk50;
     wire                     dcm_for_xaui_locked;
     //wire                     dcm_rst_in;
+    wire                     mac_clk;
+    wire                     mac_rst;
+    wire                     clk156_25;
+    //wire                     reset156_25;
 
     //-------------------------------------------------------
     // Local XAUI
@@ -145,6 +152,17 @@ module xge_intf # (
     wire                     mac_mdio_in;
     wire                     mac_mdio_out;
     wire                     mac_mdio_tri;
+    // MAC tx
+    wire                     mac_tx_underrun;
+    wire         [63:0]      mac_tx_data;
+    wire         [7:0]       mac_tx_data_valid;
+    wire                     mac_tx_start;
+    wire                     mac_tx_ack;
+    // MAC rx
+    wire         [63:0]      mac_rx_data;
+    wire         [7:0]       mac_rx_data_valid;
+    wire                     mac_rx_good_frame;
+    wire                     mac_rx_bad_frame;
 
     //-------------------------------------------------------
     // Virtex5-FX DCM for XAUI
@@ -223,7 +241,7 @@ module xge_intf # (
     //-------------------------------------------------------
     assign host_clk = clk50;
 
-    ten_gig_eth_mac_v10_3 mac_d (
+    xgmac_mdio mac_d (
         .reset(reset156_25),                                   // I
         
         .tx_underrun(mac_tx_underrun),                         // I 
@@ -283,14 +301,14 @@ module xge_intf # (
     // // -------------------------------------------------------------------------------------
     // // Rx
     // assign mac_configuration_vector[47:0] = 48'b0;  //Pause frame MAC Source Address
-    // assign mac_configuration_vector[48] = 1'b0;     //Receive VLAN Enable
+    // assign mac_configuration_vector[48] = 1'b1;     //Receive VLAN Enable
     // assign mac_configuration_vector[49] = 1'b1;     //Receive Enable
     // assign mac_configuration_vector[50] = 1'b0;     //Receive In-Band FCS
     // assign mac_configuration_vector[51] = 1'b0;     //Receive Jumbo Frame Enable
     // assign mac_configuration_vector[52] = 1'b0;     //Receiver Reset
     // assign mac_configuration_vector[60] = 1'b0;     //Receive Flow Control Enable
     // assign mac_configuration_vector[66] = 1'b1;     //Receiver Preserve Preamble Enable
-    // assign mac_configuration_vector[67] = 1'b0;     //Receiver Length/Type Error Disable
+    // assign mac_configuration_vector[67] = 1'b1;     //Receiver Length/Type Error Disable
     // assign mac_configuration_vector[68] = 1'b0;     //Control Frame Length Check Disable
     // // Tx
     // assign mac_configuration_vector[53] = 1'b0;     //Transmitter LAN/WAN Mode
@@ -324,7 +342,31 @@ module xge_intf # (
         .reset156_25(reset156_25)                              // O
         );
 
-endmodule // xge_intf
+    //-------------------------------------------------------
+    // mac2axis
+    //-------------------------------------------------------
+    mac2axis #(
+        .BW(9)
+    ) mac2axis_mod (
+        // MAC rx
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        .mac_rx_data(mac_rx_data),                             // O [63:0]
+        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
+        .mac_rx_good_frame(mac_rx_good_frame),                 // O
+        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        // AXIS
+        .m_axis_aclk(clk250),                                  // I
+        .m_axis_aresetp(mac_rst),                              // I
+        .m_axis_tdata(m_axis_tdata),                           // O [63:0]
+        .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
+        .m_axis_tuser(m_axis_tuser),                           // O [127:0]
+        .m_axis_tvalid(m_axis_tvalid),                         // O
+        .m_axis_tlast(m_axis_tlast),                           // O
+        .m_axis_tready(m_axis_tready)                          // I
+        );
+
+endmodule // xge_intf_master
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

@@ -75,7 +75,7 @@ module ibuf_mgmt # (
     input                    lbuf_en,
     output reg               lbuf_dn,
 
-    // ibuf2mac
+    // ibuf2bkd
     output reg   [BW:0]      committed_prod,
     input        [BW:0]      committed_cons,
 

@@ -55,17 +55,19 @@ module rx # (
     parameter BW = 10
     ) (
 
-    input                    mac_clk,
-    input                    mac_rst,
+    input                    bkd_clk,
+    input                    bkd_rst,
 
     input                    pcie_clk,
     input                    pcie_rst,
 
-    // MAC rx
-    input        [63:0]      mac_rx_data,
-    input        [7:0]       mac_rx_data_valid,
-    input                    mac_rx_good_frame,
-    input                    mac_rx_bad_frame,
+    // BKD rx
+    input        [63:0]      s_axis_tdata,
+    input        [7:0]       s_axis_tstrb,
+    input        [127:0]     s_axis_tuser,
+    input                    s_axis_tvalid,
+    input                    s_axis_tlast,
+    output                   s_axis_tready,
 
     // TRN tx
     output       [63:0]      trn_td,
@@ -96,9 +98,9 @@ module rx # (
     );
 
     //-------------------------------------------------------
-    // Local mac2ibuf
+    // Local bkd2ibuf
     //-------------------------------------------------------
-    wire                     mac_activity;
+    wire                     bkd_activity;
     wire         [BW:0]      committed_prod;
     wire         [15:0]      dropped_pkts_cnt;
 
@@ -126,7 +128,7 @@ module rx # (
     wire         [15:0]      dropped_pkts_cnt_sync;
 
     //-------------------------------------------------------
-    // Local eth2tlp_ctrl
+    // Local bkd2tlp_ctrl
     //-------------------------------------------------------
     wire                     trig_tlp;
     wire                     trig_tlp_ack;
@@ -156,25 +158,28 @@ module rx # (
     wire         [63:0]      sw_ptr;
 
     //-------------------------------------------------------
-    // mac2ibuf
+    // bkd2ibuf
     //-------------------------------------------------------
-    mac2ibuf #(.BW(BW)) mac2ibuf_mod (
-        .clk(mac_clk),                                         // I
-        .rst(mac_rst),                                         // I
-        // MAC rx
-        .rx_data(mac_rx_data),                                 // I [63:0]
-        .rx_data_valid(mac_rx_data_valid),                     // I [7:0]
-        .rx_good_frame(mac_rx_good_frame),                     // I
-        .rx_bad_frame(mac_rx_bad_frame),                       // I
+    bkd2ibuf #(.BW(BW)) bkd2ibuf_mod (
+        .clk(bkd_clk),                                         // I
+        .rst(bkd_rst),                                         // I
+        // BKD rx
+        .s_axis_tdata(s_axis_tdata),                           // I [63:0]
+        .s_axis_tstrb(s_axis_tstrb),                           // I [7:0]
+        .s_axis_tuser(s_axis_tuser),                           // I [127:0]
+        .s_axis_tvalid(s_axis_tvalid),                         // I
+        .s_axis_tlast(s_axis_tlast),                           // I
+        .s_axis_tready(s_axis_tready),                         // O
         // ibuf
         .wr_addr(wr_addr),                                     // O [BW-1:0]
         .wr_data(wr_data),                                     // O [63:0]
         // fwd logic
         .hst_rdy(lbuf_en),                                     // I
-        .activity(mac_activity),                               // O
+        .activity(bkd_activity),                               // O
         .committed_prod(committed_prod),                       // O [BW:0]
-        .committed_cons(committed_cons_sync),                  // I [BW:0]
-        .dropped_pkts(dropped_pkts_cnt)                        // O [15:0]
+        //.committed_cons(committed_cons_sync),                  // I [BW:0]
+        .committed_cons(committed_cons_sync)                  // I [BW:0]
+        //.dropped_pkts(dropped_pkts_cnt)                        // O [15:0]
         );
 
     //-------------------------------------------------------
@@ -184,7 +189,7 @@ module rx # (
         .a(wr_addr),                                           // I [BW-1:0]
         .d(wr_data),                                           // I [63:0]
         .dpra(rd_addr),                                        // I [BW-1:0]
-        .clk(mac_clk),                                         // I 
+        .clk(bkd_clk),                                         // I 
         .qdpo_clk(pcie_clk),                                   // I
         .qdpo(rd_data)                                         // O [63:0]
         );
@@ -195,8 +200,8 @@ module rx # (
     sync_type1 #(.W(BW+1)) prod_sync_mod (
         .clk_out(pcie_clk),                                    // I
         .rst_out(pcie_rst),                                    // I
-        .clk_in(mac_clk),                                      // I
-        .rst_in(mac_rst),                                      // I
+        .clk_in(bkd_clk),                                      // I
+        .rst_in(bkd_rst),                                      // I
         .in(committed_prod),                                   // I [BW:0]
         .out(committed_prod_sync)                              // O [BW:0]
         );
@@ -205,8 +210,8 @@ module rx # (
     // cons_sync
     //-------------------------------------------------------
     sync_type0 #(.W(BW+1)) cons_sync_mod (
-        .clk_out(mac_clk),                                     // I
-        .rst_out(mac_rst),                                     // I
+        .clk_out(bkd_clk),                                     // I
+        .rst_out(bkd_rst),                                     // I
         .clk_in(pcie_clk),                                     // I
         .rst_in(pcie_rst),                                     // I
         .in(committed_cons),                                   // I [BW:0]
@@ -219,24 +224,24 @@ module rx # (
     sync_type1 #(.W(16)) dropped_pkts_cnt_sync_mod (
         .clk_out(pcie_clk),                                    // I
         .rst_out(pcie_rst),                                    // I
-        .clk_in(mac_clk),                                      // I
-        .rst_in(mac_rst),                                      // I
+        .clk_in(bkd_clk),                                      // I
+        .rst_in(bkd_rst),                                      // I
         .in(dropped_pkts_cnt),                                 // I [15:0]
         .out(dropped_pkts_cnt_sync)                            // O [15:0]
         );
 
     //-------------------------------------------------------
-    // eth2tlp_ctrl
+    // bkd2tlp_ctrl
     //-------------------------------------------------------
-    eth2tlp_ctrl #(.BW(BW)) eth2tlp_ctrl_mod (
+    bkd2tlp_ctrl #(.BW(BW)) bkd2tlp_ctrl_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
         // CFG
         .cfg_max_payload_size(cfg_max_payload_size),           // I [2:0]
-        // mac2ibuf
+        // bkd2ibuf
         .committed_prod(committed_prod_sync),                  // I [BW:0]
-        .mac_activity(mac_activity),                           // I
-        // eth2tlp_ctrl
+        .bkd_activity(bkd_activity),                           // I
+        // bkd2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // O
         .trig_tlp_ack(trig_tlp_ack),                           // I
         .chng_lbuf(chng_lbuf),                                 // O
@@ -267,7 +272,7 @@ module rx # (
         .lbuf_en(lbuf_en),                                     // I
         .lbuf64b(lbuf64b),                                     // I
         .lbuf_dn(lbuf_dn),                                     // O
-        // eth2tlp_ctrl
+        // bkd2tlp_ctrl
         .trig_tlp(trig_tlp),                                   // I
         .trig_tlp_ack(trig_tlp_ack),                           // O
         .chng_lbuf(chng_lbuf),                                 // I
@@ -275,7 +280,7 @@ module rx # (
         .send_qws(send_qws),                                   // I
         .send_qws_ack(send_qws_ack),                           // O
         .qw_cnt(qw_cnt),                                       // I [5:0]
-        // mac2ibuf
+        // bkd2ibuf
         .committed_cons(committed_cons),                       // O [BW:0]
         // ibuf
         .rd_addr(rd_addr),                                     // O [BW-1:0]
@@ -286,7 +291,8 @@ module rx # (
         .my_trn(my_trn),                                       // I
         .drv_ep(drv_ep),                                       // O
         // stats
-        .dropped_pkts(dropped_pkts_cnt_sync)                   // I [15:0]
+        //.dropped_pkts(dropped_pkts_cnt_sync)                   // I [15:0]
+        .dropped_pkts(15'b0)                                   // I [15:0]
         );
 
     //-------------------------------------------------------
@@ -342,7 +348,7 @@ module rx # (
     irq_gen irq_gen_mod (
         .clk(pcie_clk),                                        // I
         .rst(pcie_rst),                                        // I
-        .hw_ptr_update(mac_activity),                          // I
+        .hw_ptr_update(bkd_activity),                          // I
         .hst_rdy(lbuf_en),                                     // I
         .hw_ptr(hw_ptr),                                       // I [63:0]
         .sw_ptr(sw_ptr),                                       // I [63:0]

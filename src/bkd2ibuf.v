@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        mac2ibuf.v
+*        bkd2ibuf.v
 *
 *  Project:
 *
@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Eth frames 2 internal buff
+*        Backend packets 2 internal buff
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -43,27 +43,30 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module mac2ibuf # (
+module bkd2ibuf # (
     parameter BW = 10
     ) (
 
     input                    clk,
     input                    rst,
 
-    // MAC rx
-    input        [63:0]      rx_data,
-    input        [7:0]       rx_data_valid,
-    input                    rx_good_frame,
-    input                    rx_bad_frame,
+    // BKD rx
+    input        [63:0]      s_axis_tdata,
+    input        [7:0]       s_axis_tstrb,
+    input        [127:0]     s_axis_tuser,
+    input                    s_axis_tvalid,
+    input                    s_axis_tlast,
+    output reg               s_axis_tready,
 
     // ibuf
     output reg   [BW-1:0]    wr_addr,
     output reg   [63:0]      wr_data,
 
     // fwd logic
+    input                    hst_rdy,
+    output reg               activity,
     output reg   [BW:0]      committed_prod,
-    input        [BW:0]      committed_cons,
-    output reg   [15:0]      dropped_pkts
+    input        [BW:0]      committed_cons
     );
 
     // localparam
@@ -80,15 +83,17 @@ module mac2ibuf # (
     localparam MAX_DIFF = (2**BW) - 10;
 
     //-------------------------------------------------------
-    // Local mac2ibuf
+    // Local bkd2ibuf
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [15:0]      len;
+    reg          [7:0]       src_port;
+    reg          [7:0]       des_port;
+    reg          [63:0]      timestamp;
     reg          [BW:0]      aux_wr_addr;
+    reg          [BW:0]      aux_ts_wr_addr;
     reg          [BW:0]      diff;
-    reg          [7:0]       rx_data_valid_reg;
-    reg                      rx_good_frame_reg;
-    reg                      rx_bad_frame_reg;
+    reg                      hst_rdy_reg0;
 
     ////////////////////////////////////////////////
     // Inbound ethernet frame to ibuf
@@ -96,106 +101,108 @@ module mac2ibuf # (
     always @(posedge clk) begin
 
         if (rst) begin  // rst
+            s_axis_tready <= 1'b0;
             rx_fsm <= s0;
         end
         
         else begin  // not rst
             
             diff <= aux_wr_addr + (~committed_cons) +1;
+            activity <= 1'b0;
+
+            hst_rdy_reg0 <= hst_rdy;
 
             case (rx_fsm)
 
                 s0 : begin
                     committed_prod <= 'b0;
-                    dropped_pkts <= 'b0;
+                    hst_rdy_reg0 <= 1'b0;
+                    aux_wr_addr <= 'h1;
                     rx_fsm <= s1;
                 end
 
                 s1 : begin
-                    if (!rx_data_valid) begin      // wait eof if any ongoing
+                    if (hst_rdy_reg0) begin
+                        s_axis_tready <= 1'b1;
                         rx_fsm <= s2;
                     end
                 end
 
-                s2 : begin                                  // configure mac core to present preamble and save the packet timestamp
-                    len <= 'b0;
-                    aux_wr_addr <= committed_prod +1;
-                    if (rx_data_valid) begin      // wait for sof (preamble)
+                s2 : begin
+                    if (s_axis_tlast && s_axis_tvalid) begin
+                        rx_fsm <= s4;
+                    end
+                    else if (s_axis_tvalid) begin
                         rx_fsm <= s3;
+                    end
+                    else begin
+                        rx_fsm <= s4;
                     end
                 end
 
                 s3 : begin
-                    wr_data <= rx_data;
-                    wr_addr <= aux_wr_addr;
-                    aux_wr_addr <= aux_wr_addr +1;
-
-                    rx_data_valid_reg <= rx_data_valid;
-                    rx_good_frame_reg <= rx_good_frame;
-                    rx_bad_frame_reg <= rx_bad_frame;
-                    
-                    case (rx_data_valid)
-                        8'b00000000 : begin
-                            len <= len;
-                            aux_wr_addr <= aux_wr_addr;
-                        end
-                        8'b00000001 : begin
-                            len <= len + 1;
-                        end
-                        8'b00000011 : begin
-                            len <= len + 2;
-                        end
-                        8'b00000111 : begin
-                            len <= len + 3;
-                        end
-                        8'b00001111 : begin
-                            len <= len + 4;
-                        end
-                        8'b00011111 : begin
-                            len <= len + 5;
-                        end
-                        8'b00111111 : begin
-                            len <= len + 6;
-                        end
-                        8'b01111111 : begin
-                            len <= len + 7;
-                        end
-                        8'b11111111 : begin
-                            len <= len + 8;
-                        end
-                    endcase
-
-                    if (diff > MAX_DIFF) begin           // ibufer is almost full
-                        rx_fsm <= s5;
-                    end
-                    else if (rx_good_frame) begin        // eof (good frame)
+                    if (s_axis_tlast && s_axis_tvalid) begin
                         rx_fsm <= s4;
-                    end
-                    else if (rx_bad_frame) begin
-                        rx_fsm <= s2;
                     end
                 end
 
                 s4 : begin
-                    wr_data <= {1'b0, 15'b0, len, 32'b0};
-                    wr_addr <= committed_prod;
-
-                    committed_prod <= aux_wr_addr;                      // commit the packet
-                    aux_wr_addr <= aux_wr_addr +1;
-                    len <= 'b0;
-
-                    if (rx_data_valid) begin        // sof (preamble)
-                        rx_fsm <= s3;
-                    end
-                    else begin
-                        rx_fsm <= s2;
+                    len <= s_axis_tuser[15:0];
+                    src_port <= s_axis_tuser[23:16];
+                    des_port <= s_axis_tuser[31:24];
+                    timestamp <= s_axis_tuser[95:32];
+                    
+                    wr_data <= s_axis_tdata;
+                    wr_addr <= aux_wr_addr;
+                    if (s_axis_tvalid) begin
+                        aux_wr_addr <= aux_wr_addr +1;
+                        rx_fsm <= s5;
                     end
                 end
-                
-                s5 : begin                                  // drop current frame
-                    if (rx_good_frame || rx_good_frame_reg || rx_bad_frame  || rx_bad_frame_reg) begin
-                        dropped_pkts <= dropped_pkts +1; 
-                        rx_fsm <= s2;
+
+                s5 : begin
+                    activity <= 1'b1;
+                    wr_data <= s_axis_tdata;
+                    wr_addr <= aux_wr_addr;
+                    if (s_axis_tvalid) begin
+                        aux_wr_addr <= aux_wr_addr +1;
+                    end
+
+                    if (s_axis_tlast && s_axis_tvalid) begin
+                        s_axis_tready <= 1'b0;
+                        rx_fsm <= s6;
+                    end
+                    else if (diff > MAX_DIFF) begin           // ibufer is almost full
+                        s_axis_tready <= 1'b0;
+                        rx_fsm <= s8;
+                    end
+                end
+
+                s6 : begin
+                    activity <= 1'b1;
+                    //wr_data <= {1'b0, 15'b0, len, 8'b0, des_port, 8'b0, src_port};
+                    wr_data <= {1'b0, 15'b0, len, 8'b0, 8'b0, 8'b0, 8'b0};
+                    wr_addr <= committed_prod;
+
+                    committed_prod <= aux_wr_addr;            // commit the packet
+                    aux_wr_addr <= aux_wr_addr +1;
+                    aux_ts_wr_addr <= committed_prod +1;
+                    s_axis_tready <= 1'b1;
+                    rx_fsm <= s4;
+                end
+
+                //s5 : begin
+                //    wr_data <= timestamp;
+                //    wr_addr <= aux_ts_wr_addr;
+                //    aux_wr_addr <= aux_wr_addr +1;
+                //    s_axis_tready <= 1'b1;
+                //    rx_fsm <= s2;
+                //end
+
+                s8 : begin
+                    if (diff < MAX_DIFF) begin
+                        s_axis_tready <= 1'b1;
+                        rx_fsm <= s5;
                     end
                 end
 
@@ -207,7 +214,7 @@ module mac2ibuf # (
         end     // not rst
     end  //always
 
-endmodule // mac2ibuf
+endmodule // bkd2ibuf
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
