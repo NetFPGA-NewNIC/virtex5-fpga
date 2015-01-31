@@ -54,12 +54,12 @@ module top (
     input        [7:0]       pci_exp_rxn,
 
     // XAUI D
-    input                    refclk_A_p,
-    input                    refclk_A_n,
-    output       [3:0]       xaui_A_txp,
-    output       [3:0]       xaui_A_txn,
-    input        [3:0]       xaui_A_rxp,
-    input        [3:0]       xaui_A_rxn,
+    input                    refclk_D_p,
+    input                    refclk_D_n,
+    output       [3:0]       xaui_D_txp,
+    output       [3:0]       xaui_D_txn,
+    input        [3:0]       xaui_D_rxp,
+    input        [3:0]       xaui_D_rxn,
 
     input                    usr_100MHz,
 
@@ -100,17 +100,17 @@ module top (
     wire                     pcie_rst;
 
     //-------------------------------------------------------
-    // xge_intf A
+    // xge_intf D
     //-------------------------------------------------------
     xge_intf # (
-        .XAUI_REVERSE_LANES(1)
-    ) xge_intf_A (
-        .refclk_p(refclk_A_p),                                 // I
-        .refclk_n(refclk_A_n),                                 // I
-        .xaui_txp(xaui_A_txp),                                 // O [3:0]
-        .xaui_txn(xaui_A_txn),                                 // O [3:0]
-        .xaui_rxp(xaui_A_rxp),                                 // I [3:0]
-        .xaui_rxn(xaui_A_rxn),                                 // I [3:0]
+        .XAUI_REVERSE_LANES(0)
+    ) xge_intf_D (
+        .refclk_p(refclk_D_p),                                 // I
+        .refclk_n(refclk_D_n),                                 // I
+        .xaui_txp(xaui_D_txp),                                 // O [3:0]
+        .xaui_txn(xaui_D_txn),                                 // O [3:0]
+        .xaui_rxp(xaui_D_rxp),                                 // I [3:0]
+        .xaui_rxn(xaui_D_rxn),                                 // I [3:0]
         .clk100(usr_100MHz),                                   // I
         .dcm_rst_in(pcie_rst),                                 // I
         .clk156_25(mac_clk),                                   // O
