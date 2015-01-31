@@ -93,7 +93,7 @@ module mxr (
     ////////////////////////////////////////////////
     // ARB
     ////////////////////////////////////////////////
-    always @(posedge clk or negedge arst) begin
+    always @(posedge clk or posedge arst) begin
 
         if (arst) begin  // rst
             s_axis_A_tready <= 1'b0;

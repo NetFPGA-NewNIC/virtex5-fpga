@@ -44,7 +44,8 @@
 //`default_nettype none
 
 module xge_intf_master # ( 
-    parameter XAUI_REVERSE_LANES = 0
+    parameter XAUI_REVERSE_LANES = 0,
+    parameter DST_PORT = 8'h00
     ) (
 
     // XAUI
@@ -351,10 +352,10 @@ module xge_intf_master # (
         // MAC rx
         .mac_clk(mac_clk),                                     // I
         .mac_rst(mac_rst),                                     // I
-        .mac_rx_data(mac_rx_data),                             // O [63:0]
-        .mac_rx_data_valid(mac_rx_data_valid),                 // O [7:0]
-        .mac_rx_good_frame(mac_rx_good_frame),                 // O
-        .mac_rx_bad_frame(mac_rx_bad_frame),                   // O
+        .mac_rx_data(mac_rx_data),                             // I [63:0]
+        .mac_rx_data_valid(mac_rx_data_valid),                 // I [7:0]
+        .mac_rx_good_frame(mac_rx_good_frame),                 // I
+        .mac_rx_bad_frame(mac_rx_bad_frame),                   // I
         // AXIS
         .m_axis_aclk(clk250),                                  // I
         .m_axis_aresetp(mac_rst),                              // I
@@ -364,6 +365,32 @@ module xge_intf_master # (
         .m_axis_tvalid(m_axis_tvalid),                         // O
         .m_axis_tlast(m_axis_tlast),                           // O
         .m_axis_tready(m_axis_tready)                          // I
+        );
+
+    //-------------------------------------------------------
+    // axis2mac
+    //-------------------------------------------------------
+    axis2mac #(
+        .BW(9),
+        .DST_PORT(8'h80)
+    ) axis2mac_mod (
+        // MAC tx
+        .mac_clk(mac_clk),                                     // I
+        .mac_rst(mac_rst),                                     // I
+        .mac_tx_underrun(mac_tx_underrun),                     // O
+        .mac_tx_data(mac_tx_data),                             // O [63:0]
+        .mac_tx_data_valid(mac_tx_data_valid),                 // O [7:0]
+        .mac_tx_start(mac_tx_start),                           // O
+        .mac_tx_ack(mac_tx_ack),                               // I
+        // AXIS
+        .s_axis_aclk(clk250),                                  // I
+        .s_axis_aresetp(mac_rst),                              // I
+        .s_axis_tdata(s_axis_tdata),                           // I [63:0]
+        .s_axis_tstrb(s_axis_tstrb),                           // I [7:0]
+        .s_axis_tuser(s_axis_tuser),                           // I [127:0]
+        .s_axis_tvalid(s_axis_tvalid),                         // I
+        .s_axis_tlast(s_axis_tlast),                           // I
+        .s_axis_tready(s_axis_tready)                          // O
         );
 
 endmodule // xge_intf_master

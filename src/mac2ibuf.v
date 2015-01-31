@@ -84,7 +84,7 @@ module mac2ibuf # (
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [15:0]      len;
-    reg          [BW:0]      aux_wr_addr;
+    reg          [BW:0]      ax_wr_addr;
     reg          [BW:0]      diff;
     reg          [7:0]       rx_data_valid_reg;
     reg                      rx_good_frame_reg;
@@ -101,7 +101,7 @@ module mac2ibuf # (
         
         else begin  // not rst
             
-            diff <= aux_wr_addr + (~committed_cons) +1;
+            diff <= ax_wr_addr + (~committed_cons) +1;
 
             case (rx_fsm)
 
@@ -119,7 +119,7 @@ module mac2ibuf # (
 
                 s2 : begin                                  // configure mac core to present preamble and save the packet timestamp
                     len <= 'b0;
-                    aux_wr_addr <= committed_prod +1;
+                    ax_wr_addr <= committed_prod +1;
                     if (rx_data_valid) begin      // wait for sof (preamble)
                         rx_fsm <= s3;
                     end
@@ -127,8 +127,8 @@ module mac2ibuf # (
 
                 s3 : begin
                     wr_data <= rx_data;
-                    wr_addr <= aux_wr_addr;
-                    aux_wr_addr <= aux_wr_addr +1;
+                    wr_addr <= ax_wr_addr;
+                    ax_wr_addr <= ax_wr_addr +1;
 
                     rx_data_valid_reg <= rx_data_valid;
                     rx_good_frame_reg <= rx_good_frame;
@@ -137,7 +137,7 @@ module mac2ibuf # (
                     case (rx_data_valid)
                         8'b00000000 : begin
                             len <= len;
-                            aux_wr_addr <= aux_wr_addr;
+                            ax_wr_addr <= ax_wr_addr;
                         end
                         8'b00000001 : begin
                             len <= len + 1;
@@ -180,8 +180,8 @@ module mac2ibuf # (
                     wr_data <= {1'b0, 15'b0, len, 32'b0};
                     wr_addr <= committed_prod;
 
-                    committed_prod <= aux_wr_addr;                      // commit the packet
-                    aux_wr_addr <= aux_wr_addr +1;
+                    committed_prod <= ax_wr_addr;                      // commit the packet
+                    ax_wr_addr <= ax_wr_addr +1;
                     len <= 'b0;
 
                     if (rx_data_valid) begin        // sof (preamble)

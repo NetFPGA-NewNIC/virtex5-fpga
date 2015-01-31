@@ -47,10 +47,10 @@ module ibuf2axis # (
     parameter BW = 10
     ) (
 
-    // AXIS
     input                    m_axis_aclk,
     input                    m_axis_aresetp,
 
+    // AXIS
     output reg   [63:0]      m_axis_tdata,
     output reg   [7:0]       m_axis_tstrb,
     output reg   [127:0]     m_axis_tuser,
@@ -60,10 +60,10 @@ module ibuf2axis # (
 
     // mac2ibuf
     input        [BW:0]      committed_prod,
-    output reg   [BW:0]      committed_cons,
+    output       [BW:0]      committed_cons,
 
     // ibuf
-    output reg   [BW-1:0]    rd_addr,
+    output       [BW-1:0]    rd_addr,
     input        [63:0]      rd_data
     );
 
@@ -79,50 +79,59 @@ module ibuf2axis # (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local send_fsm
+    // Local snd_fsm
     //-------------------------------------------------------   
-    reg          [7:0]       send_fsm;
+    reg          [7:0]       snd_fsm;
     reg          [15:0]      len;
-    reg          [BW-1:0]    rd_addr_prev1;
-    reg          [BW-1:0]    rd_addr_prev2;
-    reg          [BW:0]      nxt_committed_cons;
+    reg          [BW:0]      rd_addr_i;
     reg          [7:0]       last_tstrb;
+    reg          [12:0]      qw_len;
+    reg          [12:0]      qw_snt;
+    reg          [63:0]      ax_rd_data;
+
+    //-------------------------------------------------------
+    // assigns
+    //-------------------------------------------------------
+    assign rd_addr = rd_addr_i;
+    assign committed_cons = rd_addr_i;
 
     ////////////////////////////////////////////////
-    // send_fsm
+    // snd_fsm
     ////////////////////////////////////////////////
-    always @(posedge m_axis_aclk or negedge m_axis_aresetp) begin
+    always @(posedge m_axis_aclk or posedge m_axis_aresetp) begin
 
         if (m_axis_aresetp) begin  // rst
             m_axis_tvalid <= 1'b0;
-            send_fsm <= s0;
+            snd_fsm <= s0;
         end
         
         else begin  // not rst
 
-            rd_addr_prev1 <= rd_addr;
-            rd_addr_prev2 <= rd_addr_prev1;
+            diff <= committed_prod + (~rd_addr_i) +1;
 
-            diff <= committed_prod + (~committed_cons) +1;
-
-            case (send_fsm)
+            case (snd_fsm)
 
                 s0 : begin
                     diff <= 'b0;
-                    committed_cons <= 'b0;
-                    rd_addr <= 'b0;
-                    send_fsm <= s1;
+                    rd_addr_i <= 'b0;
+                    snd_fsm <= s1;
                 end
 
                 s1 : begin
                     len <= rd_data[47:32];
+                    qw_len <= rd_data[47:35];
                     if (diff) begin
-                        rd_addr <= rd_addr + 1;
-                        send_fsm <= s2;
+                        rd_addr_i <= rd_addr_i + 1;
+                        snd_fsm <= s2;
                     end
                 end
 
                 s2 : begin
+                    if (len_i[2:0]) begin
+                        qw_len <= len_i[15:3] + 1;
+                    end
+
+                    (* parallel_case *)
                     case (len_i[2:0])                    // my deco
                         3'b000 : begin
                             last_tstrb <= 8'b11111111;
@@ -149,8 +158,8 @@ module ibuf2axis # (
                             last_tstrb <= 8'b01111111;
                         end
                     endcase
-                    rd_addr <= rd_addr + 1;
-                    send_fsm <= s3;
+                    rd_addr_i <= rd_addr_i + 1;
+                    snd_fsm <= s3;
                 end
 
                 s3 : begin
@@ -159,18 +168,63 @@ module ibuf2axis # (
                     m_axis_tuser[15:0] <= len;
                     m_axis_tvalid <= 1'b1;
                     m_axis_tlast <= 1'b0;
-                    rd_addr <= rd_addr + 1;
-                    send_fsm <= s4;
+                    rd_addr_i <= rd_addr_i + 1;
+                    qw_snt <= 'h2;
+                    snd_fsm <= s4;
                 end
 
                 s4 : begin
+                    ax_rd_data <= rd_data;
                     if (m_axis_tready) begin
-                        
+                        rd_addr_i <= rd_addr_i + 1;
+                        m_axis_tdata <= rd_data;
+                        qw_snt <= qw_snt + 1;
+                        if (qw_len == qw_snt) begin
+                            rd_addr_i <= rd_addr_i;
+                            m_axis_tstrb <= last_tstrb;
+                            m_axis_tlast <= 1'b1;
+                            snd_fsm <= s6;
+                        end
+                    end
+                    else begin
+                        snd_fsm <= s5;
+                    end
+                end
+
+                s5 : begin
+                    if (m_axis_tready) begin
+                        rd_addr_i <= rd_addr_i + 1;
+                        m_axis_tdata <= ax_rd_data;
+                        qw_snt <= qw_snt + 1;
+                        if (qw_len == qw_snt) begin
+                            m_axis_tstrb <= last_tstrb;
+                            m_axis_tlast <= 1'b1;
+                            snd_fsm <= s6;
+                        end
+                        else begin
+                            snd_fsm <= s4;
+                        end
+                    end
+                end
+
+                s6 : begin
+                    len <= rd_data[47:32];
+                    qw_len <= rd_data[47:35];
+                    if (m_axis_tready) begin
+                        m_axis_tlast <= 1'b0;
+                        m_axis_tvalid <= 1'b0;
+                        if (diff) begin
+                            rd_addr_i <= rd_addr_i + 1;
+                            snd_fsm <= s2;
+                        end
+                        else begin
+                            snd_fsm <= s1;
+                        end
                     end
                 end
 
                 default : begin 
-                    send_fsm <= s0;
+                    snd_fsm <= s0;
                 end
 
             endcase

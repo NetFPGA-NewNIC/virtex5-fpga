@@ -50,7 +50,6 @@ module mac2axis # (
     // MAC rx
     input                    mac_clk,
     input                    mac_rst,
-
     input        [63:0]      mac_rx_data,
     input        [7:0]       mac_rx_data_valid,
     input                    mac_rx_good_frame,
@@ -59,7 +58,6 @@ module mac2axis # (
     // AXIS
     input                    m_axis_aclk,
     input                    m_axis_aresetp,
-
     output       [63:0]      m_axis_tdata,
     output       [7:0]       m_axis_tstrb,
     output       [127:0]     m_axis_tuser,
@@ -137,7 +135,7 @@ module mac2axis # (
     //-------------------------------------------------------
     // prod_sync
     //-------------------------------------------------------
-    sync_type1 #(.W(BW+1)) prod_sync_mod (
+    xge_sync_type1 #(.W(BW+1)) prod_sync_mod (
         .clk_out(m_axis_aclk),                                 // I
         .rst_out(m_axis_aresetp),                              // I
         .clk_in(mac_clk),                                      // I
@@ -149,7 +147,7 @@ module mac2axis # (
     //-------------------------------------------------------
     // cons_sync
     //-------------------------------------------------------
-    sync_type0 #(.W(BW+1)) cons_sync_mod (
+    xge_sync_type0 #(.W(BW+1)) cons_sync_mod (
         .clk_out(mac_clk),                                     // I
         .rst_out(mac_rst),                                     // I
         .clk_in(m_axis_aclk),                                  // I
@@ -161,7 +159,7 @@ module mac2axis # (
     //-------------------------------------------------------
     // dropped_pkts_cnt_sync
     //-------------------------------------------------------
-    sync_type1 #(.W(16)) dropped_pkts_cnt_sync_mod (
+    xge_sync_type1 #(.W(16)) dropped_pkts_cnt_sync_mod (
         .clk_out(m_axis_aclk),                                 // I
         .rst_out(m_axis_aresetp),                              // I
         .clk_in(mac_clk),                                      // I
@@ -173,12 +171,10 @@ module mac2axis # (
     //-------------------------------------------------------
     // ibuf2axis
     //-------------------------------------------------------
-    ibuf2tlp ibuf2tlp_mod (
+    ibuf2axis #(.BW(BW)) ibuf2axis_mod (
         .m_axis_aclk(m_axis_aclk),                             // I
         .m_axis_aresetp(m_axis_aresetp),                       // I
         // AXIS
-        .m_axis_aclk(clk250),                                  // I
-        .m_axis_aresetp(mac_rst),                              // I
         .m_axis_tdata(m_axis_tdata),                           // O [63:0]
         .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
         .m_axis_tuser(m_axis_tuser),                           // O [127:0]

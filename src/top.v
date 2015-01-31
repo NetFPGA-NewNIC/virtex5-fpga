@@ -188,7 +188,8 @@ module top (
     // xge_intf D - Master
     //-------------------------------------------------------
     xge_intf_master # (
-        .XAUI_REVERSE_LANES(0)
+        .XAUI_REVERSE_LANES(0),
+        .DST_PORT(8'h80)
     ) xge_intf_D (
         .refclk_p(refclk_D_p),                                 // I
         .refclk_n(refclk_D_n),                                 // I

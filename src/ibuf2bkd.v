@@ -12,7 +12,7 @@
 *        Marco Forconesi
 *
 *  Description:
-*        Sends Ethernet frames.
+*        Sends packets to backend.
 *
 *
 *    This code is initially developed for the Network-as-a-Service (NaaS) project.
@@ -79,59 +79,50 @@ module ibuf2bkd # (
     localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
-    // Local frm_sync
-    //-------------------------------------------------------
-    reg          [7:0]       syn_fsm;
-    reg          [15:0]      len_i;
-    reg          [12:0]      qw_len;
-    reg                      trig;
-    reg          [BW:0]      diff;
-    reg          [7:0]       last_tstrb;
-
-    //-------------------------------------------------------
     // Local snd_fsm
-    //-------------------------------------------------------
+    //-------------------------------------------------------   
     reg          [7:0]       snd_fsm;
-    reg          [12:0]      qw_snt;
-    reg          [BW:0]      rd_addr_i;
-    reg          [BW:0]      rd_addr_prev0;
-    reg                      sync;
     reg          [15:0]      len;
-    reg          [7:0]       src_port;
-    reg          [7:0]       des_port;
+    reg          [BW:0]      rd_addr_i;
+    reg          [7:0]       last_tstrb;
+    reg          [12:0]      qw_len;
+    reg          [12:0]      qw_snt;
+    reg          [63:0]      ax_rd_data;
 
     //-------------------------------------------------------
     // assigns
     //-------------------------------------------------------
     assign rd_addr = rd_addr_i;
+    assign committed_cons = rd_addr_i;
 
     ////////////////////////////////////////////////
-    // frm_sync
+    // snd_fsm
     ////////////////////////////////////////////////
     always @(posedge clk) begin
 
         if (rst) begin  // rst
-            syn_fsm <= s0;
+            m_axis_tvalid <= 1'b0;
+            snd_fsm <= s0;
         end
         
         else begin  // not rst
 
-            trig <= 1'b0;
+            diff <= committed_prod + (~rd_addr_i) +1;
 
-            diff <= committed_prod + (~rd_addr_i) + 1;
-
-            case (syn_fsm)
+            case (snd_fsm)
 
                 s0 : begin
                     diff <= 'b0;
-                    syn_fsm <= s1;
+                    rd_addr_i <= 'b0;
+                    snd_fsm <= s1;
                 end
 
                 s1 : begin
-                    len_i <= rd_data[47:32];
-                    if (diff) begin
-                        qw_len <= rd_data[47:35];
-                        syn_fsm <= s2;
+                    len <= rd_data[47:32];
+                    qw_len <= rd_data[47:35];
+                    if (diff > 'h2) begin
+                        rd_addr_i <= rd_addr_i + 1;
+                        snd_fsm <= s2;
                     end
                 end
 
@@ -140,6 +131,7 @@ module ibuf2bkd # (
                         qw_len <= len_i[15:3] + 1;
                     end
 
+                    (* parallel_case *)
                     case (len_i[2:0])                    // my deco
                         3'b000 : begin
                             last_tstrb <= 8'b11111111;
@@ -166,98 +158,35 @@ module ibuf2bkd # (
                             last_tstrb <= 8'b01111111;
                         end
                     endcase
-
-                    if (diff > qw_len) begin
-                        trig <= 1'b1;
-                        syn_fsm <= s3;
-                    end
-                    else begin
-                        syn_fsm <= s1;
-                    end
-                end
-
-                s3 : begin
-                    len_i <= rd_data[47:32];
-                    if (sync) begin
-                        qw_len <= rd_data[47:35];
-                        syn_fsm <= s2;
-                    end
-                end
-            
-                default : begin 
-                    syn_fsm <= s0;
-                end
-
-            endcase
-        end     // not rst
-    end  //always
-
-    ////////////////////////////////////////////////
-    // snd_fsm
-    ////////////////////////////////////////////////
-    always @(posedge clk) begin
-
-        if (rst) begin  // rst
-            m_axis_tvalid <= 1'b0;
-            snd_fsm <= s0;
-        end
-        
-        else begin  // not rst
-
-            sync <= 1'b0;
-            
-            rd_addr_prev0 <= rd_addr_i;
-
-            case (snd_fsm)
-
-                s0 : begin
-                    rd_addr_i <= 'b0;
-                    committed_cons <= 'b0;
-                    snd_fsm <= s1;
-                end
-
-                s1: begin
-                    len <= rd_data[47:32];
-                    src_port <= rd_data[7:0];
-                    des_port <= rd_data[23:16];
-
-                    m_axis_tlast <= 1'b0;
-                    if (trig) begin
-                        rd_addr_i <= rd_addr_i + 1;
-                        snd_fsm <= s2;
-                    end
-                end
-
-                s2 : begin
                     rd_addr_i <= rd_addr_i + 1;
                     snd_fsm <= s3;
                 end
 
                 s3 : begin
                     m_axis_tdata <= rd_data;
-                    m_axis_tstrb <= 'hFF;
-                    m_axis_tuser[31:0] <= {des_port, src_port, len};
+                    m_axis_tstrb <= 8'hFF;
+                    m_axis_tuser[15:0] <= len;
                     m_axis_tvalid <= 1'b1;
+                    m_axis_tlast <= 1'b0;
                     rd_addr_i <= rd_addr_i + 1;
                     qw_snt <= 'h2;
                     snd_fsm <= s4;
                 end
 
                 s4 : begin
+                    ax_rd_data <= rd_data;
                     if (m_axis_tready) begin
                         rd_addr_i <= rd_addr_i + 1;
                         m_axis_tdata <= rd_data;
                         qw_snt <= qw_snt + 1;
                         if (qw_len == qw_snt) begin
                             rd_addr_i <= rd_addr_i;
-                            sync <= 1'b1;
                             m_axis_tstrb <= last_tstrb;
                             m_axis_tlast <= 1'b1;
-                            snd_fsm <= s7;
+                            snd_fsm <= s6;
                         end
                     end
                     else begin
-                        rd_addr_i <= rd_addr_prev0;
                         snd_fsm <= s5;
                     end
                 end
@@ -265,34 +194,32 @@ module ibuf2bkd # (
                 s5 : begin
                     if (m_axis_tready) begin
                         rd_addr_i <= rd_addr_i + 1;
-                        m_axis_tvalid <= 1'b0;
-                        snd_fsm <= s6;
+                        m_axis_tdata <= ax_rd_data;
+                        qw_snt <= qw_snt + 1;
+                        if (qw_len == qw_snt) begin
+                            m_axis_tstrb <= last_tstrb;
+                            m_axis_tlast <= 1'b1;
+                            snd_fsm <= s6;
+                        end
+                        else begin
+                            snd_fsm <= s4;
+                        end
                     end
                 end
 
                 s6 : begin
-                    rd_addr_i <= rd_addr_i + 1;
-                    m_axis_tdata <= rd_data;
-                    m_axis_tvalid <= 1'b1;
-                    qw_snt <= qw_snt + 1;
-                    m_axis_tstrb <= 'hFF;
-                    if (qw_len == qw_snt) begin
-                        rd_addr_i <= rd_addr_i;
-                        sync <= 1'b1;
-                        m_axis_tstrb <= last_tstrb;
-                        m_axis_tlast <= 1'b1;
-                        snd_fsm <= s7;
-                    end
-                    else begin
-                        snd_fsm <= s4;
-                    end
-                end
-
-                s7 : begin
-                    committed_cons <= rd_addr_i;
+                    len <= rd_data[47:32];
+                    qw_len <= rd_data[47:35];
                     if (m_axis_tready) begin
+                        m_axis_tlast <= 1'b0;
                         m_axis_tvalid <= 1'b0;
-                        snd_fsm <= s1;
+                        if (diff) begin
+                            rd_addr_i <= rd_addr_i + 1;
+                            snd_fsm <= s2;
+                        end
+                        else begin
+                            snd_fsm <= s1;
+                        end
                     end
                 end
 
