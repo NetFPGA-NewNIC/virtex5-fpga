@@ -54,7 +54,7 @@ module mxr (
     input        [127:0]     s_axis_A_tuser,
     input                    s_axis_A_tvalid,
     input                    s_axis_A_tlast,
-    output                   s_axis_A_tready,
+    output reg               s_axis_A_tready,
 
     // MAC D
     input        [63:0]      s_axis_D_tdata,
@@ -62,14 +62,14 @@ module mxr (
     input        [127:0]     s_axis_D_tuser,
     input                    s_axis_D_tvalid,
     input                    s_axis_D_tlast,
-    output                   s_axis_D_tready,
+    output reg               s_axis_D_tready,
 
     // 2DMA
-    output       [63:0]      m_axis_tdata,
-    output       [7:0]       m_axis_tstrb,
-    output       [127:0]     m_axis_tuser,
-    output                   m_axis_tvalid,
-    output                   m_axis_tlast,
+    output reg   [63:0]      m_axis_tdata,
+    output reg   [7:0]       m_axis_tstrb,
+    output reg   [127:0]     m_axis_tuser,
+    output reg               m_axis_tvalid,
+    output reg               m_axis_tlast,
     input                    m_axis_tready
     );
 

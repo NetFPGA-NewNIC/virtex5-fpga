@@ -95,7 +95,6 @@ module bkd2ibuf # (
     reg          [BW:0]      diff;
     reg                      hst_rdy_reg0;
     reg                      hst_rdy_reg1;
-    (* KEEP = "TRUE" *)reg          [31:0]      counter;
 
     ////////////////////////////////////////////////
     // Inbound ethernet frame to ibuf
@@ -114,8 +113,6 @@ module bkd2ibuf # (
 
             hst_rdy_reg0 <= hst_rdy;
             hst_rdy_reg1 <= hst_rdy_reg0;
-
-            counter <= 'b0;
 
             case (rx_fsm)
 
@@ -205,7 +202,6 @@ module bkd2ibuf # (
                 //end
 
                 s8 : begin
-                    counter <= counter + 1;
                     if (diff < MAX_DIFF) begin
                         s_axis_tready <= 1'b1;
                         rx_fsm <= s5;

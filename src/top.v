@@ -161,41 +161,41 @@ module top (
     assign M_AXI_LITE_ARESETN = 1'b1;
     assign M_AXIS_TREADY_DMA = s_axis_A_tready | s_axis_D_tready;
 
-    assign S_AXIS_TDATA_DMA = m_axis_A_tdata;
-    assign S_AXIS_TSTRB_DMA = m_axis_A_tstrb;
-    assign S_AXIS_TUSER_DMA = m_axis_A_tuser;
-    assign S_AXIS_TVALID_DMA = m_axis_A_tvalid;
-    assign S_AXIS_TLAST_DMA = m_axis_A_tlast;
-    assign m_axis_A_tready = S_AXIS_TREADY_DMA;
+    //assign S_AXIS_TDATA_DMA = m_axis_A_tdata;
+    //assign S_AXIS_TSTRB_DMA = m_axis_A_tstrb;
+    //assign S_AXIS_TUSER_DMA = m_axis_A_tuser;
+    //assign S_AXIS_TVALID_DMA = m_axis_A_tvalid;
+    //assign S_AXIS_TLAST_DMA = m_axis_A_tlast;
+    //assign m_axis_A_tready = S_AXIS_TREADY_DMA;
 
     //-------------------------------------------------------
     // MXR - for testing only
     //-------------------------------------------------------
-    //mxr mxr_mod (
-    //    .clk(pcie_clk),                                        // I
-    //    .arst(reset156_25),                                    // I  // To simulate nf10 environment
-    //    // MAC A
-    //    .s_axis_A_tdata(m_axis_A_tdata),                       // I [63:0]
-    //    .s_axis_A_tstrb(m_axis_A_tstrb),                       // I [7:0]
-    //    .s_axis_A_tuser(m_axis_A_tuser),                       // I [127:0]
-    //    .s_axis_A_tvalid(m_axis_A_tvalid),                     // I
-    //    .s_axis_A_tlast(m_axis_A_tlast),                       // I
-    //    .s_axis_A_tready(m_axis_A_tready),                     // O
-    //    // MAC D
-    //    .s_axis_D_tdata(m_axis_D_tdata),                       // I [63:0]
-    //    .s_axis_D_tstrb(m_axis_D_tstrb),                       // I [7:0]
-    //    .s_axis_D_tuser(m_axis_D_tuser),                       // I [127:0]
-    //    .s_axis_D_tvalid(m_axis_D_tvalid),                     // I
-    //    .s_axis_D_tlast(m_axis_D_tlast),                       // I
-    //    .s_axis_D_tready(m_axis_D_tready),                     // O
-    //    // 2DMA
-    //    .m_axis_tdata(S_AXIS_TDATA_DMA),                       // O [63:0]
-    //    .m_axis_tstrb(S_AXIS_TSTRB_DMA),                       // O [7:0]
-    //    .m_axis_tuser(S_AXIS_TUSER_DMA),                       // O [127:0]
-    //    .m_axis_tvalid(S_AXIS_TVALID_DMA),                     // O
-    //    .m_axis_tlast(S_AXIS_TLAST_DMA),                       // O
-    //    .m_axis_tready(S_AXIS_TREADY_DMA)                      // I
-    //    );
+    mxr mxr_mod (
+        .clk(pcie_clk),                                        // I
+        .arst(reset156_25),                                    // I  // To simulate nf10 environment
+        // MAC A
+        .s_axis_A_tdata(m_axis_A_tdata),                       // I [63:0]
+        .s_axis_A_tstrb(m_axis_A_tstrb),                       // I [7:0]
+        .s_axis_A_tuser(m_axis_A_tuser),                       // I [127:0]
+        .s_axis_A_tvalid(m_axis_A_tvalid),                     // I
+        .s_axis_A_tlast(m_axis_A_tlast),                       // I
+        .s_axis_A_tready(m_axis_A_tready),                     // O
+        // MAC D
+        .s_axis_D_tdata(m_axis_D_tdata),                       // I [63:0]
+        .s_axis_D_tstrb(m_axis_D_tstrb),                       // I [7:0]
+        .s_axis_D_tuser(m_axis_D_tuser),                       // I [127:0]
+        .s_axis_D_tvalid(m_axis_D_tvalid),                     // I
+        .s_axis_D_tlast(m_axis_D_tlast),                       // I
+        .s_axis_D_tready(m_axis_D_tready),                     // O
+        // 2DMA
+        .m_axis_tdata(S_AXIS_TDATA_DMA),                       // O [63:0]
+        .m_axis_tstrb(S_AXIS_TSTRB_DMA),                       // O [7:0]
+        .m_axis_tuser(S_AXIS_TUSER_DMA),                       // O [127:0]
+        .m_axis_tvalid(S_AXIS_TVALID_DMA),                     // O
+        .m_axis_tlast(S_AXIS_TLAST_DMA),                       // O
+        .m_axis_tready(S_AXIS_TREADY_DMA)                      // I
+        );
 
     //-------------------------------------------------------
     // xge_intf A
