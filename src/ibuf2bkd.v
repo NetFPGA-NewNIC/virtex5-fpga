@@ -63,27 +63,29 @@ module ibuf2bkd # (
     input        [63:0]      rd_data,
 
     // bwd logic
-    output reg   [BW:0]      committed_cons,
+    output       [BW:0]      committed_cons,
     input        [BW:0]      committed_prod
     );
 
     // localparam
-    localparam s0 = 8'b00000000;
-    localparam s1 = 8'b00000001;
-    localparam s2 = 8'b00000010;
-    localparam s3 = 8'b00000100;
-    localparam s4 = 8'b00001000;
-    localparam s5 = 8'b00010000;
-    localparam s6 = 8'b00100000;
-    localparam s7 = 8'b01000000;
-    localparam s8 = 8'b10000000;
+    localparam s0 = 9'b000000000;
+    localparam s1 = 9'b000000001;
+    localparam s2 = 9'b000000010;
+    localparam s3 = 9'b000000100;
+    localparam s4 = 9'b000001000;
+    localparam s5 = 9'b000010000;
+    localparam s6 = 9'b000100000;
+    localparam s7 = 9'b001000000;
+    localparam s8 = 9'b010000000;
+    localparam s9 = 9'b100000000;
 
     //-------------------------------------------------------
     // Local snd_fsm
     //-------------------------------------------------------   
-    reg          [7:0]       snd_fsm;
+    reg          [8:0]       snd_fsm;
     reg          [15:0]      len;
     reg          [BW:0]      rd_addr_i;
+    reg          [BW:0]      diff;
     reg          [7:0]       last_tstrb;
     reg          [12:0]      qw_len;
     reg          [12:0]      qw_snt;
@@ -127,12 +129,12 @@ module ibuf2bkd # (
                 end
 
                 s2 : begin
-                    if (len_i[2:0]) begin
-                        qw_len <= len_i[15:3] + 1;
+                    if (len[2:0]) begin
+                        qw_len <= len[15:3] + 1;
                     end
 
                     (* parallel_case *)
-                    case (len_i[2:0])                    // my deco
+                    case (len[2:0])                    // my deco
                         3'b000 : begin
                             last_tstrb <= 8'b11111111;
                         end
@@ -185,6 +187,10 @@ module ibuf2bkd # (
                             m_axis_tlast <= 1'b1;
                             snd_fsm <= s6;
                         end
+                        else if (diff == 'h1) begin
+                            rd_addr_i <= rd_addr_i;
+                            snd_fsm <= s7;
+                        end
                     end
                     else begin
                         snd_fsm <= s5;
@@ -220,6 +226,36 @@ module ibuf2bkd # (
                         else begin
                             snd_fsm <= s1;
                         end
+                    end
+                end
+
+                s7 : begin
+                    if (m_axis_tready) begin
+                        m_axis_tvalid <= 1'b0;
+                        snd_fsm <= s8;
+                    end
+                end
+
+                s8: begin
+                    if (diff) begin
+                        rd_addr_i <= rd_addr_i + 1;
+                        snd_fsm <= s9;
+                    end
+                end
+
+                s9 : begin
+                    m_axis_tdata <= rd_data;
+                    rd_addr_i <= rd_addr_i + 1;
+                    m_axis_tvalid <= 1'b1;
+                    qw_snt <= qw_snt + 1;
+                    if (qw_len == qw_snt) begin
+                        rd_addr_i <= rd_addr_i;
+                        m_axis_tstrb <= last_tstrb;
+                        m_axis_tlast <= 1'b1;
+                        snd_fsm <= s6;
+                    end
+                    else begin
+                        snd_fsm <= s4;
                     end
                 end
 

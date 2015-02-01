@@ -44,7 +44,8 @@
 //`default_nettype none
 
 module axis2mac # (
-    parameter BW = 9
+    parameter BW = 9,
+    parameter DST_PORT = 8'h00
     ) (
 
     // MAC tx
@@ -79,7 +80,6 @@ module axis2mac # (
     wire         [63:0]      wr_data;
     wire         [BW-1:0]    rd_addr;
     wire         [63:0]      rd_data;
-    wire                     wr_en;
 
     //-------------------------------------------------------
     // Local prod_sync
@@ -95,7 +95,6 @@ module axis2mac # (
     // Local axis2ibuf
     //-------------------------------------------------------
     wire         [BW:0]      committed_prod;
-    wire                     req_ep_i;
 
     //-------------------------------------------------------
     // ibuf2mac
@@ -123,7 +122,6 @@ module axis2mac # (
     xge_ibuf #(.AW(BW), .DW(64)) ibuf_mod (
         .a(wr_addr),                                           // I [BW-1:0]
         .d(wr_data),                                           // I [63:0]
-        .we(wr_en),                                            // I
         .dpra(rd_addr),                                        // I [BW-1:0]
         .clk(s_axis_aclk),                                     // I 
         .qdpo_clk(mac_clk),                                    // I
@@ -157,7 +155,10 @@ module axis2mac # (
     //-------------------------------------------------------
     // axis2ibuf
     //-------------------------------------------------------
-    axis2ibuf #(.BW(BW)) axis2ibuf_mod (
+    axis2ibuf #(
+        .BW(BW),
+        .DST_PORT(DST_PORT)
+    ) axis2ibuf_mod (
         .s_axis_aclk(s_axis_aclk),                             // I
         .s_axis_aresetp(s_axis_aresetp),                       // I
         // AXIS
@@ -166,7 +167,7 @@ module axis2mac # (
         .s_axis_tuser(s_axis_tuser),                           // I [127:0]
         .s_axis_tvalid(s_axis_tvalid),                         // I
         .s_axis_tlast(s_axis_tlast),                           // I
-        .s_axis_tready(s_axis_tready)                          // O
+        .s_axis_tready(s_axis_tready),                         // O
         // ibuf2mac
         .committed_prod(committed_prod),                       // O [BW:0]
         .committed_cons(committed_cons_sync),                  // I [BW:0]

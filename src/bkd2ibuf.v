@@ -94,6 +94,7 @@ module bkd2ibuf # (
     reg          [BW:0]      aux_ts_wr_addr;
     reg          [BW:0]      diff;
     reg                      hst_rdy_reg0;
+    reg                      hst_rdy_reg1;
 
     ////////////////////////////////////////////////
     // Inbound ethernet frame to ibuf
@@ -111,6 +112,7 @@ module bkd2ibuf # (
             activity <= 1'b0;
 
             hst_rdy_reg0 <= hst_rdy;
+            hst_rdy_reg1 <= hst_rdy_reg0;
 
             case (rx_fsm)
 
@@ -122,7 +124,7 @@ module bkd2ibuf # (
                 end
 
                 s1 : begin
-                    if (hst_rdy_reg0) begin
+                    if (hst_rdy_reg1) begin
                         s_axis_tready <= 1'b1;
                         rx_fsm <= s2;
                     end

@@ -180,7 +180,7 @@ module mac2axis # (
         .m_axis_tuser(m_axis_tuser),                           // O [127:0]
         .m_axis_tvalid(m_axis_tvalid),                         // O
         .m_axis_tlast(m_axis_tlast),                           // O
-        .m_axis_tready(m_axis_tready)                          // I
+        .m_axis_tready(m_axis_tready),                         // I
         // mac2ibuf
         .committed_prod(committed_prod_sync),                  // I [BW:0]
         .committed_cons(committed_cons),                       // O [BW:0]

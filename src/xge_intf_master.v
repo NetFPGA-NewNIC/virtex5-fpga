@@ -58,6 +58,7 @@ module xge_intf_master # (
 
     input                    clk100,
     input                    dcm_rst_in,
+    output                   dcm_for_xaui_locked,
     output                   clk50,
     input                    clk250,
     output                   reset156_25,
@@ -98,10 +99,8 @@ module xge_intf_master # (
     // Local DCM for XAUI
     //-------------------------------------------------------
     //wire                     clk50;
-    wire                     dcm_for_xaui_locked;
+    //wire                     dcm_for_xaui_locked;
     //wire                     dcm_rst_in;
-    wire                     mac_clk;
-    wire                     mac_rst;
     wire                     clk156_25;
     //wire                     reset156_25;
 
@@ -166,10 +165,76 @@ module xge_intf_master # (
     wire                     mac_rx_bad_frame;
 
     //-------------------------------------------------------
+    // assigns - for testing only
+    //-------------------------------------------------------
+    // Clocking
+    //assign dcm_rst_in = 1'b0;
+    assign xaui_reset = ~dcm_for_xaui_locked;
+
+    // XAUI
+    assign xaui_txp = {xaui_tx_l3_p, xaui_tx_l2_p, xaui_tx_l1_p, xaui_tx_l0_p};
+    assign xaui_txn = {xaui_tx_l3_n, xaui_tx_l2_n, xaui_tx_l1_n, xaui_tx_l0_n};
+
+    assign {xaui_rx_l3_p, xaui_rx_l2_p, xaui_rx_l1_p, xaui_rx_l0_p} = xaui_rxp;
+    assign {xaui_rx_l3_n, xaui_rx_l2_n, xaui_rx_l1_n, xaui_rx_l0_n} = xaui_rxn;
+
+    // XAUI Loopback
+    //always @(posedge clk156_25) begin
+        //xgmii_txd <= xgmii_rxd;
+        //xgmii_txc <= xgmii_rxc;
+    //end
+
+    // XAUI Configuration
+    assign  xaui_signal_detect = 4'b1111;      //according to pg053
+    assign  xaui_configuration_vector = 7'b0;  //see pg053
+
+    // MDIO conf
+    assign host_clk = clk50;
+    assign host_reset = xaui_reset;
+    // MDIO interface
+    assign phy_mdio = mac_mdio_tri ? 1'bZ : mac_mdio_out;
+    assign mac_mdio_in = mac_mdio_out;
+
+    // MAC Configuration
+    assign mac_tx_ifg_delay = 8'b0;
+    assign mac_pause_val = 16'b0;
+    assign mac_pause_req = 1'b0;
+    
+    // When using The Management Interface the configuration vector interface doesn't exists
+    // -------------------------------------------------------------------------------------
+    // // Configuration vector ug148
+    // // -------------------------------------------------------------------------------------
+    // // Rx
+    // assign mac_configuration_vector[47:0] = 48'b0;  //Pause frame MAC Source Address
+    // assign mac_configuration_vector[48] = 1'b1;     //Receive VLAN Enable
+    // assign mac_configuration_vector[49] = 1'b1;     //Receive Enable
+    // assign mac_configuration_vector[50] = 1'b0;     //Receive In-Band FCS
+    // assign mac_configuration_vector[51] = 1'b0;     //Receive Jumbo Frame Enable
+    // assign mac_configuration_vector[52] = 1'b0;     //Receiver Reset
+    // assign mac_configuration_vector[60] = 1'b0;     //Receive Flow Control Enable
+    // assign mac_configuration_vector[66] = 1'b1;     //Receiver Preserve Preamble Enable
+    // assign mac_configuration_vector[67] = 1'b1;     //Receiver Length/Type Error Disable
+    // assign mac_configuration_vector[68] = 1'b0;     //Control Frame Length Check Disable
+    // // Tx
+    // assign mac_configuration_vector[53] = 1'b0;     //Transmitter LAN/WAN Mode
+    // assign mac_configuration_vector[54] = 1'b0;     //Transmitter Interframe Gap Adjust Enable
+    // assign mac_configuration_vector[55] = 1'b0;     //Transmitter VLAN Enable
+    // assign mac_configuration_vector[56] = 1'b1;     //Transmitter Enable
+    // assign mac_configuration_vector[57] = 1'b0;     //Transmitter In-Band FCS Enable
+    // assign mac_configuration_vector[58] = 1'b0;     //Transmitter Jumbo Frame Enable
+    // assign mac_configuration_vector[59] = 1'b0;     //Transmitter Reset
+    // assign mac_configuration_vector[61] = 1'b0;     //Transmit Flow Control Enable
+    // assign mac_configuration_vector[62] = 1'b1;     //Deficit Idle Count Enable
+    // assign mac_configuration_vector[63] = 1'b0;     //Reserved. Tie to ‘0.’
+    // assign mac_configuration_vector[64] = 1'b0;     //Reconciliation Sublayer Fault Inhibit
+    // assign mac_configuration_vector[65] = 1'b0;     //Transmitter Preserve Preamble Enable
+    // // -------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------
+    // When using The Management Interface the configuration vector interface doesn't exists
+
+    //-------------------------------------------------------
     // Virtex5-FX DCM for XAUI
     //-------------------------------------------------------
-    //assign dcm_rst_in = 1'b0;
-
     xaui_dcm dcm_for_xaui (
         .CLKIN_IN(clk100),                                     // I
         .RST_IN(dcm_rst_in),                                   // I
@@ -181,8 +246,6 @@ module xge_intf_master # (
     //-------------------------------------------------------
     // XAUI D
     //-------------------------------------------------------
-    assign xaui_reset = ~dcm_for_xaui_locked;
-
     xaui_example_design # (
         .REVERSE_LANES(XAUI_REVERSE_LANES)
     ) xaui_mod (
@@ -219,30 +282,10 @@ module xge_intf_master # (
         .status_vector(xaui_status_vector)                     // O [7:0]
         );
 
-    assign xaui_txp = {xaui_tx_l3_p, xaui_tx_l2_p, xaui_tx_l1_p, xaui_tx_l0_p};
-    assign xaui_txn = {xaui_tx_l3_n, xaui_tx_l2_n, xaui_tx_l1_n, xaui_tx_l0_n};
-
-    assign {xaui_rx_l3_p, xaui_rx_l2_p, xaui_rx_l1_p, xaui_rx_l0_p} = xaui_rxp;
-    assign {xaui_rx_l3_n, xaui_rx_l2_n, xaui_rx_l1_n, xaui_rx_l0_n} = xaui_rxn;
-
-    assign host_reset = xaui_reset;
-
-    // XAUI Loopback
-    //always @(posedge clk156_25) begin
-        //xgmii_txd <= xgmii_rxd;
-        //xgmii_txc <= xgmii_rxc;
-    //end
-
-    // XAUI Configuration
-    assign  xaui_signal_detect = 4'b1111;      //according to pg053
-    assign  xaui_configuration_vector = 7'b0;  //see pg053
-
     //-------------------------------------------------------
     // MAC
     //-------------------------------------------------------
-    assign host_clk = clk50;
-
-    xgmac_mdio mac_d (
+    xgmac_mdio mac_mod (
         .reset(reset156_25),                                   // I
         
         .tx_underrun(mac_tx_underrun),                         // I 
@@ -291,49 +334,6 @@ module xge_intf_master # (
         .mdio_tri(mac_mdio_tri)                                // O
         );
 
-    // MAC Configuration
-    assign mac_tx_ifg_delay = 8'b0;
-    assign mac_pause_val = 16'b0;
-    assign mac_pause_req = 1'b0;
-    
-    // When using The Management Interface the configuration vector interface doesn't exists
-    // -------------------------------------------------------------------------------------
-    // // Configuration vector ug148
-    // // -------------------------------------------------------------------------------------
-    // // Rx
-    // assign mac_configuration_vector[47:0] = 48'b0;  //Pause frame MAC Source Address
-    // assign mac_configuration_vector[48] = 1'b1;     //Receive VLAN Enable
-    // assign mac_configuration_vector[49] = 1'b1;     //Receive Enable
-    // assign mac_configuration_vector[50] = 1'b0;     //Receive In-Band FCS
-    // assign mac_configuration_vector[51] = 1'b0;     //Receive Jumbo Frame Enable
-    // assign mac_configuration_vector[52] = 1'b0;     //Receiver Reset
-    // assign mac_configuration_vector[60] = 1'b0;     //Receive Flow Control Enable
-    // assign mac_configuration_vector[66] = 1'b1;     //Receiver Preserve Preamble Enable
-    // assign mac_configuration_vector[67] = 1'b1;     //Receiver Length/Type Error Disable
-    // assign mac_configuration_vector[68] = 1'b0;     //Control Frame Length Check Disable
-    // // Tx
-    // assign mac_configuration_vector[53] = 1'b0;     //Transmitter LAN/WAN Mode
-    // assign mac_configuration_vector[54] = 1'b0;     //Transmitter Interframe Gap Adjust Enable
-    // assign mac_configuration_vector[55] = 1'b0;     //Transmitter VLAN Enable
-    // assign mac_configuration_vector[56] = 1'b1;     //Transmitter Enable
-    // assign mac_configuration_vector[57] = 1'b0;     //Transmitter In-Band FCS Enable
-    // assign mac_configuration_vector[58] = 1'b0;     //Transmitter Jumbo Frame Enable
-    // assign mac_configuration_vector[59] = 1'b0;     //Transmitter Reset
-    // assign mac_configuration_vector[61] = 1'b0;     //Transmit Flow Control Enable
-    // assign mac_configuration_vector[62] = 1'b1;     //Deficit Idle Count Enable
-    // assign mac_configuration_vector[63] = 1'b0;     //Reserved. Tie to ‘0.’
-    // assign mac_configuration_vector[64] = 1'b0;     //Reconciliation Sublayer Fault Inhibit
-    // assign mac_configuration_vector[65] = 1'b0;     //Transmitter Preserve Preamble Enable
-    // // -------------------------------------------------------------------------------------
-    // -------------------------------------------------------------------------------------
-    // When using The Management Interface the configuration vector interface doesn't exists
-
-    //-------------------------------------------------------
-    // MDIO interface
-    //-------------------------------------------------------
-    assign phy_mdio = mac_mdio_tri ? 1'bZ : mac_mdio_out;
-    assign mac_mdio_in = mac_mdio_out;
-
     //-------------------------------------------------------
     // mac_reset
     //-------------------------------------------------------
@@ -350,15 +350,15 @@ module xge_intf_master # (
         .BW(9)
     ) mac2axis_mod (
         // MAC rx
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
+        .mac_clk(clk156_25),                                   // I
+        .mac_rst(reset156_25),                                 // I
         .mac_rx_data(mac_rx_data),                             // I [63:0]
         .mac_rx_data_valid(mac_rx_data_valid),                 // I [7:0]
         .mac_rx_good_frame(mac_rx_good_frame),                 // I
         .mac_rx_bad_frame(mac_rx_bad_frame),                   // I
         // AXIS
         .m_axis_aclk(clk250),                                  // I
-        .m_axis_aresetp(mac_rst),                              // I
+        .m_axis_aresetp(reset156_25),                          // I
         .m_axis_tdata(m_axis_tdata),                           // O [63:0]
         .m_axis_tstrb(m_axis_tstrb),                           // O [7:0]
         .m_axis_tuser(m_axis_tuser),                           // O [127:0]
@@ -375,8 +375,8 @@ module xge_intf_master # (
         .DST_PORT(8'h80)
     ) axis2mac_mod (
         // MAC tx
-        .mac_clk(mac_clk),                                     // I
-        .mac_rst(mac_rst),                                     // I
+        .mac_clk(clk156_25),                                   // I
+        .mac_rst(reset156_25),                                 // I
         .mac_tx_underrun(mac_tx_underrun),                     // O
         .mac_tx_data(mac_tx_data),                             // O [63:0]
         .mac_tx_data_valid(mac_tx_data_valid),                 // O [7:0]
@@ -384,7 +384,7 @@ module xge_intf_master # (
         .mac_tx_ack(mac_tx_ack),                               // I
         // AXIS
         .s_axis_aclk(clk250),                                  // I
-        .s_axis_aresetp(mac_rst),                              // I
+        .s_axis_aresetp(reset156_25),                          // I
         .s_axis_tdata(s_axis_tdata),                           // I [63:0]
         .s_axis_tstrb(s_axis_tstrb),                           // I [7:0]
         .s_axis_tuser(s_axis_tuser),                           // I [127:0]

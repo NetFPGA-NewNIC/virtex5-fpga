@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module ibuf2axis # (
+module axis2ibuf # (
     parameter BW = 10,
     parameter DST_PORT = 8'h00
     ) (
@@ -65,7 +65,7 @@ module ibuf2axis # (
 
     // ibuf
     output       [BW-1:0]    wr_addr,
-    output       [63:0]      wr_data
+    output reg   [63:0]      wr_data
     );
 
     // localparam
@@ -82,7 +82,7 @@ module ibuf2axis # (
     localparam MAX_DIFF = (2**BW) - 10;
 
     //-------------------------------------------------------
-    // Local ibuf2axis
+    // Local axis2ibuf
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [BW:0]      diff;
@@ -96,7 +96,7 @@ module ibuf2axis # (
     assign committed_prod = wr_addr_i;
 
     ////////////////////////////////////////////////
-    // ibuf2axis
+    // axis2ibuf
     ////////////////////////////////////////////////
     always @(posedge s_axis_aclk or posedge s_axis_aresetp) begin
 

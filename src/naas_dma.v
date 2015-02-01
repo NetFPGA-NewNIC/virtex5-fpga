@@ -53,6 +53,7 @@ module naas_dma (
     input        [7:0]       pci_exp_rxp,
     input        [7:0]       pci_exp_rxn,
     output                   pcie_clk,
+    output                   pcie_rst,
 
     // BKD
     input                    bkd_clk,

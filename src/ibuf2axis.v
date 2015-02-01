@@ -84,6 +84,7 @@ module ibuf2axis # (
     reg          [7:0]       snd_fsm;
     reg          [15:0]      len;
     reg          [BW:0]      rd_addr_i;
+    reg          [BW:0]      diff;
     reg          [7:0]       last_tstrb;
     reg          [12:0]      qw_len;
     reg          [12:0]      qw_snt;
@@ -127,12 +128,12 @@ module ibuf2axis # (
                 end
 
                 s2 : begin
-                    if (len_i[2:0]) begin
-                        qw_len <= len_i[15:3] + 1;
+                    if (len[2:0]) begin
+                        qw_len <= len[15:3] + 1;
                     end
 
                     (* parallel_case *)
-                    case (len_i[2:0])                    // my deco
+                    case (len[2:0])                    // my deco
                         3'b000 : begin
                             last_tstrb <= 8'b11111111;
                         end

@@ -93,6 +93,7 @@ module top (
     //-------------------------------------------------------
     wire                     clk50;
     wire                     reset156_25;
+    wire                     dcm_for_xaui_locked;
     // MAC tx
     wire         [63:0]      m_axis_D_tdata;
     wire         [7:0]       m_axis_D_tstrb;
@@ -117,6 +118,7 @@ module top (
     // Local DMA
     //-------------------------------------------------------
     wire                     pcie_clk;
+    wire                     pcie_rst;
     // Tx
     wire         [63:0]      M_AXIS_TDATA_DMA;
     wire         [7:0]       M_AXIS_TSTRB_DMA;
@@ -134,6 +136,8 @@ module top (
     wire                     S_AXIS_TREADY_DMA;
     wire                     S_AXIS_ARESETN_DMA;
     // REGIF
+    wire                     M_AXI_LITE_ACLK;
+    wire                     M_AXI_LITE_ARESETN;
     wire                     IP2Bus_MstRd_Req;
     wire                     IP2Bus_MstWr_Req;
     wire         [31:0]      IP2Bus_Mst_Addr;
@@ -153,35 +157,76 @@ module top (
     //-------------------------------------------------------
     // assigns - for testing only
     //-------------------------------------------------------
+    assign M_AXI_LITE_ACLK = 1'b0;
+    assign M_AXI_LITE_ARESETN = 1'b1;
     assign M_AXIS_TREADY_DMA = s_axis_A_tready | s_axis_D_tready;
+
+    assign S_AXIS_TDATA_DMA = m_axis_A_tdata;
+    assign S_AXIS_TSTRB_DMA = m_axis_A_tstrb;
+    assign S_AXIS_TUSER_DMA = m_axis_A_tuser;
+    assign S_AXIS_TVALID_DMA = m_axis_A_tvalid;
+    assign S_AXIS_TLAST_DMA = m_axis_A_tlast;
+    assign m_axis_A_tready = S_AXIS_TREADY_DMA;
 
     //-------------------------------------------------------
     // MXR - for testing only
     //-------------------------------------------------------
-    mxr mxr_mod (
-        .clk(pcie_clk),                                        // I
-        .arst(reset156_25),                                    // I  // To simulate nf10 environment
-        // MAC A
-        .s_axis_A_tdata(s_axis_A_tdata),                       // I [63:0]
-        .s_axis_A_tstrb(s_axis_A_tstrb),                       // I [7:0]
-        .s_axis_A_tuser(s_axis_A_tuser),                       // I [127:0]
-        .s_axis_A_tvalid(s_axis_A_tvalid),                     // I
-        .s_axis_A_tlast(s_axis_A_tlast),                       // I
-        .s_axis_A_tready(s_axis_A_tready),                     // O
-        // MAC D
-        .s_axis_D_tdata(s_axis_D_tdata),                       // I [63:0]
-        .s_axis_D_tstrb(s_axis_D_tstrb),                       // I [7:0]
-        .s_axis_D_tuser(s_axis_D_tuser),                       // I [127:0]
-        .s_axis_D_tvalid(s_axis_D_tvalid),                     // I
-        .s_axis_D_tlast(s_axis_D_tlast),                       // I
-        .s_axis_D_tready(s_axis_D_tready),                     // O
-        // 2DMA
-        .m_axis_tdata(S_AXIS_TDATA_DMA),                       // O [63:0]
-        .m_axis_tstrb(S_AXIS_TSTRB_DMA),                       // O [7:0]
-        .m_axis_tuser(S_AXIS_TUSER_DMA),                       // O [127:0]
-        .m_axis_tvalid(S_AXIS_TVALID_DMA),                     // O
-        .m_axis_tlast(S_AXIS_TLAST_DMA),                       // O
-        .m_axis_tready(S_AXIS_TREADY_DMA)                      // I
+    //mxr mxr_mod (
+    //    .clk(pcie_clk),                                        // I
+    //    .arst(reset156_25),                                    // I  // To simulate nf10 environment
+    //    // MAC A
+    //    .s_axis_A_tdata(m_axis_A_tdata),                       // I [63:0]
+    //    .s_axis_A_tstrb(m_axis_A_tstrb),                       // I [7:0]
+    //    .s_axis_A_tuser(m_axis_A_tuser),                       // I [127:0]
+    //    .s_axis_A_tvalid(m_axis_A_tvalid),                     // I
+    //    .s_axis_A_tlast(m_axis_A_tlast),                       // I
+    //    .s_axis_A_tready(m_axis_A_tready),                     // O
+    //    // MAC D
+    //    .s_axis_D_tdata(m_axis_D_tdata),                       // I [63:0]
+    //    .s_axis_D_tstrb(m_axis_D_tstrb),                       // I [7:0]
+    //    .s_axis_D_tuser(m_axis_D_tuser),                       // I [127:0]
+    //    .s_axis_D_tvalid(m_axis_D_tvalid),                     // I
+    //    .s_axis_D_tlast(m_axis_D_tlast),                       // I
+    //    .s_axis_D_tready(m_axis_D_tready),                     // O
+    //    // 2DMA
+    //    .m_axis_tdata(S_AXIS_TDATA_DMA),                       // O [63:0]
+    //    .m_axis_tstrb(S_AXIS_TSTRB_DMA),                       // O [7:0]
+    //    .m_axis_tuser(S_AXIS_TUSER_DMA),                       // O [127:0]
+    //    .m_axis_tvalid(S_AXIS_TVALID_DMA),                     // O
+    //    .m_axis_tlast(S_AXIS_TLAST_DMA),                       // O
+    //    .m_axis_tready(S_AXIS_TREADY_DMA)                      // I
+    //    );
+
+    //-------------------------------------------------------
+    // xge_intf A
+    //-------------------------------------------------------
+    xge_intf # (
+        .XAUI_REVERSE_LANES(1),
+        .DST_PORT(8'h02)
+    ) xge_intf_A (
+        .refclk_p(refclk_A_p),                                 // I
+        .refclk_n(refclk_A_n),                                 // I
+        .xaui_txp(xaui_A_txp),                                 // O [3:0]
+        .xaui_txn(xaui_A_txn),                                 // O [3:0]
+        .xaui_rxp(xaui_A_rxp),                                 // I [3:0]
+        .xaui_rxn(xaui_A_rxn),                                 // I [3:0]
+        .dcm_for_xaui_locked(dcm_for_xaui_locked),             // I
+        .clk50(clk50),                                         // I
+        .clk250(pcie_clk),                                     // I
+        // MAC tx
+        .s_axis_tdata(M_AXIS_TDATA_DMA),                       // I [63:0]
+        .s_axis_tstrb(M_AXIS_TSTRB_DMA),                       // I [7:0]
+        .s_axis_tuser(M_AXIS_TUSER_DMA),                       // I [127:0]
+        .s_axis_tvalid(M_AXIS_TVALID_DMA),                     // I
+        .s_axis_tlast(M_AXIS_TLAST_DMA),                       // I
+        .s_axis_tready(s_axis_A_tready),                       // O
+        // MAC rx
+        .m_axis_tdata(m_axis_A_tdata),                         // O [63:0]
+        .m_axis_tstrb(m_axis_A_tstrb),                         // O [7:0]
+        .m_axis_tuser(m_axis_A_tuser),                         // O [127:0]
+        .m_axis_tvalid(m_axis_A_tvalid),                       // O
+        .m_axis_tlast(m_axis_A_tlast),                         // O
+        .m_axis_tready(m_axis_A_tready)                        // I
         );
 
     //-------------------------------------------------------
@@ -199,6 +244,7 @@ module top (
         .xaui_rxn(xaui_D_rxn),                                 // I [3:0]
         .clk100(usr_100MHz),                                   // I
         .dcm_rst_in(1'b0),                                     // I         // We should use pcie_rst, but we are simulating nf10
+        .dcm_for_xaui_locked(dcm_for_xaui_locked),             // O
         .clk50(clk50),                                         // O
         .clk250(pcie_clk),                                     // I
         .reset156_25(reset156_25),                             // O
@@ -243,9 +289,10 @@ module top (
         .pci_exp_rxp(pci_exp_rxp),                             // I [7:0]
         .pci_exp_rxn(pci_exp_rxn),                             // I [7:0]
         .pcie_clk(pcie_clk),                                   // O
+        .pcie_rst(pcie_rst),                                   // O
         // BKD
         .bkd_clk(pcie_clk),                                    // I
-        .bkd_rst(pcie_clk),                                    // I
+        .bkd_rst(pcie_rst),                                    // I
         // BKD tx
         .m_axis_tdata(M_AXIS_TDATA_DMA),                       // O [63:0]
         .m_axis_tstrb(M_AXIS_TSTRB_DMA),                       // O [7:0]

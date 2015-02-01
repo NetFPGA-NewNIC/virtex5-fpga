@@ -54,7 +54,7 @@ module mxr (
     input        [127:0]     s_axis_A_tuser,
     input                    s_axis_A_tvalid,
     input                    s_axis_A_tlast,
-    output reg               s_axis_A_tready,
+    output                   s_axis_A_tready,
 
     // MAC D
     input        [63:0]      s_axis_D_tdata,
@@ -62,14 +62,14 @@ module mxr (
     input        [127:0]     s_axis_D_tuser,
     input                    s_axis_D_tvalid,
     input                    s_axis_D_tlast,
-    output reg               s_axis_D_tready,
+    output                   s_axis_D_tready,
 
     // 2DMA
-    output reg   [63:0]      m_axis_tdata,
-    output reg   [7:0]       m_axis_tstrb,
-    output reg   [127:0]     m_axis_tuser,
-    output reg               m_axis_tvalid,
-    output reg               m_axis_tlast,
+    output       [63:0]      m_axis_tdata,
+    output       [7:0]       m_axis_tstrb,
+    output       [127:0]     m_axis_tuser,
+    output                   m_axis_tvalid,
+    output                   m_axis_tlast,
     input                    m_axis_tready
     );
 
@@ -89,6 +89,36 @@ module mxr (
     //-------------------------------------------------------   
     reg          [7:0]       arb_fsm;
     reg                      turn_bit;
+    reg                      en;
+
+    ////////////////////////////////////////////////
+    // MUX
+    ////////////////////////////////////////////////
+    always @(*) begin
+        case (turn_bit)
+
+            1'b0 : begin
+                m_axis_tdata <= s_axis_A_tdata;
+                m_axis_tstrb <= s_axis_A_tstrb;
+                m_axis_tuser <= s_axis_A_tuser;
+                m_axis_tvalid <= s_axis_A_tvalid;
+                m_axis_tlast <= s_axis_A_tlast;
+                s_axis_A_tready <= m_axis_tready & en;
+                s_axis_D_tready <= 1'b0;
+            end
+
+            1'b1 : begin
+                m_axis_tdata <= s_axis_D_tdata;
+                m_axis_tstrb <= s_axis_D_tstrb;
+                m_axis_tuser <= s_axis_D_tuser;
+                m_axis_tvalid <= s_axis_D_tvalid;
+                m_axis_tlast <= s_axis_D_tlast;
+                s_axis_D_tready <= m_axis_tready & en;
+                s_axis_A_tready <= 1'b0;
+            end
+
+        endcase
+    end  //always
 
     ////////////////////////////////////////////////
     // ARB
@@ -96,9 +126,7 @@ module mxr (
     always @(posedge clk or posedge arst) begin
 
         if (arst) begin  // rst
-            s_axis_A_tready <= 1'b0;
-            s_axis_D_tready <= 1'b0;
-            m_axis_tvalid <= 1'b0;
+            en <= 1'b0;
             arb_fsm <= s0;
         end
         
@@ -107,7 +135,26 @@ module mxr (
             case (arb_fsm)
 
                 s0 : begin
+                    en <= 1'b1;
                     arb_fsm <= s1;
+                end
+
+                s1 : begin
+                    if (m_axis_tvalid && m_axis_tready) begin
+                        arb_fsm <= s2;
+                    end
+                end
+
+                s2 : begin
+                    if (m_axis_tvalid && m_axis_tready && m_axis_tlast) begin
+                        arb_fsm <= s2;
+                    end
+                end
+
+                s1 : begin
+                    if (!m_axis_tvalid || !m_axis_tready) begin
+                        turn_bit <= ~turn_bit;
+                    end
                 end
 
                 s1 : begin
