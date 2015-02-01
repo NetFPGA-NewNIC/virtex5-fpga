@@ -198,6 +198,7 @@ module ibuf2axis # (
                         m_axis_tdata <= ax_rd_data;
                         qw_snt <= qw_snt + 1;
                         if (qw_len == qw_snt) begin
+                            rd_addr_i <= rd_addr_i;
                             m_axis_tstrb <= last_tstrb;
                             m_axis_tlast <= 1'b1;
                             snd_fsm <= s6;

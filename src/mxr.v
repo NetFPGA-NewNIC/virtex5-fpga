@@ -101,7 +101,7 @@ module mxr (
                 m_axis_tdata <= s_axis_A_tdata;
                 m_axis_tstrb <= s_axis_A_tstrb;
                 m_axis_tuser <= s_axis_A_tuser;
-                m_axis_tvalid <= s_axis_A_tvalid;
+                m_axis_tvalid <= s_axis_A_tvalid & en;
                 m_axis_tlast <= s_axis_A_tlast;
                 s_axis_A_tready <= m_axis_tready & en;
                 s_axis_D_tready <= 1'b0;
@@ -111,7 +111,7 @@ module mxr (
                 m_axis_tdata <= s_axis_D_tdata;
                 m_axis_tstrb <= s_axis_D_tstrb;
                 m_axis_tuser <= s_axis_D_tuser;
-                m_axis_tvalid <= s_axis_D_tvalid;
+                m_axis_tvalid <= s_axis_D_tvalid & en;
                 m_axis_tlast <= s_axis_D_tlast;
                 s_axis_D_tready <= m_axis_tready & en;
                 s_axis_A_tready <= 1'b0;
@@ -143,51 +143,14 @@ module mxr (
                     if (m_axis_tvalid && m_axis_tready) begin
                         arb_fsm <= s2;
                     end
-                end
-
-                s2 : begin
-                    if (m_axis_tvalid && m_axis_tready && m_axis_tlast) begin
-                        arb_fsm <= s2;
-                    end
-                end
-
-                s1 : begin
-                    if (!m_axis_tvalid || !m_axis_tready) begin
+                    else begin
                         turn_bit <= ~turn_bit;
                     end
                 end
 
-                s1 : begin
-                    if (s_axis_A_tvalid) begin
-                        m_axis_tdata <= s_axis_A_tdata;
-                        m_axis_tstrb <= s_axis_A_tstrb;
-                        m_axis_tuser <= s_axis_A_tuser;
-                        m_axis_tvalid <= s_axis_A_tvalid;
-                        m_axis_tlast <= s_axis_A_tlast;
-                        s_axis_A_tready <= m_axis_tready;
-                        arb_fsm <= s2;
-                    end
-                    else if (s_axis_D_tvalid) begin
-                        m_axis_tdata <= s_axis_D_tdata;
-                        m_axis_tstrb <= s_axis_D_tstrb;
-                        m_axis_tuser <= s_axis_D_tuser;
-                        m_axis_tvalid <= s_axis_D_tvalid;
-                        m_axis_tlast <= s_axis_D_tlast;
-                        s_axis_D_tready <= m_axis_tready;
-                        arb_fsm <= s2;
-                    end
-                    else begin
-                        s_axis_A_tready <= 1'b0;
-                        s_axis_D_tready <= 1'b0;
-                        m_axis_tvalid <= 1'b0;
-                    end
-                end
-
                 s2 : begin
                     if (m_axis_tvalid && m_axis_tready && m_axis_tlast) begin
-                        s_axis_A_tready <= 1'b0;
-                        s_axis_D_tready <= 1'b0;
-                        m_axis_tvalid <= 1'b0;
+                        turn_bit <= ~turn_bit;
                         arb_fsm <= s1;
                     end
                 end
