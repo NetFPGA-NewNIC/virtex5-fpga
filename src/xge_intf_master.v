@@ -372,7 +372,7 @@ module xge_intf_master # (
     //-------------------------------------------------------
     axis2mac #(
         .BW(9),
-        .DST_PORT(8'h80)
+        .DST_PORT(DST_PORT)
     ) axis2mac_mod (
         // MAC tx
         .mac_clk(clk156_25),                                   // I

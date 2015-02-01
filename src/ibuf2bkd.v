@@ -220,7 +220,7 @@ module ibuf2bkd # (
                     if (m_axis_tready) begin
                         m_axis_tlast <= 1'b0;
                         m_axis_tvalid <= 1'b0;
-                        if (diff) begin
+                        if (diff > 'h2) begin
                             rd_addr_i <= rd_addr_i + 1;
                             snd_fsm <= s2;
                         end
