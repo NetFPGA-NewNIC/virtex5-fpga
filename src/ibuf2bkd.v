@@ -84,6 +84,8 @@ module ibuf2bkd # (
     //-------------------------------------------------------   
     reg          [8:0]       snd_fsm;
     reg          [15:0]      len;
+    reg          [7:0]       src_port;
+    reg          [7:0]       des_port;
     reg          [BW:0]      rd_addr_i;
     reg          [BW:0]      diff;
     reg          [7:0]       last_tstrb;
@@ -120,6 +122,8 @@ module ibuf2bkd # (
                 end
 
                 s1 : begin
+                    src_port <= rd_data[7:0];
+                    des_port <= rd_data[23:16];
                     len <= rd_data[47:32];
                     qw_len <= rd_data[47:35];
                     if (diff > 'h2) begin
@@ -167,7 +171,7 @@ module ibuf2bkd # (
                 s3 : begin
                     m_axis_tdata <= rd_data;
                     m_axis_tstrb <= 8'hFF;
-                    m_axis_tuser[15:0] <= len;
+                    m_axis_tuser[31:0] <= {des_port, src_port, len};
                     m_axis_tvalid <= 1'b1;
                     m_axis_tlast <= 1'b0;
                     rd_addr_i <= rd_addr_i + 1;
@@ -208,13 +212,19 @@ module ibuf2bkd # (
                             m_axis_tlast <= 1'b1;
                             snd_fsm <= s6;
                         end
-                        else begin
+                        else if (diff) begin
                             snd_fsm <= s4;
+                        end
+                        else begin
+                            rd_addr_i <= rd_addr_i;
+                            snd_fsm <= s7;
                         end
                     end
                 end
 
                 s6 : begin
+                    src_port <= rd_data[7:0];
+                    des_port <= rd_data[23:16];
                     len <= rd_data[47:32];
                     qw_len <= rd_data[47:35];
                     if (m_axis_tready) begin

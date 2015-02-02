@@ -86,6 +86,7 @@ module axis2ibuf # (
     //-------------------------------------------------------
     reg          [7:0]       rx_fsm;
     reg          [BW:0]      diff;
+    reg          [BW:0]      ax_wr_addr;
     reg          [BW:0]      wr_addr_i;
     reg          [63:0]      ax_wr_data;
 
@@ -93,7 +94,7 @@ module axis2ibuf # (
     // assigns
     //-------------------------------------------------------
     assign wr_addr = wr_addr_i;
-    assign committed_prod = wr_addr_i;
+    assign committed_prod = ax_wr_addr;
 
     ////////////////////////////////////////////////
     // axis2ibuf
@@ -106,13 +107,13 @@ module axis2ibuf # (
         end
         
         else begin  // not rst
-            
-            diff <= wr_addr_i + (~committed_cons) +1;
+
+            diff <= ax_wr_addr + (~committed_cons) +1;
 
             case (rx_fsm)
 
                 s0 : begin
-                    wr_addr_i <= 'b0;
+                    ax_wr_addr <= 'b0;
                     diff <= 'b0;
                     s_axis_tready <= 1'b1;
                     rx_fsm <= s1;
@@ -121,8 +122,10 @@ module axis2ibuf # (
                 s1 : begin
                     wr_data <= {1'b0, 15'b0, s_axis_tuser[15:0], 8'b0, 8'b0, 8'b0, 8'b0};
                     ax_wr_data <= s_axis_tdata;
+                    wr_addr_i <= ax_wr_addr;
                     if (s_axis_tvalid && !s_axis_tlast) begin
-                        if (s_axis_tuser[31:24] == DST_PORT) begin
+                        if (s_axis_tuser[23:16] == DST_PORT) begin
+                            ax_wr_addr <= ax_wr_addr + 1;
                             s_axis_tready <= 1'b0;
                             rx_fsm <= s2;
                         end
@@ -134,15 +137,17 @@ module axis2ibuf # (
 
                 s2 : begin
                     wr_data <= ax_wr_data;
-                    wr_addr_i <= wr_addr_i + 1;
+                    wr_addr_i <= ax_wr_addr;
+                    ax_wr_addr <= ax_wr_addr + 1;
                     s_axis_tready <= 1'b1;
                     rx_fsm <= s3;
                 end
 
                 s3 : begin
                     wr_data <= s_axis_tdata;
+                    wr_addr_i <= ax_wr_addr;
                     if (s_axis_tvalid) begin
-                        wr_addr_i <= wr_addr_i + 1;
+                        ax_wr_addr <= ax_wr_addr + 1;
                     end
 
                     if (s_axis_tvalid && s_axis_tlast) begin

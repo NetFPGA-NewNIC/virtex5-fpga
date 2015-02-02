@@ -90,8 +90,8 @@ module bkd2ibuf # (
     reg          [7:0]       src_port;
     reg          [7:0]       des_port;
     reg          [63:0]      timestamp;
-    reg          [BW:0]      aux_wr_addr;
-    reg          [BW:0]      aux_ts_wr_addr;
+    reg          [BW:0]      ax_wr_addr;
+    reg          [BW:0]      ax_ts_wr_addr;
     reg          [BW:0]      diff;
     reg                      hst_rdy_reg0;
     reg                      hst_rdy_reg1;
@@ -108,7 +108,7 @@ module bkd2ibuf # (
         
         else begin  // not rst
             
-            diff <= aux_wr_addr + (~committed_cons) +1;
+            diff <= ax_wr_addr + (~committed_cons) +1;
             activity <= 1'b0;
 
             hst_rdy_reg0 <= hst_rdy;
@@ -119,7 +119,7 @@ module bkd2ibuf # (
                 s0 : begin
                     committed_prod <= 'b0;
                     hst_rdy_reg0 <= 1'b0;
-                    aux_wr_addr <= 'h1;
+                    ax_wr_addr <= 'h1;
                     rx_fsm <= s1;
                 end
 
@@ -155,9 +155,9 @@ module bkd2ibuf # (
                     timestamp <= s_axis_tuser[95:32];
                     
                     wr_data <= s_axis_tdata;
-                    wr_addr <= aux_wr_addr;
+                    wr_addr <= ax_wr_addr;
                     if (s_axis_tvalid) begin
-                        aux_wr_addr <= aux_wr_addr +1;
+                        ax_wr_addr <= ax_wr_addr +1;
                         rx_fsm <= s5;
                     end
                 end
@@ -165,9 +165,9 @@ module bkd2ibuf # (
                 s5 : begin
                     activity <= 1'b1;
                     wr_data <= s_axis_tdata;
-                    wr_addr <= aux_wr_addr;
+                    wr_addr <= ax_wr_addr;
                     if (s_axis_tvalid) begin
-                        aux_wr_addr <= aux_wr_addr +1;
+                        ax_wr_addr <= ax_wr_addr +1;
                     end
 
                     if (s_axis_tlast && s_axis_tvalid) begin
@@ -186,17 +186,17 @@ module bkd2ibuf # (
                     wr_data <= {1'b0, 15'b0, len, 8'b0, 8'b0, 8'b0, 8'b0};
                     wr_addr <= committed_prod;
 
-                    committed_prod <= aux_wr_addr;            // commit the packet
-                    aux_wr_addr <= aux_wr_addr +1;
-                    aux_ts_wr_addr <= committed_prod +1;
+                    committed_prod <= ax_wr_addr;            // commit the packet
+                    ax_wr_addr <= ax_wr_addr +1;
+                    ax_ts_wr_addr <= committed_prod +1;
                     s_axis_tready <= 1'b1;
                     rx_fsm <= s4;
                 end
 
                 //s5 : begin
                 //    wr_data <= timestamp;
-                //    wr_addr <= aux_ts_wr_addr;
-                //    aux_wr_addr <= aux_wr_addr +1;
+                //    wr_addr <= ax_ts_wr_addr;
+                //    ax_wr_addr <= ax_wr_addr +1;
                 //    s_axis_tready <= 1'b1;
                 //    rx_fsm <= s2;
                 //end

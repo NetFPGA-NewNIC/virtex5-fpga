@@ -159,8 +159,8 @@ module top (
     //-------------------------------------------------------
     assign M_AXI_LITE_ACLK = 1'b0;
     assign M_AXI_LITE_ARESETN = 1'b1;
-    //assign M_AXIS_TREADY_DMA = s_axis_A_tready & s_axis_D_tready;
-    assign M_AXIS_TREADY_DMA = 1'b1;
+    assign M_AXIS_TREADY_DMA = s_axis_A_tready & s_axis_D_tready;
+    //assign M_AXIS_TREADY_DMA = 1'b1;
 
     //assign S_AXIS_TDATA_DMA = m_axis_A_tdata;
     //assign S_AXIS_TSTRB_DMA = m_axis_A_tstrb;
