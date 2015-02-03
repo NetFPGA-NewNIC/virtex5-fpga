@@ -44,7 +44,8 @@
 //`default_nettype none
 
 module ibuf2axis # (
-    parameter BW = 10
+    parameter BW = 10,
+    parameter DST_PORT = 8'h00
     ) (
 
     input                    m_axis_aclk,
@@ -166,7 +167,7 @@ module ibuf2axis # (
                 s3 : begin
                     m_axis_tdata <= rd_data;
                     m_axis_tstrb <= 8'hFF;
-                    m_axis_tuser[15:0] <= len;
+                    m_axis_tuser[31:0] <= {DST_PORT, 8'b0, len};
                     m_axis_tvalid <= 1'b1;
                     m_axis_tlast <= 1'b0;
                     rd_addr_i <= rd_addr_i + 1;

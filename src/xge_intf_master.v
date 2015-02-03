@@ -347,7 +347,8 @@ module xge_intf_master # (
     // mac2axis
     //-------------------------------------------------------
     mac2axis #(
-        .BW(9)
+        .BW(9),
+        .DST_PORT(DST_PORT)
     ) mac2axis_mod (
         // MAC rx
         .mac_clk(clk156_25),                                   // I

@@ -182,8 +182,8 @@ module bkd2ibuf # (
 
                 s6 : begin
                     activity <= 1'b1;
-                    //wr_data <= {1'b0, 15'b0, len, 8'b0, des_port, 8'b0, src_port};
-                    wr_data <= {1'b0, 15'b0, len, 8'b0, 8'b0, 8'b0, 8'b0};
+                    wr_data <= {1'b0, 15'b0, len, 8'b0, des_port, 8'b0, src_port};
+                    //wr_data <= {1'b0, 15'b0, len, 8'b0, 8'b0, 8'b0, 8'b0};
                     wr_addr <= committed_prod;
 
                     committed_prod <= ax_wr_addr;            // commit the packet

@@ -44,7 +44,8 @@
 //`default_nettype none
 
 module mac2axis # (
-    parameter BW = 10
+    parameter BW = 10,
+    parameter DST_PORT = 8'h00
     ) (
 
     // MAC rx
@@ -171,7 +172,10 @@ module mac2axis # (
     //-------------------------------------------------------
     // ibuf2axis
     //-------------------------------------------------------
-    ibuf2axis #(.BW(BW)) ibuf2axis_mod (
+    ibuf2axis #(
+        .BW(BW),
+        .DST_PORT(DST_PORT)
+    ) ibuf2axis_mod (
         .m_axis_aclk(m_axis_aclk),                             // I
         .m_axis_aresetp(m_axis_aresetp),                       // I
         // AXIS
