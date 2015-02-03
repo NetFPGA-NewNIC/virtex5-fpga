@@ -282,7 +282,7 @@ module top (
     // NAAS_DMA
     //-------------------------------------------------------
     naas_dma_v5 #(
-        .CHN0_RX_CONFIG_TIMESTAMP(1),
+        .CHN0_RX_CONFIG_TIMESTAMP(0),
         .CONFIG_MDIO_IF(1),
         .CONFIG_REGIF(1)
     ) naas_dma_mod (
