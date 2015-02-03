@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module chn # ( 
+module chn # (
     parameter BARHIT = 2,
     // Tx
     parameter TX_BARMP_CPL_ADDR = 6'b111111,
@@ -65,7 +65,8 @@ module chn # (
     // RQ_TAG_BASE
     parameter RQTB = 5'b11000,
     // Outstanding request width
-    parameter OSRW = 3
+    parameter OSRW = 3,
+    parameter RX_CONFIG_TIMESTAMP = 0
     ) (
 
     input                    bkd_clk,
@@ -249,7 +250,8 @@ module chn # (
         .BARMP_LBUF2_EN(RX_BARMP_LBUF2_EN),
         .BARMP_WRBCK(RX_BARMP_WRBCK),
         // MISC
-        .BW(9)
+        .BW(9),
+        .CONFIG_TIMESTAMP(RX_CONFIG_TIMESTAMP)
     ) rx_mod (
         .bkd_clk(bkd_clk),                                     // I
         .bkd_rst(bkd_rst),                                     // I

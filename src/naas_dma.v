@@ -43,7 +43,11 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module naas_dma (
+module naas_dma # (
+    parameter CHN0_RX_CONFIG_TIMESTAMP = 0,
+    parameter CONFIG_MDIO_IF = 1,
+    parameter CONFIG_REGIF = 0
+    ) (
 
     // PCIe
     input                    sys_clk_p,
@@ -402,7 +406,8 @@ module naas_dma (
         // RQ_TAG_BASE
         .RQTB(5'b11100),
         // Outstanding request width
-        .OSRW(2)
+        .OSRW(2),
+        .RX_CONFIG_TIMESTAMP(CHN0_RX_CONFIG_TIMESTAMP)
     ) chn0 (
         .bkd_clk(bkd_clk),                                     // I
         .bkd_rst(bkd_rst),                                     // I
@@ -454,6 +459,7 @@ module naas_dma (
     //-------------------------------------------------------
     // MDIO conf
     //-------------------------------------------------------
+    generate if (CONFIG_MDIO_IF) begin
     mdioconf #(
         .BARHIT(0),
         .BARMP_WRREG(6'b000100)
@@ -483,10 +489,15 @@ module naas_dma (
         .host_req(mac_host_req),                               // O
         .host_miim_rdy(mac_host_miim_rdy)                      // I
         );
+    end
+    else begin
+        assign mdio_cfg_interrupt_n = 1'b1; 
+    end endgenerate
 
     //-------------------------------------------------------
     // REGIF
     //-------------------------------------------------------
+    generate if (CONFIG_REGIF) begin
     regif #(
         .BARHIT(0),
         // WRIF
@@ -541,6 +552,16 @@ module naas_dma (
         .chn_drvn(regif_drvn),                                 // O
         .chn_reqep(regif_reqep)                                // O
         );
+    end
+    else begin
+        assign regif_drvn = 1'b0;
+        assign regif_reqep = 1'b0;
+        assign regif_trn_td = 'b0;
+        assign regif_trn_trem_n = 'hFF;
+        assign regif_trn_tsof_n = 1'b1;
+        assign regif_trn_teof_n = 1'b1;
+        assign regif_trn_tsrc_rdy_n = 1'b1;
+    end endgenerate
 
 endmodule // naas_dma
 

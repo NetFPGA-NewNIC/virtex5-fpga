@@ -52,7 +52,8 @@ module rx # (
     parameter BARMP_LBUF2_EN = 6'bxxxxxx,
     parameter BARMP_WRBCK = 6'bxxxxxx,
     // MISC
-    parameter BW = 10
+    parameter BW = 10,
+    parameter CONFIG_TIMESTAMP = 0
     ) (
 
     input                    bkd_clk,
@@ -160,7 +161,10 @@ module rx # (
     //-------------------------------------------------------
     // bkd2ibuf
     //-------------------------------------------------------
-    bkd2ibuf #(.BW(BW)) bkd2ibuf_mod (
+    bkd2ibuf #(
+        .BW(BW),
+        .CONFIG_TIMESTAMP(CONFIG_TIMESTAMP)
+    ) bkd2ibuf_mod (
         .clk(bkd_clk),                                         // I
         .rst(bkd_rst),                                         // I
         // BKD rx

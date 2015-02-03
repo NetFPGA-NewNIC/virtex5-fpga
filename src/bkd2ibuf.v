@@ -44,7 +44,8 @@
 //`default_nettype none
 
 module bkd2ibuf # (
-    parameter BW = 10
+    parameter BW = 10,
+    parameter CONFIG_TIMESTAMP = 0
     ) (
 
     input                    clk,
@@ -93,6 +94,7 @@ module bkd2ibuf # (
     reg          [BW:0]      ax_wr_addr;
     reg          [BW:0]      ax_ts_wr_addr;
     reg          [BW:0]      diff;
+    reg          [BW:0]      nxt_committed_prod;
     reg                      hst_rdy_reg0;
     reg                      hst_rdy_reg1;
 
@@ -183,23 +185,31 @@ module bkd2ibuf # (
                 s6 : begin
                     activity <= 1'b1;
                     wr_data <= {1'b0, 15'b0, len, 8'b0, des_port, 8'b0, src_port};
-                    //wr_data <= {1'b0, 15'b0, len, 8'b0, 8'b0, 8'b0, 8'b0};
                     wr_addr <= committed_prod;
 
-                    committed_prod <= ax_wr_addr;            // commit the packet
+                    if (CONFIG_TIMESTAMP) begin
+                        nxt_committed_prod <= ax_wr_addr;
+                        ax_wr_addr <= ax_wr_addr +1;
+                        ax_ts_wr_addr <= committed_prod +1;
+                        rx_fsm <= s7;
+                    end
+                    else begin
+                        committed_prod <= ax_wr_addr;            // commit the packet
+                        ax_wr_addr <= ax_wr_addr +1;
+                        s_axis_tready <= 1'b1;
+                        rx_fsm <= s4;
+                    end
+                end
+
+                s7 : begin
+                    activity <= 1'b1;
+                    committed_prod <= nxt_committed_prod;        // commit the packet
+                    wr_data <= timestamp;
+                    wr_addr <= ax_ts_wr_addr;
                     ax_wr_addr <= ax_wr_addr +1;
-                    ax_ts_wr_addr <= committed_prod +1;
                     s_axis_tready <= 1'b1;
                     rx_fsm <= s4;
                 end
-
-                //s5 : begin
-                //    wr_data <= timestamp;
-                //    wr_addr <= ax_ts_wr_addr;
-                //    ax_wr_addr <= ax_wr_addr +1;
-                //    s_axis_tready <= 1'b1;
-                //    rx_fsm <= s2;
-                //end
 
                 s8 : begin
                     if (diff < MAX_DIFF) begin

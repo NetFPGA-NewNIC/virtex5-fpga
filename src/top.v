@@ -281,7 +281,11 @@ module top (
     //-------------------------------------------------------
     // NAAS_DMA
     //-------------------------------------------------------
-    naas_dma naas_dma_mod (
+    naas_dma #(
+        .CHN0_RX_CONFIG_TIMESTAMP(1),
+        .CONFIG_MDIO_IF(1),
+        .CONFIG_REGIF(1)
+    ) naas_dma_mod (
         // PCIe
         .sys_clk_p(sys_clk_p),                                 // I
         .sys_clk_n(sys_clk_n),                                 // I
