@@ -121,7 +121,12 @@ module bkd2ibuf # (
                 s0 : begin
                     committed_prod <= 'b0;
                     hst_rdy_reg0 <= 1'b0;
-                    ax_wr_addr <= 'h1;
+                    if (CONFIG_TIMESTAMP) begin
+                        ax_wr_addr <= 'h2;
+                    end
+                    else begin
+                        ax_wr_addr <= 'h1;
+                    end
                     rx_fsm <= s1;
                 end
 

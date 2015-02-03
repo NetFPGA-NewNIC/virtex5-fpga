@@ -3,7 +3,7 @@
 *  NetFPGA-10G http://www.netfpga.org
 *
 *  File:
-*        naas_dma.v
+*        naas_dma_v5.v
 *
 *  Project:
 *
@@ -43,7 +43,7 @@
 `timescale 1ns / 1ps
 //`default_nettype none
 
-module naas_dma # (
+module naas_dma_v5 # (
     parameter CHN0_RX_CONFIG_TIMESTAMP = 0,
     parameter CONFIG_MDIO_IF = 1,
     parameter CONFIG_REGIF = 0
@@ -563,7 +563,7 @@ module naas_dma # (
         assign regif_trn_tsrc_rdy_n = 1'b1;
     end endgenerate
 
-endmodule // naas_dma
+endmodule // naas_dma_v5
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////

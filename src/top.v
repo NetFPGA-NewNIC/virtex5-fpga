@@ -281,7 +281,7 @@ module top (
     //-------------------------------------------------------
     // NAAS_DMA
     //-------------------------------------------------------
-    naas_dma #(
+    naas_dma_v5 #(
         .CHN0_RX_CONFIG_TIMESTAMP(1),
         .CONFIG_MDIO_IF(1),
         .CONFIG_REGIF(1)
