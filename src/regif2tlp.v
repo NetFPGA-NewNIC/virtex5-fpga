@@ -76,21 +76,20 @@ module regif2tlp (
 
     `include "includes.v"
     // localparam
-    localparam s0 = 9'b000000000;
-    localparam s1 = 9'b000000001;
-    localparam s2 = 9'b000000010;
-    localparam s3 = 9'b000000100;
-    localparam s4 = 9'b000001000;
-    localparam s5 = 9'b000010000;
-    localparam s6 = 9'b000100000;
-    localparam s7 = 9'b001000000;
-    localparam s8 = 9'b010000000;
-    localparam s9 = 9'b100000000;
+    localparam s0 = 8'b00000000;
+    localparam s1 = 8'b00000001;
+    localparam s2 = 8'b00000010;
+    localparam s3 = 8'b00000100;
+    localparam s4 = 8'b00001000;
+    localparam s5 = 8'b00010000;
+    localparam s6 = 8'b00100000;
+    localparam s7 = 8'b01000000;
+    localparam s8 = 8'b10000000;
 
     //-------------------------------------------------------
     // Local send_fsm
     //-------------------------------------------------------   
-    reg          [8:0]       send_fsm;
+    reg          [7:0]       send_fsm;
     reg          [15:0]      cfg_completer_id_reg;
     reg          [63:0]      cpl_addr_reg;
     reg                      cpl_addr64b;
@@ -103,7 +102,7 @@ module regif2tlp (
     //-------------------------------------------------------
     // Local Output driver
     //-------------------------------------------------------
-    reg          [8:0]       odr_fsm;
+    reg          [7:0]       odr_fsm;
 
     ////////////////////////////////////////////////
     // Output driver. Keep high for 5 (250MHz) ticks (1 50MHz tick)
@@ -244,7 +243,7 @@ module regif2tlp (
                     if (!trn_tdst_rdy_n) begin
                         trn_td <= qw_endian_conv(resp_reg);
                         trn_teof_n <= 1'b0;
-                        send_fsm <= s9;
+                        send_fsm <= s8;
                     end
                 end
 
@@ -257,15 +256,15 @@ module regif2tlp (
                     end
                 end
 
-                s8 : begin
+                s7 : begin
                     if (!trn_tdst_rdy_n) begin
                         trn_td[63:32] <= dw_endian_conv(resp_reg[63:32]);
                         trn_teof_n <= 1'b0;
-                        send_fsm <= s9;
+                        send_fsm <= s8;
                     end
                 end
 
-                s9 : begin
+                s8 : begin
                     wait_cnt <= 'b0;
                     if (!trn_tdst_rdy_n) begin
                         trn_tsrc_rdy_n <= 1'b1;
