@@ -104,11 +104,9 @@ module chn_arb (
                             chn0_trn <= 1'b1;
                         end
                         turn_bit <= ~turn_bit;
-                        chn_arb_fsm <= s2;
+                        chn_arb_fsm <= s0;
                     end
                 end
-
-                s2 : chn_arb_fsm <= s1;
 
                 default : begin 
                     chn_arb_fsm <= s0;
